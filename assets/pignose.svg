@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <!-- Пятачок SoundBimba: водяной знак рабочего поля. Цвет берётся из темы через currentColor. -->
+  <ellipse cx="200" cy="150" rx="170" ry="125" fill="currentColor"/>
+  <ellipse cx="145" cy="150" rx="26" ry="48" fill="#000" fill-opacity=".85"/>
+  <ellipse cx="255" cy="150" rx="26" ry="48" fill="#000" fill-opacity=".85"/>
+</svg>
