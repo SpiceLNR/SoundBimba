@@ -11,6 +11,9 @@ Keep this list up to date: every dependency and bundled resource must appear her
 | React Flow (xyflow) | Node map | MIT | https://github.com/xyflow/xyflow |
 | Microsoft Edge WebView2 Runtime | UI engine (offline installer bundled in installer) | Microsoft redistributable terms | https://developer.microsoft.com/microsoft-edge/webview2 |
 | Selawik (planned, theme "Metro") | Font | SIL OFL 1.1 | verify before bundling |
+| windows-rs: `windows`, `windows-core` and their sub-crates (`windows-link`, `-result`, `-strings`, `-implement`, `-interface`, `-collections`, `-future`, `-numerics`, `-threading`) | Windows API bindings (tools/probe) | MIT or Apache-2.0 | https://github.com/microsoft/windows-rs |
+| `proc-macro2`, `quote`, `syn` | Build-time only (macros of windows-rs), not in the binary | MIT or Apache-2.0 | https://github.com/dtolnay |
+| `unicode-ident` | Build-time only (used by `syn`), not in the binary | (MIT or Apache-2.0) and Unicode-3.0 (permissive, OSI-approved) | https://github.com/dtolnay/unicode-ident |
 
 Before release, generate a complete list from Cargo.lock and package-lock.json and verify each
 license is compatible (MIT, Apache-2.0, BSD, MPL-2.0, zlib, ISC, OFL).
