@@ -67,6 +67,67 @@ describe('graph', () => {
     expect(x('n2')).toBeLessThan(x('n4'));
   });
 
+  it('puts unconnected nodes into columns by type, below the connected part', () => {
+    const { nodes, edges } = toFlow(project);
+    const extra = [newNode('mic-input', 'm2', 900, 900), newNode('volume', 'v2', -50, 400), newNode('speaker-out', 's2', 0, 0)];
+    const laid = arrange([...nodes, ...extra], edges);
+    const at = (id: string) => laid.find((n) => n.id === id)!.position;
+    // Не в один ряд: источник левее обработки, обработка левее выхода.
+    expect(at('m2').x).toBeLessThan(at('v2').x);
+    expect(at('v2').x).toBeLessThan(at('s2').x);
+    // Те же столбцы, что у соединённых узлов того же типа.
+    expect(at('m2').x).toBe(at('n1').x);
+    expect(at('v2').x).toBe(at('n3').x);
+    expect(at('s2').x).toBe(at('n4').x);
+    // И ниже соединённой схемы.
+    const bottom = Math.max(...['n1', 'n2', 'n3', 'n4'].map((id) => at(id).y));
+    for (const id of ['m2', 'v2', 's2']) expect(at(id).y).toBeGreaterThan(bottom);
+  });
+
+  it('only unconnected nodes still form type columns', () => {
+    const nodes = [newNode('speaker-out', 'a', 0, 0), newNode('app-source', 'b', 0, 0), newNode('volume', 'c', 0, 0), newNode('mic-input', 'd', 0, 0)];
+    const laid = arrange(nodes, []);
+    const at = (id: string) => laid.find((n) => n.id === id)!.position;
+    expect(at('b').x).toBe(at('d').x);
+    expect(at('b').x).toBeLessThan(at('c').x);
+    expect(at('c').x).toBeLessThan(at('a').x);
+    expect(at('b').y).not.toBe(at('d').y);
+  });
+
+  it('a chain of processing nodes steps to the right, outputs stay last', () => {
+    const nodes = [
+      newNode('app-source', 's', 0, 0),
+      newNode('volume', 'v1', 0, 0),
+      newNode('volume', 'v2', 0, 0),
+      newNode('virtual-out', 'o', 0, 0),
+      newNode('speaker-out', 'h', 0, 0),
+    ];
+    const edges = [
+      { id: 's->v1', source: 's', target: 'v1' },
+      { id: 'v1->v2', source: 'v1', target: 'v2' },
+      { id: 'v2->o', source: 'v2', target: 'o' },
+      { id: 's->h', source: 's', target: 'h' },
+    ];
+    const laid = arrange(nodes, edges);
+    const x = (id: string) => laid.find((n) => n.id === id)!.position.x;
+    expect(x('s')).toBeLessThan(x('v1'));
+    expect(x('v1')).toBeLessThan(x('v2'));
+    expect(x('v2')).toBeLessThan(x('o'));
+    expect(x('h')).toBe(x('o'));
+  });
+
+  it('orders a column so wires do not cross', () => {
+    // a → B, b → A: выходы встают в том же порядке, что их источники.
+    const nodes = [newNode('app-source', 'a', 0, 0), newNode('mic-input', 'b', 0, 100), newNode('speaker-out', 'A', 0, 0), newNode('virtual-out', 'B', 0, 100)];
+    const edges = [
+      { id: 'a->B', source: 'a', target: 'B' },
+      { id: 'b->A', source: 'b', target: 'A' },
+    ];
+    const laid = arrange(nodes, edges);
+    const y = (id: string) => laid.find((n) => n.id === id)!.position.y;
+    expect(y('a') < y('b')).toBe(y('B') < y('A'));
+  });
+
   it('writes short node subtitles', () => {
     const t = (k: string) => translate('ru', k);
     expect(summary('volume', { gain: 1.5, mute: true }, t)).toBe('150 % · звук выключен');

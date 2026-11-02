@@ -11,7 +11,6 @@ Keep this list up to date: every dependency and bundled resource must appear her
 | React Flow (xyflow) | Node map | MIT | https://github.com/xyflow/xyflow |
 | Microsoft Edge WebView2 Runtime | UI engine (offline installer bundled in installer) | Microsoft redistributable terms | https://developer.microsoft.com/microsoft-edge/webview2 |
 | Tauri dialog plugin (`tauri-plugin-dialog`, `@tauri-apps/plugin-dialog`) | File dialogs for export, import, diagnostics | MIT or Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
-| dagre (`@dagrejs/dagre`) | Automatic map layout ("Arrange") | MIT | https://github.com/dagrejs/dagre |
 | serde, serde_json | Project file (de)serialization | MIT or Apache-2.0 | https://github.com/serde-rs |
 | Nunito font (via Fontsource) | Theme "Bimba" font, bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/nunito , https://fontsource.org |
 | Open Sans font (via Fontsource) | Theme "Metro" font (free alternative to Segoe UI), bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/opensans , https://fontsource.org |

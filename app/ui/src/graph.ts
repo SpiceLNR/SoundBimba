@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Модель карты на стороне интерфейса: та же схема, что в crates/graph (Rust проверяет её при сохранении).
-import dagre from '@dagrejs/dagre';
 import type { Edge, Node } from '@xyflow/react';
 import type { Translate } from './i18n';
 
@@ -131,18 +130,94 @@ export function newNode(kind: NodeKind, id: string, x: number, y: number): Sound
   return { id, type: 'sound', position: { x, y }, data: { kind, params: { ...KINDS[kind].defaults } } };
 }
 
-/** Автораскладка слева направо: источники → обработка → выходы. */
+const COLUMN_STEP = NODE_WIDTH + 100;
+const ROW_STEP = NODE_HEIGHT + 46;
+const LOOSE_GAP = 70;
+
+/**
+ * Автораскладка «Упорядочить» — столбцами слева направо:
+ *  - первый столбец — источники и кнопки, последний — выходы, между ними — обработка
+ *    (громкость после громкости уходит на столбец правее);
+ *  - внутри столбца узлы стоят так, чтобы провода меньше пересекались;
+ *  - узлы без проводов не сбиваются в одну линию: каждый встаёт в столбец своего типа,
+ *    ниже соединённой схемы — как «ещё не подключённые».
+ */
 export function arrange(nodes: SoundNode[], edges: Edge[]): SoundNode[] {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 90, marginx: 20, marginy: 20 });
-  g.setDefaultEdgeLabel(() => ({}));
-  for (const n of nodes) g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-  for (const e of edges) g.setEdge(e.source, e.target);
-  dagre.layout(g);
-  return nodes.map((n) => {
-    const p = g.node(n.id);
-    return { ...n, position: { x: round(p.x - NODE_WIDTH / 2), y: round(p.y - NODE_HEIGHT / 2) } };
+  const ids = new Set(nodes.map((n) => n.id));
+  const links = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+  const preds = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
+  const succs = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
+  for (const e of links) {
+    preds.get(e.target)!.push(e.source);
+    succs.get(e.source)!.push(e.target);
+  }
+  const kindOf = new Map(nodes.map((n) => [n.id, n.data.kind]));
+  const cat = (id: string) => KINDS[kindOf.get(id)!].category;
+
+  // Столбец обработки = 1 + самый дальний столбец среди тех, кто подаёт в него звук.
+  const procRank = new Map<string, number>();
+  const rankOf = (id: string, seen = new Set<string>()): number => {
+    if (cat(id) === 'source' || cat(id) === 'button') return 0;
+    const known = procRank.get(id);
+    if (known !== undefined) return known;
+    if (seen.has(id)) return 1; // циклов быть не должно; защита от зависания
+    seen.add(id);
+    const r = 1 + Math.max(0, ...preds.get(id)!.map((p) => (cat(p) === 'output' ? 0 : rankOf(p, seen))));
+    procRank.set(id, r);
+    return r;
+  };
+  const processing = nodes.filter((n) => cat(n.id) === 'processing');
+  const maxProc = Math.max(0, ...processing.map((n) => rankOf(n.id)));
+  const last = processing.length > 0 ? Math.max(maxProc, 1) + 1 : 1;
+  const column = (id: string) => (cat(id) === 'output' ? last : rankOf(id));
+
+  const isLinked = (id: string) => preds.get(id)!.length > 0 || succs.get(id)!.length > 0;
+  const byY = (a: SoundNode, b: SoundNode) => a.position.y - b.position.y || a.id.localeCompare(b.id);
+  const linked = nodes.filter((n) => isLinked(n.id)).sort(byY);
+  const loose = nodes.filter((n) => !isLinked(n.id)).sort(byY);
+
+  // Соединённая часть: по столбцам, затем порядок внутри них по «центру тяжести» соседей.
+  const cols: string[][] = Array.from({ length: last + 1 }, () => []);
+  for (const n of linked) cols[column(n.id)].push(n.id);
+  const index = new Map<string, number>();
+  const reindex = () => cols.forEach((c) => c.forEach((id, i) => index.set(id, i)));
+  reindex();
+  const sortBy = (col: string[], neighbours: Map<string, string[]>) => {
+    const centre = (id: string) => {
+      const ns = neighbours.get(id)!.filter((x) => index.has(x));
+      return ns.length ? ns.reduce((sum, x) => sum + index.get(x)!, 0) / ns.length : index.get(id)!;
+    };
+    const keyed = col.map((id) => ({ id, key: centre(id) }));
+    keyed.sort((a, b) => a.key - b.key || index.get(a.id)! - index.get(b.id)!);
+    col.splice(0, col.length, ...keyed.map((k) => k.id));
+  };
+  for (let pass = 0; pass < 4; pass++) {
+    for (let c = 1; c <= last; c++) {
+      sortBy(cols[c], preds);
+      reindex();
+    }
+    for (let c = last - 1; c >= 0; c--) {
+      sortBy(cols[c], succs);
+      reindex();
+    }
+  }
+
+  const pos = new Map<string, { x: number; y: number }>();
+  const tallest = Math.max(0, ...cols.map((c) => c.length));
+  cols.forEach((col, c) => {
+    const top = ((tallest - col.length) * ROW_STEP) / 2; // столбцы выровнены по центру
+    col.forEach((id, i) => pos.set(id, { x: c * COLUMN_STEP, y: top + i * ROW_STEP }));
   });
+
+  // Неподключённые — ниже схемы, каждый в столбце своего типа.
+  const looseTop = tallest > 0 ? tallest * ROW_STEP + LOOSE_GAP : 0;
+  const looseCount = new Array<number>(last + 1).fill(0);
+  for (const n of loose) {
+    const c = column(n.id);
+    pos.set(n.id, { x: c * COLUMN_STEP, y: looseTop + looseCount[c]++ * ROW_STEP });
+  }
+
+  return nodes.map((n) => ({ ...n, position: pos.get(n.id)! }));
 }
 
 /** Короткая подпись под названием узла: что выбрано. */
