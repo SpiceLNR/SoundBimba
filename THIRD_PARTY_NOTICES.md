@@ -5,7 +5,7 @@ Keep this list up to date: every dependency and bundled resource must appear her
 
 | Component | Use | License | Source |
 |---|---|---|---|
-| Virtual Audio Driver (MikeTheTech / VirtualDrivers) | Virtual speaker and microphone, installed alongside, not modified | MIT | https://github.com/VirtualDrivers/Virtual-Audio-Driver |
+| VB-CABLE (VB-Audio) — **not bundled** | Recommended virtual cable; the user installs it from the official site, SoundBimba only detects its devices by name | Donationware, proprietary (not distributed by us) | https://vb-audio.com/Cable/ |
 | Tauri | Application shell | MIT or Apache-2.0 | https://github.com/tauri-apps/tauri |
 | React | UI | MIT | https://github.com/facebook/react |
 | React Flow (xyflow) | Node map | MIT | https://github.com/xyflow/xyflow |

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Шаги 3, 4, 8: аудио-устройства, их форматы и периоды, поиск виртуального драйвера.
+//! Шаги 3, 4, 8: аудио-устройства, их форматы и периоды, поиск виртуальных кабелей.
 
 use windows::core::{Result, PWSTR};
 use windows::Win32::Devices::FunctionDiscovery::{
@@ -17,8 +17,50 @@ use crate::format::Fmt;
 use crate::report::Report;
 use crate::rep;
 
-/// Названия драйвера VirtualDrivers/Virtual-Audio-Driver (ищем без учёта регистра).
-const DRIVER_NAMES: [&str; 2] = ["virtual audio driver", "virtual mic driver"];
+/// Известный виртуальный кабель: ищем по части названия устройства или адаптера.
+pub struct CableKind {
+    pub label: &'static str,
+    patterns: &'static [&'static str],
+    pub note: Option<&'static str>,
+}
+
+/// Список расширяемый. Сравнение без учёта регистра.
+pub const CABLES: &[CableKind] = &[
+    CableKind { label: "VB-CABLE", patterns: &["vb-audio virtual cable"], note: None },
+    CableKind { label: "VB-CABLE A", patterns: &["vb-audio cable a"], note: None },
+    CableKind { label: "VB-CABLE B", patterns: &["vb-audio cable b"], note: None },
+    CableKind { label: "VB-CABLE C", patterns: &["vb-audio cable c"], note: None },
+    CableKind { label: "VB-CABLE D", patterns: &["vb-audio cable d"], note: None },
+    CableKind {
+        label: "Virtual Audio Driver (MTT)",
+        patterns: &["virtual audio driver", "virtual mic driver"],
+        note: Some("от него отказались: микрофон выдаёт тестовый тон, а не звук динамика"),
+    },
+];
+
+/// Найденный кабель: его «динамик» (куда пишем) и «микрофон» (откуда читают другие программы).
+pub struct Cable<'a> {
+    pub kind: &'static CableKind,
+    pub speaker: Option<&'a Device>,
+    pub mic: Option<&'a Device>,
+}
+
+fn cable_of(name: &str, adapter: &str) -> Option<&'static CableKind> {
+    let text = format!("{name} {adapter}").to_lowercase();
+    CABLES.iter().find(|k| k.patterns.iter().any(|p| text.contains(p)))
+}
+
+pub fn find_cables(devs: &[Device]) -> Vec<Cable<'_>> {
+    CABLES
+        .iter()
+        .map(|kind| Cable {
+            kind,
+            speaker: devs.iter().find(|d| d.render && d.cable().is_some_and(|k| std::ptr::eq(k, kind))),
+            mic: devs.iter().find(|d| !d.render && d.cable().is_some_and(|k| std::ptr::eq(k, kind))),
+        })
+        .filter(|c| c.speaker.is_some() || c.mic.is_some())
+        .collect()
+}
 
 pub struct Device {
     pub dev: IMMDevice,
@@ -36,9 +78,8 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn is_driver(&self) -> bool {
-        let text = format!("{} {}", self.name, self.adapter).to_lowercase();
-        DRIVER_NAMES.iter().any(|n| text.contains(n))
+    pub fn cable(&self) -> Option<&'static CableKind> {
+        cable_of(&self.name, &self.adapter)
     }
 }
 
@@ -138,10 +179,10 @@ fn frames_ms(frames: u32, rate: u32) -> String {
 fn print_device(r: &mut Report, d: &Device) {
     let mut marks = Vec::new();
     if d.is_default {
-        marks.push("ПО УМОЛЧАНИЮ");
+        marks.push("ПО УМОЛЧАНИЮ".to_string());
     }
-    if d.is_driver() {
-        marks.push("ДРАЙВЕР SoundBimba");
+    if let Some(k) = d.cable() {
+        marks.push(format!("ВИРТУАЛЬНЫЙ КАБЕЛЬ {}", k.label));
     }
     let marks = if marks.is_empty() { String::new() } else { format!("  [{}]", marks.join(", ")) };
     rep!(r, "  • {}{marks}", d.name);
@@ -177,23 +218,31 @@ pub fn report_devices(r: &mut Report, devs: &[Device]) {
     devs.iter().filter(|d| !d.render).for_each(|d| print_device(r, d));
 }
 
-pub fn report_driver(r: &mut Report, devs: &[Device]) {
-    r.section("4. Виртуальный драйвер (Virtual Audio Driver)");
-    let spk: Vec<_> = devs.iter().filter(|d| d.render && d.is_driver()).collect();
-    let mic: Vec<_> = devs.iter().filter(|d| !d.render && d.is_driver()).collect();
-    for (label, list) in [("Виртуальный динамик", &spk), ("Виртуальный микрофон", &mic)] {
-        if list.is_empty() {
-            rep!(r, "  {label}: НЕ НАЙДЕН");
-        }
-        for d in list {
-            let f = d.fmt.map(|f| f.describe()).unwrap_or_else(|| "формат неизвестен".into());
-            rep!(r, "  {label}: {} — {f}", d.name);
-        }
+pub fn report_cables(r: &mut Report, cables: &[Cable]) {
+    r.section("4. Виртуальный кабель");
+    if cables.is_empty() {
+        rep!(r, "  ИТОГ: виртуальный кабель НЕ найден. Рекомендуем VB-CABLE: https://vb-audio.com/Cable/");
+        return;
     }
-    match (spk.is_empty(), mic.is_empty()) {
-        (false, false) => rep!(r, "  ИТОГ: драйвер найден (оба устройства)"),
-        (true, true) => rep!(r, "  ИТОГ: драйвер НЕ установлен"),
-        _ => rep!(r, "  ИТОГ: найдено только одно из двух устройств — драйвер установлен не полностью?"),
+    let describe = |d: Option<&Device>| match d {
+        Some(d) => {
+            let f = d.fmt.map(|f| f.describe()).unwrap_or_else(|| "формат неизвестен".into());
+            format!("{} — {f}", d.name)
+        }
+        None => "НЕ НАЙДЕН".into(),
+    };
+    for c in cables {
+        rep!(r, "  {}:", c.kind.label);
+        rep!(r, "    динамик (сюда пишет SoundBimba): {}", describe(c.speaker));
+        rep!(r, "    микрофон (его выбирают в Discord/OBS): {}", describe(c.mic));
+        if let Some(note) = c.kind.note {
+            rep!(r, "    примечание: {note}");
+        }
+        if c.speaker.is_none() || c.mic.is_none() {
+            rep!(r, "    ИТОГ: найдено только одно из двух устройств — кабель установлен не полностью?");
+        } else {
+            rep!(r, "    ИТОГ: кабель найден (оба устройства)");
+        }
     }
 }
 
@@ -208,5 +257,19 @@ pub fn report_latency(r: &mut Report, devs: &[Device]) {
             _ => "недоступно".into(),
         };
         rep!(r, "  {kind} «{}»: shared {shared}; shared-lowlatency (минимум IAudioClient3) {low}", d.name);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cable_of;
+
+    #[test]
+    fn recognizes_cables() {
+        let label = |n, a| cable_of(n, a).map(|k| k.label);
+        assert_eq!(label("CABLE Input (VB-Audio Virtual Cable)", "VB-Audio Virtual Cable"), Some("VB-CABLE"));
+        assert_eq!(label("CABLE-A Output (VB-Audio Cable A)", "VB-Audio Cable A"), Some("VB-CABLE A"));
+        assert_eq!(label("Speakers (Virtual Desktop Audio)", "Virtual Desktop Audio"), None);
+        assert_eq!(label("Speakers (Realtek(R) Audio)", "Realtek(R) Audio"), None);
     }
 }

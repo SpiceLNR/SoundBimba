@@ -187,19 +187,43 @@ pub struct Analysis {
     pub latency_ms: Option<f64>,
 }
 
-/// Ищет начало тона, частоту (по переходам через ноль) и задержку.
+/// Ищет наш тон 440 Гц (а не любой звук), его начало, частоту и задержку.
 pub fn analyze(r: &LoopResult) -> Analysis {
     analyze_parts(&r.mono, r.mic_fmt.rate, &r.stamps, r.render.onset_qpc)
 }
 
+/// Амплитуда частоты `freq` в блоке (алгоритм Гёрцеля).
+fn tone_amplitude(block: &[f32], freq: f32, rate: u32) -> f32 {
+    let coeff = 2.0 * (TAU * freq / rate as f32).cos();
+    let (mut s1, mut s2) = (0.0f32, 0.0f32);
+    for &x in block {
+        let s0 = x + coeff * s1 - s2;
+        s2 = s1;
+        s1 = s0;
+    }
+    let power = (s1 * s1 + s2 * s2 - coeff * s1 * s2).max(0.0);
+    2.0 * power.sqrt() / block.len().max(1) as f32
+}
+
 fn analyze_parts(mono: &[f32], rate: u32, stamps: &[(usize, i64)], onset_qpc: Option<i64>) -> Analysis {
     let peak = mono.iter().fold(0.0f32, |m, s| m.max(s.abs()));
-    let reached = peak > 0.01;
-    let mut a = Analysis { peak, reached, freq: None, latency_ms: None };
-    if !reached {
+    let mut a = Analysis { peak, reached: false, freq: None, latency_ms: None };
+    // Блоки по 20 мс: в каком из них сильнее всего 440 Гц и насколько это «чистый» тон.
+    let len = (rate as usize / 50).max(1);
+    let amps: Vec<f32> = mono.chunks(len).map(|b| tone_amplitude(b, FREQ, rate)).collect();
+    let Some((best, &max_amp)) = amps.iter().enumerate().max_by(|x, y| x.1.total_cmp(y.1)) else {
+        return a;
+    };
+    let block = &mono[best * len..mono.len().min((best + 1) * len)];
+    let rms = (block.iter().map(|x| x * x).sum::<f32>() / block.len() as f32).sqrt();
+    let purity = max_amp / (rms * std::f32::consts::SQRT_2).max(1e-9);
+    a.reached = max_amp > 0.005 && purity > 0.6;
+    if !a.reached {
         return a;
     }
-    let Some(onset) = mono.iter().position(|s| s.abs() > peak * 0.25) else {
+    let first = amps.iter().position(|&x| x > max_amp * 0.5).unwrap_or(best);
+    let from = first.saturating_sub(1) * len;
+    let Some(onset) = mono[from..].iter().position(|s| s.abs() > max_amp * 0.25).map(|i| from + i) else {
         return a;
     };
     let win = &mono[onset..mono.len().min(onset + rate as usize)];
@@ -231,6 +255,37 @@ mod tests {
         assert!(a.reached);
         assert!((a.freq.unwrap() - 440.0).abs() < 5.0);
         // Тон в записи на 0.1 с, сыгран на 0.08 с → задержка ≈ 20 мс.
+        assert!((a.latency_ms.unwrap() - 20.0).abs() < 1.0);
+    }
+
+    /// Простой детерминированный шум от −amp до amp.
+    fn noise(n: usize, amp: f32) -> Vec<f32> {
+        let mut x = 12345u32;
+        (0..n)
+            .map(|_| {
+                x = x.wrapping_mul(1_103_515_245).wrapping_add(12345);
+                ((x >> 8) as f32 / (1u32 << 24) as f32 * 2.0 - 1.0) * amp
+            })
+            .collect()
+    }
+
+    #[test]
+    fn noise_is_not_a_tone() {
+        let a = analyze_parts(&noise(48000, 0.03), 48000, &[(0, 1)], Some(1));
+        assert!(!a.reached);
+        assert!(a.peak > 0.01);
+    }
+
+    #[test]
+    fn finds_tone_over_noise() {
+        let rate = 48000;
+        let mut mono = noise(rate as usize, 0.01);
+        for (i, x) in mono.iter_mut().enumerate().skip(4800) {
+            *x += 0.3 * ((i - 4800) as f32 * TAU * 440.0 / rate as f32).sin();
+        }
+        let a = analyze_parts(&mono, rate, &[(0, 1_000_000)], Some(1_000_000 + 800_000));
+        assert!(a.reached);
+        assert!((a.freq.unwrap() - 440.0).abs() < 10.0);
         assert!((a.latency_ms.unwrap() - 20.0).abs() < 1.0);
     }
 

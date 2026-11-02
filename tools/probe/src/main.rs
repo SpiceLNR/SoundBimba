@@ -29,7 +29,7 @@ probe.exe — проверка звука для SoundBimba (этап 0)
   --pid <номер>     записать звук процесса с этим PID
   --exe <имя.exe>   записать звук программы по имени файла (например, chrome.exe)
   --seconds <N>     длительность записи, 1–60 секунд (по умолчанию 10)
-  --loop-test       только проверка связки «виртуальный динамик → виртуальный микрофон»
+  --loop-test       только проверка виртуального кабеля (динамик → микрофон)
   --no-pause        не ждать Enter в конце
 ";
 
@@ -132,13 +132,19 @@ fn run_capture(r: &mut Report, pid: u32, seconds: u32) {
 }
 
 fn run_loop_test(r: &mut Report, devs: &[Device]) {
-    r.section("7. Проверка связки «виртуальный динамик → виртуальный микрофон»");
-    let spk = devs.iter().find(|d| d.render && d.is_driver());
-    let mic = devs.iter().find(|d| !d.render && d.is_driver());
-    let (Some(spk), Some(mic)) = (spk, mic) else {
-        rep!(r, "  Пропущено: драйвер не найден (нужны оба устройства).");
-        return;
-    };
+    r.section("7. Проверка связки «динамик кабеля → микрофон кабеля»");
+    let cables = devices::find_cables(devs);
+    let full: Vec<_> = cables.iter().filter_map(|c| Some((c.kind, c.speaker?, c.mic?))).collect();
+    if full.is_empty() {
+        rep!(r, "  Пропущено: виртуальный кабель не найден (нужны оба устройства).");
+    }
+    for (kind, spk, mic) in full {
+        loop_test_one(r, kind.label, spk, mic);
+    }
+}
+
+fn loop_test_one(r: &mut Report, label: &str, spk: &Device, mic: &Device) {
+    rep!(r, "  Кабель: {label}");
     rep!(r, "  Динамик: {}", spk.name);
     rep!(r, "  Микрофон: {}", mic.name);
     rep!(r, "  Играю тон {} Гц {} с и записываю с микрофона…", looptest::FREQ, looptest::TONE);
@@ -160,10 +166,13 @@ fn run_loop_test(r: &mut Report, devs: &[Device]) {
                     Some(ms) => rep!(r, "  Задержка «динамик → микрофон»: ≈ {ms:.1} мс"),
                     None => rep!(r, "  Задержку измерить не удалось (нет отметок времени)."),
                 }
+            } else if a.peak > 0.01 {
+                rep!(r, "  ИТОГ: тон НЕ дошёл — на микрофоне есть звук, но это не наш тон {} Гц.", looptest::FREQ);
             } else {
                 rep!(r, "  ИТОГ: тон НЕ дошёл — на микрофоне тишина.");
             }
-            let path = out_dir().join("loop-test.wav");
+            let file: String = label.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+            let path = out_dir().join(format!("loop-test-{file}.wav"));
             match wav::write_f32(&path, res.mic_fmt.rate, res.mic_fmt.channels, &res.all) {
                 Ok(()) => rep!(r, "  Запись с микрофона: {}", path.display()),
                 Err(e) => rep!(r, "  Не удалось сохранить WAV: {e}"),
@@ -203,14 +212,14 @@ fn main() {
         }
     } else if args.loop_test {
         let devs = load_devices(&mut r);
-        devices::report_driver(&mut r, &devs);
+        devices::report_cables(&mut r, &devices::find_cables(&devs));
         run_loop_test(&mut r, &devs);
     } else {
         sysinfo::system(&mut r);
         sysinfo::webview2(&mut r);
         let devs = load_devices(&mut r);
         devices::report_devices(&mut r, &devs);
-        devices::report_driver(&mut r, &devs);
+        devices::report_cables(&mut r, &devices::find_cables(&devs));
         let (sess, errors) = sessions::list(&devs);
         sessions::report(&mut r, &sess, &errors);
         devices::report_latency(&mut r, &devs);
@@ -231,7 +240,7 @@ fn main() {
                 }
             }
         }
-        if devs.iter().any(|d| d.is_driver()) {
+        if devices::find_cables(&devs).iter().any(|c| c.speaker.is_some() && c.mic.is_some()) {
             let answer = ask("Проверить виртуальный микрофон? Enter — да, 0 и Enter — пропустить:");
             if answer.is_some_and(|a| a != "0") {
                 run_loop_test(&mut r, &devs);
