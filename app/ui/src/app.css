@@ -165,6 +165,7 @@ input[type='range']:focus-visible {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dropdown-caret {
@@ -585,4 +586,96 @@ button.primary {
 button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Кнопка «Звук включён / выключен». */
+.sound-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sound-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.sound-toggle.on {
+  border-color: var(--accent);
+}
+
+.sound-toggle.on .sound-dot {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+/* Узлы при выключенном звуке чуть приглушены. */
+.sound-node.sound-off {
+  opacity: 0.85;
+}
+
+.sound-node-sub.problem,
+.problem-text {
+  color: var(--danger);
+}
+
+.problem-text {
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* Индикатор уровня на узле. */
+.meter {
+  height: 4px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  background: var(--cat);
+  transition: width 60ms linear;
+}
+
+.meter-fill.clip {
+  background: var(--danger);
+}
+
+/* Выпадающие списки в боковой панели — во всю ширину. */
+.panel-dropdown {
+  width: 100%;
+}
+
+.link-button {
+  align-self: flex-start;
+  padding: 2px 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  background: transparent;
+  color: var(--accent);
+}
+
+/* Узкое окно: «Сохранено» — только точкой с подсказкой, чтобы панель оставалась в одну строку. */
+@media (max-width: 1000px) {
+  .save-state {
+    font-size: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+
+  .save-state.save-error {
+    background: var(--danger);
+  }
 }

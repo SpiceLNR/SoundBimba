@@ -63,6 +63,9 @@
 - Тесты: `cargo test --workspace` и `npm test` (в `app`); стиль: `cargo clippy --workspace --all-targets`,
   типы: `npx tsc --noEmit` (в `app`).
 - Лицензии: `node tools/licenses/check-cargo.mjs` (из корня) и `npm run licenses` (в `app`).
+- Проверки на железе (нужен VB-CABLE, звука в колонках нет): `cargo test -p winaudio --test
+  cable_loop -- --ignored --nocapture` (тон через кабель 20 с), `--test cable_latency` (задержка),
+  `--test cable_listen` (что сейчас приходит на «микрофон» кабеля).
 - Проба: `cargo build --release -p probe` → `target\release\probe.exe` (`--help`; без окна: `--no-pause`).
 - Данные приложения: `%APPDATA%\SoundBimba\` — `project.json`, `settings.json`, `logs\soundbimba.log`.
 

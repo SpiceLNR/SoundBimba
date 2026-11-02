@@ -9,7 +9,7 @@ use std::fs;
 use crate::storage::Paths;
 use crate::zip;
 
-pub fn report(paths: &Paths, ui_info: &str) -> String {
+pub fn report(paths: &Paths, ui_info: &str, audio: &str) -> String {
     let mut r = String::new();
     let now = winaudio::system::local_time();
     let _ = writeln!(r, "SoundBimba diagnostics");
@@ -56,11 +56,12 @@ pub fn report(paths: &Paths, ui_info: &str) -> String {
             let _ = writeln!(r, "  error: {} (0x{:08X})", e.message().trim(), e.code().0 as u32);
         }
     }
+    let _ = writeln!(r, "\naudio engine:\n{audio}");
     r
 }
 
-pub fn save(paths: &Paths, target: &str, ui_info: &str) -> std::io::Result<()> {
-    let mut files = vec![("report.txt".to_string(), report(paths, ui_info).into_bytes())];
+pub fn save(paths: &Paths, target: &str, ui_info: &str, audio: &str) -> std::io::Result<()> {
+    let mut files = vec![("report.txt".to_string(), report(paths, ui_info, audio).into_bytes())];
     let old_log = paths.log.with_extension("log.old");
     for (name, path) in [
         ("project.json", &paths.project),

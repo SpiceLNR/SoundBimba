@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "engine"
+version = "0.1.0"
+description = "SoundBimba audio engine: compiled graph, mixing, volume, drift-compensating ring buffers. No OS code, no UI."
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+graph = { path = "../graph" }
+rtrb = "0.4"
+
+[dev-dependencies]
+serde_json = "1"

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { ReactFlowProvider } from '@xyflow/react';
 import { useCallback, useEffect, useState } from 'react';
-import { api, isCmdError, type LoadState, type Settings } from './api';
+import { api, isCmdError, onAudioState, type AudioState, type LoadState, type Settings } from './api';
+import { AudioContext, EMPTY_AUDIO } from './audio';
 import Notices, { type Notice, type Notify } from './components/Notices';
 import Workspace from './components/Workspace';
 import { I18nContext, isLang, systemLanguage, translate, type Translate } from './i18n';
@@ -14,6 +15,7 @@ export default function App() {
   const [failed, setFailed] = useState(false);
   const [settings, setSettings] = useState<Settings>({ language: null, theme: DEFAULT_THEME });
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [audio, setAudio] = useState<AudioState>(EMPTY_AUDIO);
 
   const lang = isLang(settings.language) ? settings.language : systemLanguage();
   const t = useCallback<Translate>((key, vars) => translate(lang, key, vars), [lang]);
@@ -28,6 +30,8 @@ export default function App() {
   }, [lang]);
 
   useEffect(() => applyTheme(settings.theme), [settings.theme]);
+
+  useEffect(() => onAudioState(setAudio), []);
 
   useEffect(() => {
     api
@@ -51,8 +55,15 @@ export default function App() {
     [lang, notify],
   );
 
+  const toggleAudio = useCallback(() => {
+    const next = { ...settings, audioEnabled: !settings.audioEnabled };
+    changeSettings(next);
+    void api.setAudioEnabled(Boolean(next.audioEnabled));
+  }, [settings, changeSettings]);
+
   return (
     <I18nContext.Provider value={t}>
+      <AudioContext.Provider value={audio}>
       {loaded ? (
         <ReactFlowProvider>
           <Workspace
@@ -61,6 +72,7 @@ export default function App() {
             settings={settings}
             lang={lang}
             onSettings={changeSettings}
+            onToggleAudio={toggleAudio}
             notify={notify}
           />
         </ReactFlowProvider>
@@ -68,6 +80,7 @@ export default function App() {
         <div className="loading">{failed ? t('reason.io') : t('app.title')}</div>
       )}
       <Notices items={notices} onClose={(id) => setNotices((list) => list.filter((n) => n.id !== id))} />
+      </AudioContext.Provider>
     </I18nContext.Provider>
   );
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Вызовы Rust-части приложения (команды Tauri). Сетевых запросов нет.
+// Вызовы Rust-части приложения (команды и события Tauri). Сетевых запросов нет.
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import type { Project } from './graph';
 
 export interface Settings {
@@ -8,6 +9,8 @@ export interface Settings {
   theme: string;
   /** Горячие клавиши: действие → сочетание («» — отключено). */
   hotkeys?: Record<string, string>;
+  /** Звук включён (запоминается). */
+  audioEnabled?: boolean;
 }
 
 export interface LoadState {
@@ -15,6 +18,35 @@ export interface LoadState {
   settings: Settings;
   recoveredFrom: string | null;
   version: string;
+}
+
+export interface AudioDevice {
+  id: string;
+  name: string;
+  render: boolean;
+  isDefault: boolean;
+  /** Название виртуального кабеля, если это он. */
+  cable: string | null;
+}
+
+export interface AudioApp {
+  exe: string;
+  active: boolean;
+}
+
+export interface Latency {
+  outputMs: number;
+  inputEstimateMs: number;
+}
+
+export type NodeStatus = 'ok' | 'off' | 'app-not-chosen' | 'app-not-running' | 'device-missing' | 'no-cable' | 'error';
+
+/** Состояние звука, приходит из Rust ~15 раз в секунду. */
+export interface AudioState {
+  enabled: boolean;
+  running: boolean;
+  status: Record<string, NodeStatus>;
+  levels: Record<string, number>;
 }
 
 /** Ошибка из Rust: code — ключ причины (reason.<code>), detail — подробность для журнала. */
@@ -46,13 +78,54 @@ const previewProject: Project = {
   ],
 };
 
+const previewDevices: AudioDevice[] = [
+  { id: 'spk', name: 'Speakers (Realtek(R) Audio)', render: true, isDefault: true, cable: null },
+  { id: 'cab', name: 'CABLE Input (VB-Audio Virtual Cable)', render: true, isDefault: false, cable: 'VB-CABLE' },
+  { id: 'mic', name: 'Microphone (USB Audio CODEC)', render: false, isDefault: true, cable: null },
+  { id: 'cabo', name: 'CABLE Output (VB-Audio Virtual Cable)', render: false, isDefault: false, cable: 'VB-CABLE' },
+];
+
+let previewEnabled = false;
+
 function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!browserPreview) return invoke<T>(cmd, args);
-  if (cmd === 'load_state') {
-    const state: LoadState = { project: previewProject, settings: { language: null, theme: 'bimba' }, recoveredFrom: null, version: 'dev' };
-    return Promise.resolve(state as T);
+  const answers: Record<string, unknown> = {
+    load_state: { project: previewProject, settings: { language: null, theme: 'bimba' }, recoveredFrom: null, version: 'dev' },
+    list_audio_devices: previewDevices,
+    measure_latency: { outputMs: 41.3, inputEstimateMs: 25 },
+    list_audio_apps: [
+      { exe: 'chrome.exe', active: true },
+      { exe: 'Discord.exe', active: false },
+    ],
+  };
+  if (cmd === 'set_audio_enabled') previewEnabled = Boolean(args?.enabled);
+  return Promise.resolve(answers[cmd] as T);
+}
+
+/** Подписка на состояние звука. Возвращает функцию отписки. */
+export function onAudioState(handler: (s: AudioState) => void): () => void {
+  if (browserPreview) {
+    // Заглушка: «живые» уровни, чтобы увидеть индикаторы в браузере.
+    const h = setInterval(() => {
+      const levels: Record<string, number> = {};
+      for (const n of previewProject.nodes) levels[n.id] = previewEnabled ? Math.random() * 0.6 : 0;
+      const status: Record<string, NodeStatus> = {};
+      for (const n of previewProject.nodes) status[n.id] = previewEnabled ? 'ok' : 'off';
+      if (previewEnabled) status.n1 = 'app-not-chosen';
+      handler({ enabled: previewEnabled, running: previewEnabled, status, levels });
+    }, 66);
+    return () => clearInterval(h);
   }
-  return Promise.resolve(undefined as T);
+  let unlisten: (() => void) | undefined;
+  let cancelled = false;
+  void listen<AudioState>('audio-state', (e) => handler(e.payload)).then((u) => {
+    if (cancelled) u();
+    else unlisten = u;
+  });
+  return () => {
+    cancelled = true;
+    unlisten?.();
+  };
 }
 
 export const api = {
@@ -62,5 +135,9 @@ export const api = {
   exportProject: (path: string, project: Project) => call<void>('export_project', { path, project }),
   importProject: (path: string) => call<Project>('import_project', { path }),
   saveDiagnostics: (path: string, uiInfo: string) => call<void>('save_diagnostics', { path, uiInfo }),
+  setAudioEnabled: (enabled: boolean) => call<void>('set_audio_enabled', { enabled }),
+  listAudioDevices: () => call<AudioDevice[]>('list_audio_devices'),
+  listAudioApps: () => call<AudioApp[]>('list_audio_apps'),
+  measureLatency: () => call<Latency>('measure_latency'),
   log: (level: 'info' | 'error', message: string) => call<void>('log_ui', { level, message }).catch(() => {}),
 };

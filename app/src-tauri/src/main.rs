@@ -6,6 +6,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod applog;
+mod audio;
 mod diagnostics;
 mod storage;
 mod zip;
@@ -15,8 +16,9 @@ use std::sync::Mutex;
 
 use graph::Project;
 use serde::Serialize;
+use audio::Audio;
 use storage::{Paths, Settings};
-use tauri::State;
+use tauri::{Manager, RunEvent, State};
 
 struct AppState {
     paths: Paths,
@@ -49,21 +51,91 @@ struct LoadState {
 }
 
 #[tauri::command]
-fn load_state(state: State<AppState>) -> LoadState {
+fn load_state(state: State<AppState>, audio: State<Audio>) -> LoadState {
     let loaded = storage::load_project(&state.paths);
-    LoadState {
-        project: loaded.project,
-        settings: storage::load_settings(&state.paths),
-        recovered_from: loaded.recovered_from,
-        version: env!("CARGO_PKG_VERSION"),
-    }
+    let settings = storage::load_settings(&state.paths);
+    audio.set_project(loaded.project.clone());
+    audio.set_enabled(settings.audio_enabled);
+    LoadState { project: loaded.project, settings, recovered_from: loaded.recovered_from, version: env!("CARGO_PKG_VERSION") }
 }
 
 #[tauri::command]
-fn save_project(state: State<AppState>, project: Project) -> Result<(), CmdError> {
+fn save_project(state: State<AppState>, audio: State<Audio>, project: Project) -> Result<(), CmdError> {
     graph::validate(&project).map_err(|e| CmdError::new(e.code(), &e))?;
+    audio.set_project(project.clone());
     let _guard = state.write_lock.lock().unwrap();
     storage::write_atomic(&state.paths.project, &graph::to_json(&project)).map_err(|e| CmdError::new("io", e))
+}
+
+/// Включить или выключить звук (сама настройка сохраняется вместе с остальными).
+#[tauri::command]
+fn set_audio_enabled(audio: State<Audio>, enabled: bool) {
+    audio.set_enabled(enabled);
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeviceDto {
+    id: String,
+    name: String,
+    render: bool,
+    is_default: bool,
+    cable: Option<&'static str>,
+}
+
+/// Звуковые устройства для выбора в боковой панели.
+#[tauri::command]
+fn list_audio_devices() -> Result<Vec<DeviceDto>, CmdError> {
+    let devs = winaudio::devices::list().map_err(|e| CmdError::new("io", e.message()))?;
+    Ok(devs
+        .into_iter()
+        .map(|d| DeviceDto { id: d.id, name: d.name, render: d.render, is_default: d.is_default, cable: d.cable.map(|c| c.label) })
+        .collect())
+}
+
+#[derive(Serialize)]
+struct AppDto {
+    exe: String,
+    active: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LatencyDto {
+    /// Замер: SoundBimba → виртуальный микрофон, мс.
+    output_ms: f64,
+    /// Оценка входа (захват программы или микрофона → движок): запас буфера + порция устройства.
+    input_estimate_ms: f64,
+}
+
+/// Замер задержки через виртуальный кабель (около 2 секунд).
+#[tauri::command]
+async fn measure_latency(app: tauri::AppHandle) -> Result<LatencyDto, CmdError> {
+    let result = tauri::async_runtime::spawn_blocking(|| {
+        winaudio::devices::ensure_com().map_err(|e| e.message())?;
+        let devs = winaudio::devices::list().map_err(|e| e.message())?;
+        let spk = winaudio::devices::primary_cable_render(&devs).ok_or("no-cable")?;
+        let mic = winaudio::devices::primary_cable_capture(&devs).ok_or("no-cable")?;
+        winaudio::latency::measure_cable(&spk.id, &mic.id, audio::RENDER_RESERVE_MS, audio::CAPTURE_RESERVE_MS)
+    })
+    .await
+    .map_err(|e| CmdError::new("io", e))?;
+    match result {
+        Ok(ms) => {
+            app.state::<Audio>().set_latency(ms);
+            applog::info(&format!("latency measured: {ms:.1} ms"));
+            Ok(LatencyDto { output_ms: ms, input_estimate_ms: audio::CAPTURE_RESERVE_MS + 10.0 })
+        }
+        Err(e) if e == "no-cable" => Err(CmdError::new("no-cable", e)),
+        Err(e) => Err(CmdError::new("latency", e)),
+    }
+}
+
+/// Программы, у которых сейчас есть звук, — для выбора в узле «Звук приложения».
+#[tauri::command]
+fn list_audio_apps() -> Result<Vec<AppDto>, CmdError> {
+    let apps = winaudio::processes::audio_apps().map_err(|e| CmdError::new("io", e.message()))?;
+    Ok(apps.into_iter().map(|a| AppDto { exe: a.exe, active: a.active }).collect())
 }
 
 #[tauri::command]
@@ -90,8 +162,9 @@ fn import_project(path: String) -> Result<Project, CmdError> {
 }
 
 #[tauri::command]
-fn save_diagnostics(state: State<AppState>, path: String, ui_info: String) -> Result<(), CmdError> {
-    diagnostics::save(&state.paths, &path, &ui_info).map_err(|e| CmdError::new("io", e))?;
+fn save_diagnostics(state: State<AppState>, audio: State<Audio>, path: String, ui_info: String) -> Result<(), CmdError> {
+    let snapshot = serde_json::to_string_pretty(&audio.snapshot()).unwrap_or_default();
+    diagnostics::save(&state.paths, &path, &ui_info, &snapshot).map_err(|e| CmdError::new("io", e))?;
     applog::info("diagnostics saved");
     Ok(())
 }
@@ -115,6 +188,10 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState { paths, write_lock: Mutex::new(()) })
+        .setup(|app| {
+            app.manage(Audio::start(app.handle().clone()));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             load_state,
             save_project,
@@ -122,8 +199,18 @@ fn main() {
             export_project,
             import_project,
             save_diagnostics,
-            log_ui
+            log_ui,
+            set_audio_enabled,
+            list_audio_devices,
+            list_audio_apps,
+            measure_latency
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running SoundBimba");
+        .build(tauri::generate_context!())
+        .expect("error while building SoundBimba")
+        .run(|app, event| {
+            if let RunEvent::Exit = event {
+                // Закрыть устройства аккуратно, а не обрывом процесса.
+                app.state::<Audio>().shutdown();
+            }
+        });
 }

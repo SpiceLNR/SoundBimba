@@ -5,7 +5,6 @@
 
 mod capture;
 mod devices;
-mod format;
 mod looptest;
 mod report;
 mod sessions;
@@ -18,6 +17,7 @@ use std::path::PathBuf;
 use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
 
 use devices::Device;
+use winaudio::format;
 use report::Report;
 
 const HELP: &str = "\

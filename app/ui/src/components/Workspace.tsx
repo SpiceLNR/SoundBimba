@@ -51,10 +51,11 @@ interface Props {
   settings: Settings;
   lang: Lang;
   onSettings: (s: Settings) => void;
+  onToggleAudio: () => void;
   notify: Notify;
 }
 
-export default function Workspace({ project, version, settings, lang, onSettings, notify }: Props) {
+export default function Workspace({ project, version, settings, lang, onSettings, onToggleAudio, notify }: Props) {
   const t = useT();
   const rf = useReactFlow<SoundNode>();
   const initial = useMemo(() => toFlow(project), [project]);
@@ -269,6 +270,22 @@ export default function Workspace({ project, version, settings, lang, onSettings
     [onSettings, settings],
   );
 
+  const [measuring, setMeasuring] = useState(false);
+  const onLatency = useCallback(async () => {
+    if (measuring) return;
+    setMeasuring(true);
+    notify('notice.latencyMeasuring');
+    try {
+      const l = await api.measureLatency();
+      notify('notice.latency', { output: Math.round(l.outputMs), total: Math.round(l.outputMs + l.inputEstimateMs) });
+    } catch (e) {
+      const code = isCmdError(e) ? e.code : 'other';
+      notify(code === 'no-cable' ? 'error.latencyNoCable' : 'error.latency', undefined, true);
+    } finally {
+      setMeasuring(false);
+    }
+  }, [measuring, notify]);
+
   const ariaLabelConfig = useMemo(
     () => ({
       'node.a11yDescription.default': t('map.nodeDesc'),
@@ -295,11 +312,13 @@ export default function Workspace({ project, version, settings, lang, onSettings
         settings={settings}
         saveState={saveState}
         bindings={bindings}
+        onToggleAudio={onToggleAudio}
         onAdd={addNode}
         onArrange={onArrange}
         onExport={() => void onExport()}
         onImport={() => void onImport()}
         onDiagnostics={() => void onDiagnostics()}
+        onLatency={() => void onLatency()}
         onHotkeys={() => setHotkeysOpen(true)}
         onSettings={onSettings}
       />

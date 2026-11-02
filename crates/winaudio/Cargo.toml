@@ -2,22 +2,31 @@
 [package]
 name = "winaudio"
 version = "0.1.0"
-description = "SoundBimba Windows wrappers: system info, audio devices, virtual cable detection"
+description = "SoundBimba Windows wrappers: system info, audio devices, virtual cables, device streams, engine thread"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+
+[dependencies]
+engine = { path = "../engine" }
+windows-core = "0.62"
 
 [dependencies.windows]
 version = "0.62"
 features = [
     "Win32_Foundation",
     "Win32_Media_Audio",
+    "Win32_Media_KernelStreaming",
+    "Win32_Media_Multimedia",
     "Win32_Devices_FunctionDiscovery",
     "Win32_Devices_Properties",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Security",
     "Win32_System_Com",
     "Win32_System_Com_StructuredStorage",
     "Win32_System_Variant",
     "Win32_System_Registry",
     "Win32_System_SystemInformation",
+    "Win32_System_Threading",
     "Win32_UI_Shell_PropertiesSystem",
 ]

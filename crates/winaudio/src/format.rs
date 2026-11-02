@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Разбор формата звука WAVEFORMATEX и перевод сэмплов в float и обратно.
+//! Разбор формата звука WAVEFORMATEX и перевод сэмплов в float и обратно (общий для пробы и
+//! приложения).
 
 use std::ptr::read_unaligned;
 
@@ -100,17 +101,54 @@ impl Fmt {
 
     /// Записывает одно значение во все каналы кадра `frame` буфера `out`.
     pub fn write_frame(&self, out: &mut [u8], frame: usize, value: f32) {
+        for ch in 0..self.channels as usize {
+            self.write_sample(out, frame, ch, value);
+        }
+    }
+
+    /// Записывает одно значение в канал `ch` кадра `frame`.
+    pub fn write_sample(&self, out: &mut [u8], frame: usize, ch: usize, value: f32) {
         let v = value.clamp(-1.0, 1.0);
         let bps = self.bits as usize / 8;
-        for ch in 0..self.channels as usize {
-            let at = frame * self.block_align as usize + ch * bps;
-            let dst = &mut out[at..at + bps];
-            match self.sample {
-                Sample::F32 => dst.copy_from_slice(&v.to_le_bytes()),
-                Sample::I16 => dst.copy_from_slice(&((v * 32767.0) as i16).to_le_bytes()),
-                Sample::I24 => dst.copy_from_slice(&((v * 8_388_607.0) as i32).to_le_bytes()[..3]),
-                Sample::I32 => dst.copy_from_slice(&((v as f64 * 2_147_483_647.0) as i32).to_le_bytes()),
-                Sample::Unknown => dst.fill(0),
+        let at = frame * self.block_align as usize + ch * bps;
+        let dst = &mut out[at..at + bps];
+        match self.sample {
+            Sample::F32 => dst.copy_from_slice(&v.to_le_bytes()),
+            Sample::I16 => dst.copy_from_slice(&((v * 32767.0) as i16).to_le_bytes()),
+            Sample::I24 => dst.copy_from_slice(&((v * 8_388_607.0) as i32).to_le_bytes()[..3]),
+            Sample::I32 => dst.copy_from_slice(&((v as f64 * 2_147_483_647.0) as i32).to_le_bytes()),
+            Sample::Unknown => dst.fill(0),
+        }
+    }
+
+    /// Кадры устройства → стерео float: моно раздваивается, лишние каналы отбрасываются.
+    /// `scratch` — заранее выделенный буфер (поток реального времени не выделяет память).
+    pub fn to_stereo(&self, bytes: &[u8], scratch: &mut Vec<f32>, out: &mut Vec<f32>) {
+        scratch.clear();
+        self.push_f32(bytes, scratch);
+        let ch = self.channels.max(1) as usize;
+        for frame in scratch.chunks_exact(ch) {
+            let (l, r) = if ch == 1 { (frame[0], frame[0]) } else { (frame[0], frame[1]) };
+            out.push(l);
+            out.push(r);
+        }
+    }
+
+    /// Стерео float → кадры устройства: для моно — среднее, в лишние каналы — тишина.
+    pub fn from_stereo(&self, stereo: &[f32], out: &mut [u8]) {
+        let ch = self.channels as usize;
+        for (f, &[l, r]) in stereo.as_chunks::<2>().0.iter().enumerate() {
+            if ch == 1 {
+                self.write_sample(out, f, 0, 0.5 * (l + r));
+                continue;
+            }
+            for c in 0..ch {
+                let v = match c {
+                    0 => l,
+                    1 => r,
+                    _ => 0.0,
+                };
+                self.write_sample(out, f, c, v);
             }
         }
     }
@@ -156,6 +194,22 @@ mod tests {
         f.push_f32(&buf, &mut out);
         assert_eq!(out.len(), 2);
         assert!((out[0] - 0.5).abs() < 1e-3 && (out[1] - 0.5).abs() < 1e-3);
+    }
+
+    #[test]
+    fn mono_and_multichannel_convert_to_stereo() {
+        let mono = unsafe { Fmt::from_ptr(&float_format(48000, 1)) };
+        let bytes: Vec<u8> = [0.25f32, -0.5].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let (mut scratch, mut out) = (Vec::new(), Vec::new());
+        mono.to_stereo(&bytes, &mut scratch, &mut out);
+        assert_eq!(out, vec![0.25, 0.25, -0.5, -0.5]);
+
+        let quad = unsafe { Fmt::from_ptr(&float_format(48000, 4)) };
+        let mut dev = vec![0u8; 2 * 16];
+        quad.from_stereo(&[0.1, 0.2, 0.3, 0.4], &mut dev);
+        let mut back = Vec::new();
+        quad.push_f32(&dev, &mut back);
+        assert_eq!(back, vec![0.1, 0.2, 0.0, 0.0, 0.3, 0.4, 0.0, 0.0]);
     }
 
     #[test]

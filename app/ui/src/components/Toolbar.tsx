@@ -15,11 +15,13 @@ interface Props {
   settings: Settings;
   saveState: SaveState;
   bindings: Bindings;
+  onToggleAudio: () => void;
   onAdd: (kind: NodeKind) => void;
   onArrange: () => void;
   onExport: () => void;
   onImport: () => void;
   onDiagnostics: () => void;
+  onLatency: () => void;
   onHotkeys: () => void;
   onSettings: (s: Settings) => void;
 }
@@ -30,10 +32,21 @@ export default function Toolbar(p: Props) {
     import: p.onImport,
     export: p.onExport,
     diagnostics: p.onDiagnostics,
+    latency: p.onLatency,
   };
   return (
     <header className="toolbar">
       <div className="brand">{t('app.title')}</div>
+      <button
+        type="button"
+        className={`sound-toggle${p.settings.audioEnabled ? ' on' : ''}`}
+        aria-pressed={Boolean(p.settings.audioEnabled)}
+        title={t(p.settings.audioEnabled ? 'toolbar.soundTurnOff' : 'toolbar.soundTurnOn')}
+        onClick={p.onToggleAudio}
+      >
+        <span className="sound-dot" aria-hidden="true" />
+        {t(p.settings.audioEnabled ? 'toolbar.soundOn' : 'toolbar.soundOff')}
+      </button>
       <Dropdown
         className="add-node"
         label={t('toolbar.add')}
@@ -63,6 +76,7 @@ export default function Toolbar(p: Props) {
             items: [
               { value: 'import', label: t('toolbar.import') },
               { value: 'export', label: t('toolbar.export') },
+              { value: 'latency', label: t('toolbar.latency') },
               { value: 'diagnostics', label: t('toolbar.diagnostics') },
             ],
           },

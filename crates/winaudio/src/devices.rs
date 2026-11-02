@@ -81,3 +81,21 @@ pub fn list() -> Result<Vec<DeviceInfo>> {
     list_flow(&en, eCapture, &mut out)?;
     Ok(out)
 }
+
+/// Главный «динамик» виртуального кабеля, куда SoundBimba отправляет звук для Discord и OBS.
+/// У VB-CABLE есть второй вход «CABLE In 16ch» — его берём, только если основного нет.
+pub fn primary_cable_render(devs: &[DeviceInfo]) -> Option<&DeviceInfo> {
+    let cables = || devs.iter().filter(|d| d.render && d.cable.is_some());
+    cables().find(|d| !d.name.to_lowercase().contains("16ch")).or_else(|| cables().next())
+}
+
+/// «Микрофон» основного виртуального кабеля (его выбирают в Discord и OBS).
+pub fn primary_cable_capture(devs: &[DeviceInfo]) -> Option<&DeviceInfo> {
+    let cables = || devs.iter().filter(|d| !d.render && d.cable.is_some());
+    cables().find(|d| !d.name.to_lowercase().contains("16ch")).or_else(|| cables().next())
+}
+
+/// Устройство по умолчанию (вывод или ввод).
+pub fn default_device(devs: &[DeviceInfo], render: bool) -> Option<&DeviceInfo> {
+    devs.iter().find(|d| d.render == render && d.is_default)
+}

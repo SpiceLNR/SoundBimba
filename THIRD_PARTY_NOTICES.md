@@ -12,6 +12,7 @@ Keep this list up to date: every dependency and bundled resource must appear her
 | Microsoft Edge WebView2 Runtime | UI engine (offline installer bundled in installer) | Microsoft redistributable terms | https://developer.microsoft.com/microsoft-edge/webview2 |
 | Tauri dialog plugin (`tauri-plugin-dialog`, `@tauri-apps/plugin-dialog`) | File dialogs for export, import, diagnostics | MIT or Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
 | serde, serde_json | Project file (de)serialization | MIT or Apache-2.0 | https://github.com/serde-rs |
+| rtrb | Real-time safe ring buffers between audio devices and the engine | MIT or Apache-2.0 | https://github.com/mgeier/rtrb |
 | Nunito font (via Fontsource) | Theme "Bimba" font, bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/nunito , https://fontsource.org |
 | Open Sans font (via Fontsource) | Theme "Metro" font (free alternative to Segoe UI), bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/opensans , https://fontsource.org |
 | Vite, @vitejs/plugin-react, TypeScript, Vitest | Build and tests only, not in the app | MIT / Apache-2.0 | https://vitejs.dev , https://www.typescriptlang.org , https://vitest.dev |

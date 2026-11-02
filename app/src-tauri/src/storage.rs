@@ -45,6 +45,9 @@ pub struct Settings {
     /// Горячие клавиши (только внутри окна): действие → сочетание, «» — отключено.
     #[serde(default)]
     pub hotkeys: BTreeMap<String, String>,
+    /// Звук включён (запоминается между запусками; при первом запуске — выключен).
+    #[serde(default)]
+    pub audio_enabled: bool,
 }
 
 fn default_theme() -> String {
@@ -53,7 +56,7 @@ fn default_theme() -> String {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { language: None, theme: default_theme(), hotkeys: BTreeMap::new() }
+        Settings { language: None, theme: default_theme(), hotkeys: BTreeMap::new(), audio_enabled: false }
     }
 }
 
