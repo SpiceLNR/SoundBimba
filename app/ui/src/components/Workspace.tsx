@@ -33,7 +33,9 @@ import {
   type Project,
   type SoundNode,
 } from '../graph';
+import { actionFor, eventToCombo, isTyping, mergeBindings, type Action, type Bindings } from '../hotkeys';
 import { DICTS, useT, type Lang } from '../i18n';
+import HotkeysDialog from './HotkeysDialog';
 import type { Notify } from './Notices';
 import SidePanel from './SidePanel';
 import SoundNodeView from './SoundNodeView';
@@ -60,7 +62,9 @@ export default function Workspace({ project, version, settings, lang, onSettings
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const [selected, setSelected] = useState<{ node?: string; edge?: string }>({});
   const [saveState, setSaveState] = useState<SaveState>('saved');
+  const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
+  const bindings = useMemo(() => mergeBindings(settings.hotkeys), [settings.hotkeys]);
 
   // Причина ошибки из Rust → понятный текст.
   const reason = useCallback(
@@ -222,6 +226,43 @@ export default function Workspace({ project, version, settings, lang, onSettings
     }
   }, [t, version, lang, settings, nodes.length, edges.length, notify, reason]);
 
+  // Горячие клавиши — только пока окно SoundBimba активно и человек не печатает в поле ввода.
+  const commands = useRef<Record<Action, () => void>>(null as unknown as Record<Action, () => void>);
+  commands.current = {
+    deleteSelected: () => {
+      if (selected.node) deleteNode(selected.node);
+      else if (selected.edge) deleteEdge(selected.edge);
+    },
+    deselect: () => {
+      setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)));
+      setEdges((es) => es.map((e) => (e.selected ? { ...e, selected: false } : e)));
+      setSelected({});
+    },
+    arrange: onArrange,
+    fitView: fitSoon,
+    export: () => void onExport(),
+    import: () => void onImport(),
+    diagnostics: () => void onDiagnostics(),
+  };
+  useEffect(() => {
+    if (hotkeysOpen) return; // в окне «Клавиши» нажатия идут на переназначение
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || isTyping(e.target)) return;
+      const combo = eventToCombo(e);
+      const action = combo ? actionFor(bindings, combo) : undefined;
+      if (!action) return;
+      e.preventDefault();
+      commands.current[action]();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [bindings, hotkeysOpen]);
+
+  const changeBindings = useCallback(
+    (b: Bindings) => onSettings({ ...settings, hotkeys: b }),
+    [onSettings, settings],
+  );
+
   const ariaLabelConfig = useMemo(
     () => ({
       'node.a11yDescription.default': t('map.nodeDesc'),
@@ -252,6 +293,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
         onExport={() => void onExport()}
         onImport={() => void onImport()}
         onDiagnostics={() => void onDiagnostics()}
+        onHotkeys={() => setHotkeysOpen(true)}
         onSettings={onSettings}
       />
       <main className="main">
@@ -271,7 +313,8 @@ export default function Workspace({ project, version, settings, lang, onSettings
             snapToGrid
             snapGrid={[20, 20]}
             colorMode="dark"
-            /* Никаких горячих клавиш: удаление и прочее — только кнопками. */
+            /* Встроенные клавиши React Flow выключены: свои клавиши (Delete и др.) — в hotkeys.ts,
+               их можно переназначить. */
             deleteKeyCode={null}
             selectionKeyCode={null}
             multiSelectionKeyCode={null}
@@ -295,6 +338,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
           onDeleteEdge={deleteEdge}
         />
       </main>
+      {hotkeysOpen && <HotkeysDialog bindings={bindings} onChange={changeBindings} onClose={() => setHotkeysOpen(false)} />}
     </div>
   );
 }

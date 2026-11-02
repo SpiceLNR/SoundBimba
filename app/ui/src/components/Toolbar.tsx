@@ -17,6 +17,7 @@ interface Props {
   onExport: () => void;
   onImport: () => void;
   onDiagnostics: () => void;
+  onHotkeys: () => void;
   onSettings: (s: Settings) => void;
 }
 
@@ -96,6 +97,9 @@ export default function Toolbar(p: Props) {
           { label: t('toolbar.diagnostics'), action: p.onDiagnostics },
         ]}
       />
+      <button type="button" onClick={p.onHotkeys}>
+        {t('toolbar.hotkeys')}
+      </button>
       <select
         className="lang-select"
         value={p.settings.language ?? ''}

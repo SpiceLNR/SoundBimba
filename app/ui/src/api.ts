@@ -6,6 +6,8 @@ import type { Project } from './graph';
 export interface Settings {
   language: string | null;
   theme: string;
+  /** Горячие клавиши: действие → сочетание («» — отключено). */
+  hotkeys?: Record<string, string>;
 }
 
 export interface LoadState {

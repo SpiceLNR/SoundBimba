@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Файлы приложения в %APPDATA%\SoundBimba: проект (автосохранение), настройки, журнал.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -41,6 +42,9 @@ pub struct Settings {
     pub language: Option<String>,
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Горячие клавиши (только внутри окна): действие → сочетание, «» — отключено.
+    #[serde(default)]
+    pub hotkeys: BTreeMap<String, String>,
 }
 
 fn default_theme() -> String {
@@ -49,7 +53,7 @@ fn default_theme() -> String {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { language: None, theme: default_theme() }
+        Settings { language: None, theme: default_theme(), hotkeys: BTreeMap::new() }
     }
 }
 
@@ -154,5 +158,8 @@ mod tests {
         assert_eq!(s, Settings::default());
         let s: Settings = serde_json::from_str(r#"{"language":"uk","theme":"metro"}"#).unwrap();
         assert_eq!(s.language.as_deref(), Some("uk"));
+        let s: Settings = serde_json::from_str(r#"{"theme":"bimba","hotkeys":{"deleteSelected":"Backspace","arrange":""}}"#).unwrap();
+        assert_eq!(s.hotkeys["deleteSelected"], "Backspace");
+        assert_eq!(s.hotkeys["arrange"], "");
     }
 }
