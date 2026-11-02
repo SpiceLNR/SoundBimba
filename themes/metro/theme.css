@@ -54,6 +54,13 @@
   --watermark-color: #ff1493;
   --watermark-opacity: 0.05;
 
+  /* Полосы прокрутки: узкие прямоугольные, как ползунки. */
+  --scrollbar-size: 6px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #3a3245;
+  --scrollbar-thumb-hover: #f3eef7;
+  --scrollbar-radius: 0px;
+
   --backdrop: rgba(10, 8, 14, 0.6);
   --notice-bg: #2c2635;
   --notice-error-bg: #4a1f2b;

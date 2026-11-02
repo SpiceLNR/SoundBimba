@@ -69,7 +69,7 @@ export default function PanelApp() {
               ×
             </button>
           </header>
-          {!audio.enabled && <p className="panel-hint panel-pad">{t('buttons.soundOff')}</p>}
+          {!audio.enabled && <p className="panel-hint panel-note">{t('buttons.soundOff')}</p>}
           <div className="panel-pad">{project && <ButtonGrid nodes={project.nodes} />}</div>
         </div>
       </AudioContext.Provider>

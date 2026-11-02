@@ -9,21 +9,26 @@ mod applog;
 mod audio;
 mod diagnostics;
 mod storage;
+mod templates;
 mod zip;
 
 use std::fs;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use graph::Project;
 use serde::Serialize;
 use audio::Audio;
 use storage::{Paths, Settings};
+use templates::{TemplateError, UserTemplate};
 use tauri::{Emitter, Manager, RunEvent, State};
 
 struct AppState {
     paths: Paths,
     /// Запись файлов по одной, чтобы автосохранения не наложились.
     write_lock: Mutex<()>,
+    /// Шаблоны, открытые двойным щелчком при запуске: интерфейс заберёт их после загрузки.
+    opened: Mutex<OpenedDto>,
 }
 
 /// Ошибка для интерфейса: `code` — ключ локализации, `detail` — подробность для журнала.
@@ -189,6 +194,73 @@ fn import_project(path: String) -> Result<Project, CmdError> {
     Ok(project)
 }
 
+fn template_error(e: TemplateError) -> CmdError {
+    CmdError::new(e.code(), e)
+}
+
+#[tauri::command]
+fn list_templates(state: State<AppState>) -> Vec<UserTemplate> {
+    templates::list(&state.paths.templates)
+}
+
+#[tauri::command]
+fn save_template(state: State<AppState>, name: String, description: String, project: Project) -> Result<UserTemplate, CmdError> {
+    let t = templates::save(&state.paths.templates, &name, &description, &project).map_err(template_error)?;
+    applog::info(&format!("template saved: {}", t.id));
+    Ok(t)
+}
+
+#[tauri::command]
+fn delete_template(state: State<AppState>, id: String) -> Result<(), CmdError> {
+    templates::delete(&state.paths.templates, &id).map_err(template_error)?;
+    applog::info(&format!("template deleted: {id}"));
+    Ok(())
+}
+
+#[tauri::command]
+fn import_template(state: State<AppState>, path: String) -> Result<UserTemplate, CmdError> {
+    let t = templates::import(&state.paths.templates, std::path::Path::new(&path)).map_err(template_error)?;
+    applog::info(&format!("template imported: {}", t.id));
+    Ok(t)
+}
+
+#[tauri::command]
+fn export_template(state: State<AppState>, id: String, path: String) -> Result<(), CmdError> {
+    templates::export(&state.paths.templates, &id, std::path::Path::new(&path)).map_err(template_error)?;
+    applog::info("template exported");
+    Ok(())
+}
+
+/// Шаблоны, открытые двойным щелчком до того, как интерфейс загрузился (забираются один раз).
+#[tauri::command]
+fn take_opened_templates(state: State<AppState>) -> OpenedDto {
+    std::mem::take(&mut *state.opened.lock().unwrap())
+}
+
+/// Добавляет открытые файлы `.bmb` в свои шаблоны. Ошибки — в журнал (и `error` для интерфейса).
+fn import_opened(paths: &Paths, files: Vec<PathBuf>) -> (Vec<UserTemplate>, Vec<String>) {
+    let (mut ok, mut failed) = (Vec::new(), Vec::new());
+    for f in files {
+        match templates::import(&paths.templates, &f) {
+            Ok(t) => {
+                applog::info(&format!("template opened from Explorer: {}", t.id));
+                ok.push(t);
+            }
+            Err(e) => {
+                applog::error(&format!("cannot open template {}: {e}", f.display()));
+                failed.push(e.code().to_string());
+            }
+        }
+    }
+    (ok, failed)
+}
+
+#[derive(Serialize, Clone, Default)]
+struct OpenedDto {
+    templates: Vec<UserTemplate>,
+    errors: Vec<String>,
+}
+
 #[tauri::command]
 fn save_diagnostics(state: State<AppState>, audio: State<Audio>, path: String, ui_info: String) -> Result<(), CmdError> {
     let snapshot = serde_json::to_string_pretty(&audio.snapshot()).unwrap_or_default();
@@ -214,9 +286,28 @@ fn main() {
     std::panic::set_hook(Box::new(|info| applog::error(&format!("panic: {info}"))));
 
     tauri::Builder::default()
+        // Одна копия программы: вторая (например, двойной щелчок по .bmb при открытой программе)
+        // передаёт файлы первой и закрывается — иначе две копии спорили бы за звуковые устройства.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            let paths = &app.state::<AppState>().paths;
+            let (templates, errors) = import_opened(paths, templates::opened_files(args));
+            if !templates.is_empty() || !errors.is_empty() {
+                let _ = app.emit_to("main", "templates-opened", OpenedDto { templates, errors });
+            }
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState { paths, write_lock: Mutex::new(()) })
+        .manage(AppState { paths, write_lock: Mutex::new(()), opened: Mutex::new(OpenedDto::default()) })
         .setup(|app| {
+            // Двойной щелчок по .bmb при закрытой программе: файл приходит аргументом запуска.
+            // Здесь, а не раньше: если программа уже открыта, эта копия до сюда не дойдёт —
+            // файл добавит первая (см. single-instance выше), без повторов.
+            let state = app.state::<AppState>();
+            let (templates, errors) = import_opened(&state.paths, templates::opened_files(std::env::args()));
+            *state.opened.lock().unwrap() = OpenedDto { templates, errors };
             app.manage(Audio::start(app.handle().clone()));
             Ok(())
         })
@@ -234,7 +325,13 @@ fn main() {
             measure_latency,
             press_button,
             seek_button,
-            get_ui_state
+            get_ui_state,
+            list_templates,
+            save_template,
+            delete_template,
+            import_template,
+            export_template,
+            take_opened_templates
         ])
         .on_window_event(|window, event| {
             // Закрыли основное окно — закрываем и кнопочную панель, иначе программа не выйдет.

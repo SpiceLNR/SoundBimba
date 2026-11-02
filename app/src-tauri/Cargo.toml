@@ -19,3 +19,4 @@ clips = { path = "../../crates/clips" }
 engine = { path = "../../crates/engine" }
 graph = { path = "../../crates/graph" }
 winaudio = { path = "../../crates/winaudio" }
+tauri-plugin-single-instance = "2"

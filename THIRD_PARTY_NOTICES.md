@@ -9,7 +9,10 @@ Keep this list up to date: every dependency and bundled resource must appear her
 | Tauri | Application shell | MIT or Apache-2.0 | https://github.com/tauri-apps/tauri |
 | React | UI | MIT | https://github.com/facebook/react |
 | React Flow (xyflow) | Node map | MIT | https://github.com/xyflow/xyflow |
+| NSIS (Nullsoft Scriptable Install System) | Installer (`*-setup.exe`), downloaded by the Tauri bundler at build time | zlib/libpng (see NSIS COPYING) | https://nsis.sourceforge.io |
+| nsis-tauri-utils | Helper plugin inside the installer | MIT or Apache-2.0 | https://github.com/tauri-apps/nsis-tauri-utils |
 | Microsoft Edge WebView2 Runtime | UI engine (offline installer bundled in installer) | Microsoft redistributable terms | https://developer.microsoft.com/microsoft-edge/webview2 |
+| Tauri single-instance plugin (`tauri-plugin-single-instance`) | One running copy; passes .bmb files opened in Explorer to it | MIT or Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
 | Tauri dialog plugin (`tauri-plugin-dialog`, `@tauri-apps/plugin-dialog`) | File dialogs for export, import, diagnostics | MIT or Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
 | serde, serde_json | Project file (de)serialization | MIT or Apache-2.0 | https://github.com/serde-rs |
 | rtrb | Real-time safe ring buffers between audio devices and the engine | MIT or Apache-2.0 | https://github.com/mgeier/rtrb |

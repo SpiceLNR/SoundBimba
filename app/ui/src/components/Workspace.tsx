@@ -17,7 +17,7 @@ import {
   type OnSelectionChangeParams,
 } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, isCmdError, type Settings } from '../api';
+import { api, isCmdError, onTemplatesOpened, type Settings, type UserTemplate } from '../api';
 import {
   arrange,
   canConnect,
@@ -71,6 +71,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [freshTemplates, setFreshTemplates] = useState<string[]>([]);
   const [cableOpen, setCableOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const welcome = !settings.welcomeDone;
@@ -187,17 +188,34 @@ export default function Workspace({ project, version, settings, lang, onSettings
   }, [edges, setNodes, fitSoon]);
 
   const addTemplate = useCallback(
-    (tpl: Template) => {
+    (tpl: Template, name: string) => {
       const r = applyTemplate(nodes, edges, tpl);
       setNodes(r.nodes);
       setEdges(r.edges);
       setSelected({});
       setTemplatesOpen(false);
       fitSoon();
-      notify('notice.templateAdded', { name: t(`template.${tpl.id}.title`) });
+      notify('notice.templateAdded', { name });
     },
-    [nodes, edges, setNodes, setEdges, fitSoon, notify, t],
+    [nodes, edges, setNodes, setEdges, fitSoon, notify],
   );
+
+  // Файлы .bmb, открытые двойным щелчком: они уже в «Моих шаблонах» — показываем окно шаблонов.
+  const showOpened = useCallback(
+    (added: UserTemplate[], errors: string[]) => {
+      for (const a of added) notify('notice.templateImported', { name: a.name });
+      for (const code of errors) notify('error.templateOpen', { reason: reason({ code, detail: '' }) }, true);
+      if (added.length) {
+        setFreshTemplates(added.map((a) => a.id));
+        setTemplatesOpen(true);
+      }
+    },
+    [notify, reason],
+  );
+  useEffect(() => {
+    void api.takeOpenedTemplates().then((o) => o && showOpened(o.templates, o.errors));
+    return onTemplatesOpened((o) => showOpened(o.templates, o.errors));
+  }, [showOpened]);
 
   // Приветствие показывается один раз: любой выбор в нём отмечает, что человек его видел.
   const closeWelcome = useCallback(() => onSettings({ ...settings, welcomeDone: true }), [onSettings, settings]);
@@ -443,7 +461,21 @@ export default function Workspace({ project, version, settings, lang, onSettings
         />
       </main>
       )}
-      {templatesOpen && <TemplatesDialog onPick={addTemplate} onClose={() => setTemplatesOpen(false)} />}
+      {templatesOpen && (
+        <TemplatesDialog
+          project={JSON.parse(projectJson) as Project}
+          fresh={freshTemplates}
+          hidden={settings.hiddenTemplates ?? []}
+          onHidden={(ids) => onSettings({ ...settings, hiddenTemplates: ids })}
+          onPick={addTemplate}
+          onClose={() => {
+            setTemplatesOpen(false);
+            setFreshTemplates([]);
+          }}
+          notify={notify}
+          reason={reason}
+        />
+      )}
       {cableOpen && <CableWizard onClose={() => setCableOpen(false)} />}
       {clearOpen && (
         <div className="dialog-backdrop">

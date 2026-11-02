@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { canConnect, fromFlow, newNode, toFlow, wouldCreateCycle, type Project } from './graph';
 import { DICTS, LANGUAGES } from './i18n';
-import { applyTemplate, TEMPLATES } from './templates';
+import { applyTemplate, fromProject, TEMPLATES } from './templates';
 
 describe('templates', () => {
   it('every template is a valid map: known nodes, proper directions, no cycles', () => {
@@ -49,6 +49,24 @@ describe('templates', () => {
     const p = fromFlow(r.nodes, r.edges);
     expect(new Set(p.nodes.map((n) => n.id)).size).toBe(p.nodes.length);
     expect(p.edges).toHaveLength(1 + tpl.edges.length);
+  });
+
+  it('own templates keep their layout and wires', () => {
+    const own = fromProject('mine', {
+      schema: 1,
+      nodes: [
+        { id: 'a', type: 'mic-input', pos: [500, 300], params: { device: 'usb' } },
+        { id: 'b', type: 'speaker-out', pos: [900, 420], params: {} },
+      ],
+      edges: [{ from: 'a', to: 'b' }],
+    });
+    const r = applyTemplate([], [], own);
+    expect(r.nodes.map((n) => n.position)).toEqual([
+      { x: 0, y: 0 },
+      { x: 400, y: 120 },
+    ]);
+    expect(r.nodes[0].data.params.device).toBe('usb');
+    expect(r.edges.map((e) => [e.source, e.target])).toEqual([['n1', 'n2']]);
   });
 
   it('keeps template parameters', () => {

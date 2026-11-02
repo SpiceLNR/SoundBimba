@@ -51,6 +51,13 @@
   --watermark-color: #ff1493;
   --watermark-opacity: 0.05;
 
+  /* Полосы прокрутки: тонкие, скруглённые, при наведении — розовые. */
+  --scrollbar-size: 10px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #3a3245;
+  --scrollbar-thumb-hover: #ff1493;
+  --scrollbar-radius: 8px;
+
   --backdrop: rgba(10, 8, 14, 0.6);
   --notice-bg: #2c2635;
   --notice-error-bg: #4a1f2b;

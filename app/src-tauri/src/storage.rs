@@ -16,6 +16,8 @@ pub struct Paths {
     pub project: PathBuf,
     pub settings: PathBuf,
     pub log: PathBuf,
+    /// Свои шаблоны (`*.bmb`).
+    pub templates: PathBuf,
 }
 
 impl Paths {
@@ -29,6 +31,7 @@ impl Paths {
             project: dir.join("project.json"),
             settings: dir.join("settings.json"),
             log: dir.join("logs").join("soundbimba.log"),
+            templates: dir.join("templates"),
             dir,
         }
     }
@@ -57,6 +60,9 @@ pub struct Settings {
     /// Приветствие при первом запуске уже показано.
     #[serde(default)]
     pub welcome_done: bool,
+    /// Встроенные шаблоны, которые человек убрал из списка (их можно вернуть).
+    #[serde(default)]
+    pub hidden_templates: Vec<String>,
 }
 
 fn default_true() -> bool {
@@ -81,6 +87,7 @@ impl Default for Settings {
             panel_frame: true,
             mode: default_mode(),
             welcome_done: false,
+            hidden_templates: Vec::new(),
         }
     }
 }

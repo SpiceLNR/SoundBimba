@@ -56,8 +56,11 @@
 - Нужно: Rust (MSVC), Visual Studio 2022 с C++ и **Windows 11 SDK** (без SDK нет kernel32.lib).
 - Собирать из **PowerShell**, не из Git Bash: там `/usr/bin/link` подменяет компоновщик MSVC.
 - Один раз после клонирования: `npm install` в папке `app`.
-- Сборка приложения: в `app` выполнить `npx tauri build` → `target\release\soundbimba.exe`
-  (установщик пока выключен: `bundle.active = false`, включим на этапе 5).
+- Сборка приложения: в `app` выполнить `npx tauri build` → `target\release\soundbimba.exe` и
+  установщик `target\release\bundle\nsis\SoundBimba_<версия>_x64-setup.exe` (≈ 211 МБ: внутри
+  офлайн-установщик WebView2 — решение автора). Версия Rust зафиксирована в `rust-toolchain.toml`.
+- Автосборка: `.github/workflows/build.yml` (проверки + установщик на каждый push; метка `vX.Y.Z`
+  → черновик релиза с SHA256SUMS.txt; публикует черновик автор).
 - Запуск для разработки: в `app` — `npx tauri dev`. Посмотреть интерфейс без Tauri (в браузере,
   с заглушкой вместо Rust): `npm run dev` в `app`, открыть http://localhost:5173.
 - Тесты: `cargo test --workspace` и `npm test` (в `app`); стиль: `cargo clippy --workspace --all-targets`,

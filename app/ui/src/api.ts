@@ -17,6 +17,22 @@ export interface Settings {
   mode?: 'expert' | 'simple';
   /** Приветствие при первом запуске уже показано. */
   welcomeDone?: boolean;
+  /** Встроенные шаблоны, убранные из списка. */
+  hiddenTemplates?: string[];
+}
+
+/** Свой шаблон из папки пользователя (`id` — имя файла .bmb без расширения). */
+export interface UserTemplate {
+  id: string;
+  name: string;
+  description: string;
+  project: Project;
+}
+
+/** Файлы .bmb, открытые двойным щелчком: что добавилось и коды ошибок того, что не открылось. */
+export interface OpenedTemplates {
+  templates: UserTemplate[];
+  errors: string[];
 }
 
 export interface LoadState {
@@ -119,6 +135,7 @@ const previewDevices: AudioDevice[] = [
 ];
 
 let previewEnabled = false;
+const previewTemplates: UserTemplate[] = [];
 const previewPlaying: Record<string, ButtonPlayback> = {};
 
 function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -133,6 +150,14 @@ function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     ],
   };
   if (cmd === 'set_audio_enabled') previewEnabled = Boolean(args?.enabled);
+  if (cmd === 'list_templates') return Promise.resolve([...previewTemplates] as T);
+  if (cmd === 'save_template') {
+    const t = { id: `t${previewTemplates.length + 1}`, name: String(args?.name).trim(), description: String(args?.description).trim(), project: args?.project as Project };
+    previewTemplates.push(t);
+    return Promise.resolve(t as T);
+  }
+  if (cmd === 'delete_template') previewTemplates.splice(previewTemplates.findIndex((t) => t.id === args?.id), 1);
+  if (cmd === 'take_opened_templates') return Promise.resolve({ templates: [], errors: [] } as T);
   if (cmd === 'press_button') {
     const id = String(args?.nodeId);
     const b = (previewPlaying[id] ??= { playing: false, pos: 0, len: 95 });
@@ -184,12 +209,34 @@ export function onAudioState(handler: (s: AudioState) => void): () => void {
   };
 }
 
+/** Файлы .bmb, открытые двойным щелчком, пока программа уже работала. Возвращает отписку. */
+export function onTemplatesOpened(handler: (o: OpenedTemplates) => void): () => void {
+  if (browserPreview) return () => {};
+  let unlisten: (() => void) | undefined;
+  let cancelled = false;
+  void listen<OpenedTemplates>('templates-opened', (e) => handler(e.payload)).then((u) => {
+    if (cancelled) u();
+    else unlisten = u;
+  });
+  return () => {
+    cancelled = true;
+    unlisten?.();
+  };
+}
+
 export const api = {
   loadState: () => call<LoadState>('load_state'),
   saveProject: (project: Project) => call<void>('save_project', { project }),
   saveSettings: (settings: Settings) => call<void>('save_settings', { settings }),
   exportProject: (path: string, project: Project) => call<void>('export_project', { path, project }),
   importProject: (path: string) => call<Project>('import_project', { path }),
+  listTemplates: () => call<UserTemplate[]>('list_templates'),
+  saveTemplate: (name: string, description: string, project: Project) =>
+    call<UserTemplate>('save_template', { name, description, project }),
+  deleteTemplate: (id: string) => call<void>('delete_template', { id }),
+  importTemplate: (path: string) => call<UserTemplate>('import_template', { path }),
+  exportTemplate: (id: string, path: string) => call<void>('export_template', { id, path }),
+  takeOpenedTemplates: () => call<OpenedTemplates>('take_opened_templates'),
   saveDiagnostics: (path: string, uiInfo: string) => call<void>('save_diagnostics', { path, uiInfo }),
   setAudioEnabled: (enabled: boolean) => call<void>('set_audio_enabled', { enabled }),
   listAudioDevices: () => call<AudioDevice[]>('list_audio_devices'),

@@ -26,12 +26,47 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico"
+    ],
+    "targets": [
+      "nsis"
+    ],
+    "publisher": "SoundBimba contributors",
+    "copyright": "AGPL-3.0-or-later",
+    "shortDescription": "Sound routing map for Windows",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "Russian",
+          "English",
+          "Ukrainian"
+        ],
+        "displayLanguageSelector": true,
+        "installerIcon": "icons/icon.ico",
+        "startMenuFolder": "SoundBimba",
+        "installerHooks": "windows/hooks.nsh"
+      }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "bmb"
+        ],
+        "name": "SoundBimba template",
+        "description": "SoundBimba template",
+        "role": "Editor",
+        "mimeType": "application/x-soundbimba-template"
+      }
     ]
   }
 }

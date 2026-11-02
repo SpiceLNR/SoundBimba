@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Готовые схемы одним щелчком. Шаблон добавляется к карте (ниже имеющегося), ничего не стирая.
 import type { Edge } from '@xyflow/react';
-import { arrange, edgeId, KINDS, newNode, nextNodeId, NODE_HEIGHT, type NodeKind, type Params, type SoundNode } from './graph';
+import { arrange, edgeId, KINDS, newNode, nextNodeId, NODE_HEIGHT, type NodeKind, type Params, type Project, type SoundNode } from './graph';
 
 interface TemplateNode {
   /** Имя узла внутри шаблона (для проводов). */
   key: string;
   kind: NodeKind;
   params?: Params;
+  /** Положение на карте (у своих шаблонов): тогда раскладка остаётся как была. */
+  pos?: [number, number];
 }
 
 export interface Template {
@@ -78,6 +80,15 @@ export const TEMPLATES: Template[] = [
   },
 ];
 
+/** Свой шаблон (схема из файла .bmb) в том же виде, что встроенные. */
+export function fromProject(id: string, p: Project): Template {
+  return {
+    id,
+    nodes: p.nodes.map((n) => ({ key: n.id, kind: n.type, params: n.params, pos: n.pos })),
+    edges: p.edges.map((e) => [e.from, e.to]),
+  };
+}
+
 const GAP = 140;
 
 /**
@@ -101,7 +112,13 @@ export function applyTemplate(nodes: SoundNode[], edges: Edge[], tpl: Template):
     const target = ids.get(b)!;
     return { id: edgeId(source, target), source, target };
   });
-  const laid = arrange(fresh, freshEdges);
+  // Своя раскладка шаблона (сдвинутая в начало координат) — или автораскладка у встроенных.
+  const own = tpl.nodes.length > 0 && tpl.nodes.every((n) => n.pos);
+  const minX = own ? Math.min(...tpl.nodes.map((n) => n.pos![0])) : 0;
+  const minY = own ? Math.min(...tpl.nodes.map((n) => n.pos![1])) : 0;
+  const laid = own
+    ? fresh.map((n, i) => ({ ...n, position: { x: tpl.nodes[i].pos![0] - minX, y: tpl.nodes[i].pos![1] - minY } }))
+    : arrange(fresh, freshEdges);
   const left = nodes.length ? Math.min(...nodes.map((n) => n.position.x)) : 0;
   // Узлы-кнопки выше обычных — берём настоящую высоту, если карта её уже измерила.
   const top = nodes.length ? Math.max(...nodes.map((n) => n.position.y + (n.measured?.height ?? NODE_HEIGHT))) + GAP : 0;

@@ -840,6 +840,12 @@ button:disabled {
   overflow-y: auto;
 }
 
+/* Подсказка над кнопками не сжимается и не прокручивается отдельно — прокручиваются только кнопки. */
+.panel-note {
+  flex-shrink: 0;
+  padding: 12px 12px 0;
+}
+
 /* Простой режим. */
 .main-simple {
   min-height: 0;
@@ -1011,4 +1017,92 @@ button:disabled {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   transform: translate(-50%, -50%);
+}
+
+/* Свои шаблоны. */
+.template-section {
+  margin: 4px 0 0;
+  font-size: 1em;
+  color: var(--text);
+}
+
+.template-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.template-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-radius: var(--radius-small);
+}
+
+.template-form input,
+.template-form textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--control-bg);
+  border: var(--border-width) solid var(--control-border);
+  border-radius: var(--radius-small);
+  padding: 6px 10px;
+  resize: vertical;
+}
+
+.template-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.template-new {
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 0.78em;
+  font-weight: normal;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: var(--radius-small);
+}
+
+.template-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Полосы прокрутки во всех окнах (основное, кнопочная панель, диалоги) — из темы, не системные. */
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--scrollbar-radius);
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+.template-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
