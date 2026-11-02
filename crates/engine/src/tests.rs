@@ -385,7 +385,7 @@ fn button_is_silent_until_pressed_then_plays_to_the_end() {
 }
 
 #[test]
-fn second_press_stops_with_a_short_fade() {
+fn second_press_pauses_with_a_short_fade_and_third_resumes() {
     let (mut g, mut r, shared) = button_rig(RATE as usize);
     let btn = shared["btn"].clone();
     btn.press();
@@ -394,12 +394,34 @@ fn second_press_stops_with_a_short_fade() {
     btn.press();
     g.process();
     g.process();
-    assert_eq!(btn.playback(), None, "повторное нажатие — стоп");
+    assert_eq!(btn.playback(), None, "повторное нажатие — пауза");
+    let paused_at = btn.button_state().unwrap().pos_frames;
+    assert!(paused_at > (BLOCK * 2) as u64, "позиция сохранена: {paused_at}");
+    btn.press();
+    g.process();
+    let s = btn.button_state().unwrap();
+    assert!(s.playing && s.pos_frames == paused_at + BLOCK as u64, "дальше с того же места");
     let out = drain(&mut r);
     let left: Vec<f32> = out.iter().step_by(2).copied().collect();
     assert!(left.iter().any(|&s| (s - 0.5).abs() < 1e-6));
+    // Вступление, пауза и продолжение — плавно: без скачка больше 1/200 уровня за отсчёт.
     let max_step = left.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
     assert!(max_step <= 0.5 / STOP_FADE as f32 + 1e-4, "скачок {max_step}");
+}
+
+#[test]
+fn end_of_sound_resets_the_time_scale() {
+    let (mut g, _r, shared) = button_rig(BLOCK * 2);
+    let btn = shared["btn"].clone();
+    btn.press();
+    for _ in 0..3 {
+        g.process();
+    }
+    let s = btn.button_state().unwrap();
+    assert!(!s.playing && s.pos_frames == 0, "доиграла — стоп и шкала на начало");
+    btn.press();
+    g.process();
+    assert!(btn.playback().unwrap() > 0.0, "нажатие после конца — снова с начала");
 }
 
 #[test]
@@ -448,6 +470,7 @@ fn long_sound_continues_from_disk_after_the_head() {
     for _ in 0..BLOCK * 4 * CHANNELS {
         prod.push(0.25).unwrap();
     }
+    // (Звука с диска меньше 0,1 с запаса — это весь остаток трека, ждать больше нечего.)
     // Пики на выходе по блокам: 1-й блок уже сыгран (память), дальше — ещё блок памяти и диск.
     let out = shared["out"].clone();
     let mut peaks = vec![out.take_peak()];
@@ -456,9 +479,9 @@ fn long_sound_continues_from_disk_after_the_head() {
         peaks.push(out.take_peak());
     }
     assert_eq!(btn.playback(), None, "доиграла весь звук");
-    assert_eq!(peaks[0], 0.5, "начало — из памяти");
+    assert!(peaks[0] > 0.49 && peaks[0] <= 0.5, "начало — из памяти (с плавным вступлением)");
     assert_eq!(peaks[1], 0.5);
-    assert!(peaks[2..].iter().all(|&p| p == 0.25), "дальше — с диска: {peaks:?}");
+    assert!(peaks[2..].iter().all(|&p| p > 0.24 && p <= 0.25), "дальше — с диска: {peaks:?}");
     let _ = &mut r;
 }
 
@@ -475,4 +498,32 @@ fn seek_past_the_head_asks_disk_and_waits_silently() {
     let s = btn.button_state().unwrap();
     assert!(s.playing);
     assert_eq!(s.pos_frames, (BLOCK * 50) as u64);
+}
+
+#[test]
+fn after_seek_waits_for_a_reserve_instead_of_stuttering() {
+    use std::sync::atomic::Ordering::Acquire;
+    let (mut g, _r, shared, feed) = button_rig_with(BLOCK, (RATE * 60) as u64);
+    let (mut prod, ctl) = feed.unwrap();
+    let btn = shared["btn"].clone();
+    btn.seek(0.5);
+    g.process();
+    let gen = ctl.want_gen.load(Acquire);
+    // Подкачка ответила меткой и пока только 10 мс звука — играть рано.
+    prod.push(f32::NAN).unwrap();
+    prod.push(gen as f32).unwrap();
+    for _ in 0..(RATE as usize / 100) * CHANNELS {
+        prod.push(0.3).unwrap();
+    }
+    let out = shared["out"].clone();
+    out.take_peak();
+    g.process();
+    assert_eq!(out.take_peak(), 0.0, "ждём запаса 0,1 с");
+    // Подкачка догнала — звук пошёл.
+    for _ in 0..(RATE as usize / 5) * CHANNELS {
+        prod.push(0.3).unwrap();
+    }
+    g.process();
+    g.process();
+    assert!(out.take_peak() > 0.29);
 }

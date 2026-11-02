@@ -70,19 +70,29 @@ pub struct TailControl {
     pub want_pos: std::sync::atomic::AtomicU64,
 }
 
-/// Затухание при остановке кнопки — без щелчка: 5 мс.
+/// Затухание при паузе и плавное вступление звука — без щелчков: 5 мс.
 const STOP_FADE: usize = RATE as usize / 200;
+
+/// Запас подкачки перед игрой после перемотки (или если диск не успел): 0,1 с. Иначе звук
+/// начинает играть, едва придут первые отсчёты, и тут же «голодает» — слышно прерывание.
+const TAIL_PREFILL: u64 = RATE as u64 / 10;
 
 /// Состояние проигрывания кнопки (живёт в потоке звука).
 #[derive(Default)]
 struct Playback {
     pos: u64,
     playing: bool,
-    /// Сколько кадров затухания осталось; Some — сейчас затухаем перед остановкой.
+    /// На паузе: не играет, но позиция сохранена.
+    paused: bool,
+    /// Сколько кадров затухания осталось; Some — сейчас затухаем перед паузой.
     fade_left: Option<usize>,
+    /// Сколько кадров плавного вступления осталось.
+    fade_in: usize,
     /// Номер последней просьбы к подкачке и пришла ли уже её метка.
     gen: u32,
     synced: bool,
+    /// Ждём запаса подкачки (после перемотки или нехватки данных).
+    buffering: bool,
 }
 
 enum Op {
@@ -248,18 +258,21 @@ fn start_button(src: &ButtonSource, pb: &mut Playback, pos: u64) {
     use std::sync::atomic::Ordering::Release;
     pb.pos = pos.min(src.total_frames);
     pb.playing = true;
+    pb.paused = false;
     pb.fade_left = None;
+    pb.fade_in = STOP_FADE;
     if let Some(tail) = &src.tail {
         let head_frames = (src.head.len() / CHANNELS) as u64;
         pb.gen = pb.gen.wrapping_add(1).max(1);
         pb.synced = false;
+        pb.buffering = true;
         tail.ctl.want_pos.store(pb.pos.max(head_frames), Release);
         tail.ctl.want_gen.store(pb.gen, Release);
     }
 }
 
-/// Один блок кнопки: нажатие — играть с начала, повторное — стоп (с затуханием);
-/// перемотка — играть с указанной доли звука.
+/// Один блок кнопки: нажатие — играть, повторное — пауза (с затуханием), ещё раз — дальше с того
+/// же места; перемотка — играть с указанной доли звука; в конце — стоп и шкала на начало.
 fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeShared, out: &mut [f32]) {
     out.fill(0.0);
     let pressed = shared.take_press();
@@ -274,6 +287,8 @@ fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeS
     } else if pressed {
         if pb.playing && pb.fade_left.is_none() {
             pb.fade_left = Some(STOP_FADE);
+        } else if pb.paused {
+            start_button(src, pb, pb.pos);
         } else if !pb.playing {
             start_button(src, pb, 0);
         }
@@ -294,9 +309,11 @@ fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeS
         if !pb.playing {
             break;
         }
-        let gain = match pb.fade_left {
+        let mut gain = match pb.fade_left {
             Some(0) => {
+                // Затухли — пауза: позиция остаётся.
                 pb.playing = false;
+                pb.paused = true;
                 break;
             }
             Some(n) => {
@@ -314,28 +331,51 @@ fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeS
             (src.head[i], src.head[i + 1])
         } else {
             match &mut src.tail {
-                // Подкачка ещё не догнала (перемотка, медленный диск) — тишина, позиция стоит.
-                Some(tail) if pb.synced && tail.cons.slots() >= CHANNELS => {
+                Some(tail) => {
+                    // Подкачка ещё не ответила на перемотку — тишина, позиция стоит.
+                    if !pb.synced {
+                        break;
+                    }
+                    let avail = (tail.cons.slots() / CHANNELS) as u64;
+                    if pb.buffering {
+                        // Ждём запаса (или всего, что осталось до конца), потом — плавно.
+                        if avail < TAIL_PREFILL.min(total - pb.pos) {
+                            break;
+                        }
+                        pb.buffering = false;
+                        pb.fade_in = STOP_FADE;
+                    }
+                    if avail == 0 {
+                        pb.buffering = true; // диск не успел — подождём запаса, а не будем заикаться
+                        break;
+                    }
                     (tail.cons.pop().unwrap_or(0.0), tail.cons.pop().unwrap_or(0.0))
                 }
-                Some(_) => break,
                 None => {
                     pb.playing = false;
                     break;
                 }
             }
         };
+        if pb.fade_in > 0 {
+            gain *= 1.0 - pb.fade_in as f32 / STOP_FADE as f32;
+            pb.fade_in -= 1;
+        }
         out[f * CHANNELS] = l * gain;
         out[f * CHANNELS + 1] = r * gain;
         pb.pos += 1;
     }
     if pb.pos >= total {
-        pb.playing = false; // кончилось ровно на границе блока
+        // Доиграла до конца: стоп, шкала — на начало.
+        pb.playing = false;
+        pb.paused = false;
+        pb.pos = 0;
     }
     if !pb.playing {
         pb.fade_left = None;
     }
-    shared.set_button(pb.playing, if pb.playing { pb.pos } else { 0 }, total);
+    let shown = if pb.playing || pb.paused { pb.pos } else { 0 };
+    shared.set_button(pb.playing, shown, total);
 }
 
 /// Порог мягкого ограничителя: тише — звук не меняется вовсе.

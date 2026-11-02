@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Круглая кнопка-звук. Середина — играть / стоп. Кольцо — шкала времени: нажатие на кольцо
-// перематывает (верх — начало, по часовой стрелке — к концу), даже если кнопка стояла.
+// Круглая кнопка-звук. Середина — играть / пауза / продолжить. Кольцо — шкала времени: нажатие
+// на кольцо перематывает (верх — начало, по часовой стрелке — к концу), даже если кнопка стояла.
 // Внутри — время: сейчас и всего. Используется на карте, в кнопочной панели и простом режиме.
 import type React from 'react';
 import type { ButtonPlayback } from '../api';
@@ -34,12 +34,13 @@ export function ringFraction(dx: number, dy: number): number {
 export default function ButtonDisc({ state, onPress, onSeek, size = 96, disabled, label }: Props) {
   const t = useT();
   const playing = state?.playing === true;
+  const paused = !playing && (state?.pos ?? 0) > 0;
   const stroke = Math.max(5, Math.round(size * 0.08));
   const c = size / 2;
   const r = c - stroke / 2 - 1;
   const length = 2 * Math.PI * r;
   const fraction = state && state.len > 0 ? Math.min(1, state.pos / state.len) : 0;
-  const action = t(playing ? 'button.stop' : 'button.play');
+  const action = t(playing ? 'button.pause' : paused ? 'button.resume' : 'button.play');
   const icon = size * 0.17;
   const iconY = c - size * 0.2;
 
@@ -51,7 +52,7 @@ export default function ButtonDisc({ state, onPress, onSeek, size = 96, disabled
     const scale = box.width / size; // кнопка может быть уменьшена масштабом карты
     const dist = Math.hypot(dx, dy) / scale;
     // Попали по кольцу (с запасом внутрь — по нему легче попасть) — перемотка, иначе — играть/стоп.
-    if (state && state.len > 0 && dist >= r - stroke * 1.6) onSeek(ringFraction(dx, dy));
+    if (state && state.len > 0 && dist >= r - stroke * 1.2) onSeek(ringFraction(dx, dy));
     else onPress();
   };
 
@@ -80,7 +81,10 @@ export default function ButtonDisc({ state, onPress, onSeek, size = 96, disabled
           />
         )}
         {playing ? (
-          <rect className="disc-icon" x={c - icon / 2} y={iconY - icon / 2} width={icon} height={icon} rx={icon * 0.12} />
+          <>
+            <rect className="disc-icon" x={c - icon * 0.45} y={iconY - icon / 2} width={icon * 0.32} height={icon} rx={icon * 0.08} />
+            <rect className="disc-icon" x={c + icon * 0.13} y={iconY - icon / 2} width={icon * 0.32} height={icon} rx={icon * 0.08} />
+          </>
         ) : (
           <path
             className="disc-icon"
@@ -90,7 +94,7 @@ export default function ButtonDisc({ state, onPress, onSeek, size = 96, disabled
         {state && (
           <>
             <text className="disc-time-now" x={c} y={c + size * 0.08} fontSize={Math.max(9, size * 0.15)}>
-              {formatTime(playing ? state.pos : 0)}
+              {formatTime(state.pos)}
             </text>
             <text className="disc-time-total" x={c} y={c + size * 0.24} fontSize={Math.max(8, size * 0.11)}>
               {formatTime(state.len)}

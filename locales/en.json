@@ -23,7 +23,7 @@
   "node.mic-input.title": "Microphone",
   "node.mic-input.desc": "Your microphone.",
   "node.sound-button.title": "Sound button",
-  "node.sound-button.desc": "Plays a sound when pressed. Press again to stop.",
+  "node.sound-button.desc": "Plays a sound when pressed. Press again to pause, once more to continue.",
   "node.volume.title": "Volume",
   "node.volume.desc": "Makes the sound quieter or louder.",
   "node.speaker-out.title": "Headphones",
@@ -117,7 +117,6 @@
   "error.latency": "Could not measure latency: the test signal did not reach the virtual microphone.",
   "error.latencyNoCable": "Could not measure latency: virtual cable not found.",
   "button.play": "Play",
-  "button.stop": "Stop",
   "status.file-not-chosen": "no file selected",
   "status.file-missing": "file not found",
   "status.file-unsupported": "format not supported",
@@ -143,5 +142,7 @@
   "simple.nothing": "nothing connected",
   "simple.morpher": "Voice morpher",
   "simple.morpherLater": "Ready-made voices (morpher presets) will be here. Coming in stage 6.",
-  "button.seekHint": "Click the ring to jump: the top is the start, clockwise towards the end."
+  "button.seekHint": "Click the ring to jump: the top is the start, clockwise towards the end.",
+  "button.pause": "Pause",
+  "button.resume": "Resume"
 }

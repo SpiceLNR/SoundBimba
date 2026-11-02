@@ -134,8 +134,7 @@ function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (cmd === 'press_button') {
     const id = String(args?.nodeId);
     const b = (previewPlaying[id] ??= { playing: false, pos: 0, len: 95 });
-    b.playing = !b.playing;
-    b.pos = 0;
+    b.playing = !b.playing; // как в программе: повторное нажатие — пауза, позиция остаётся
   }
   if (cmd === 'seek_button') {
     const b = (previewPlaying[String(args?.nodeId)] ??= { playing: false, pos: 0, len: 95 });
@@ -159,7 +158,10 @@ export function onAudioState(handler: (s: AudioState) => void): () => void {
       for (const b of Object.values(previewPlaying)) {
         if (!b.playing) continue;
         b.pos += 0.066;
-        if (b.pos >= b.len) b.playing = false;
+        if (b.pos >= b.len) {
+          b.playing = false;
+          b.pos = 0;
+        }
       }
       if (previewEnabled) previewPlaying.n5 ??= { playing: false, pos: 0, len: 95 };
       const buttons: Record<string, ButtonPlayback> = {};
