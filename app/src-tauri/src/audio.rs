@@ -54,6 +54,8 @@ pub struct PortReport {
     pub underruns: u32,
     pub overflows: u32,
     pub skips: u32,
+    /// Блоков с перегрузом (сработал ограничитель) — только у выходов.
+    pub overloads: u32,
     pub error: Option<String>,
 }
 
@@ -192,6 +194,7 @@ struct Controller {
     snapshot: Arc<Mutex<Snapshot>>,
     last_status: HashMap<String, NodeStatus>,
     last_glitches: HashMap<String, (u32, u32, u32)>,
+    last_overloads: HashMap<String, u32>,
     last_late: u32,
 }
 
@@ -242,6 +245,7 @@ impl Controller {
     fn restart(&mut self, project: &Project, resolved: &Resolved) {
         self.stop();
         self.last_glitches.clear();
+        self.last_overloads.clear();
         self.last_late = 0;
         self.last_restart = Instant::now();
         let plan = match engine::plan(project, resolved) {
@@ -323,6 +327,7 @@ impl Controller {
                     }
                 }
                 let (underruns, overflows, skips) = stream.as_ref().map(|s| s.stats.snapshot()).unwrap_or_default();
+                let overloads = stream.as_ref().map(|s| s.stats.overloads()).unwrap_or_default();
                 ports.push(PortReport {
                     port: port_name(key),
                     format: stream.as_ref().map(|s| s.info.format.clone()).unwrap_or_default(),
@@ -330,6 +335,7 @@ impl Controller {
                     underruns,
                     overflows,
                     skips,
+                    overloads,
                     error,
                 });
             }
@@ -352,6 +358,16 @@ impl Controller {
                     now.0.saturating_sub(before.0),
                     now.1.saturating_sub(before.1),
                     now.2.saturating_sub(before.2)
+                ));
+            }
+        }
+        for p in &ports {
+            let before = self.last_overloads.insert(p.port.clone(), p.overloads).unwrap_or_default();
+            if p.overloads > before {
+                applog::info(&format!(
+                    "audio overload on {}: {} block(s) louder than maximum, limiter engaged",
+                    p.port,
+                    p.overloads - before
                 ));
             }
         }
@@ -394,6 +410,7 @@ impl Audio {
             snapshot: snapshot.clone(),
             last_status: HashMap::new(),
             last_glitches: HashMap::new(),
+            last_overloads: HashMap::new(),
             last_late: 0,
         };
         let control = std::thread::Builder::new()

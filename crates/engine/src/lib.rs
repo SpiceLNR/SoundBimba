@@ -183,6 +183,9 @@ impl Graph {
             step.shared.report_peak(&out[..]);
         }
         for (writer, buf) in self.outputs.iter_mut().zip(self.out_bufs.iter_mut()) {
+            if soft_limit(&mut buf[..]) {
+                writer.stats().overloads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
             writer.write(&buf[..]);
             buf.fill(0.0);
         }
@@ -192,6 +195,25 @@ impl Graph {
     pub fn input_stats(&self) -> impl Iterator<Item = &PortStats> {
         self.inputs.iter().map(|r| r.stats())
     }
+}
+
+/// Порог мягкого ограничителя: тише — звук не меняется вовсе.
+const LIMIT_KNEE: f32 = 0.9;
+
+/// Мягкий ограничитель на выходе: громкие пики (сумма источников, усиление выше 100 %) плавно
+/// прижимаются к максимуму вместо жёсткого среза — жёсткий срез слышен как хруст.
+/// Возвращает true, если в блоке был перегруз (звук громче максимума).
+fn soft_limit(buf: &mut [f32]) -> bool {
+    let mut overloaded = false;
+    for s in buf.iter_mut() {
+        let a = s.abs();
+        if a > LIMIT_KNEE {
+            overloaded |= a > 1.0;
+            let room = 1.0 - LIMIT_KNEE;
+            *s = s.signum() * (LIMIT_KNEE + room * ((a - LIMIT_KNEE) / room).tanh());
+        }
+    }
+    overloaded
 }
 
 /// Усиление с плавным переходом от `from` к `to` за блок — без щелчков при движении ползунка.

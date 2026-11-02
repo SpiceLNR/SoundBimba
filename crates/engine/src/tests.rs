@@ -291,3 +291,28 @@ fn two_nodes_on_one_output_are_mixed_once_per_block() {
     let tail = &out[0][out[0].len() - BLOCK_SAMPLES..];
     assert!(tail.iter().all(|&s| (s - 0.2).abs() < 1e-5), "{:?}", &tail[..2]);
 }
+
+#[test]
+fn soft_limiter_keeps_quiet_sound_and_tames_peaks() {
+    let mut buf = vec![0.5, -0.89, 0.95, -1.5, 3.0, 1.0];
+    let overloaded = super::soft_limit(&mut buf);
+    assert!(overloaded);
+    assert_eq!(&buf[..2], &[0.5, -0.89], "тихое не трогаем");
+    assert!(buf[2] > 0.9 && buf[2] < 0.95);
+    assert!(buf[3] > -1.0 && buf[3] < -0.9);
+    assert!(buf[4] <= 1.0 && buf[4] > buf[2], "громче — ближе к максимуму, но не выше");
+    let mut quiet = vec![0.3; 8];
+    assert!(!super::soft_limit(&mut quiet));
+}
+
+#[test]
+fn loud_mix_is_limited_and_counted() {
+    // Два громких источника по 0,8 — в сумме 1,6: без ограничителя был бы жёсткий срез.
+    let p = mixer_project(1.0, false);
+    let mut r = rig(&p, &ports());
+    let blocks = 40;
+    let out = run_blocks(&mut r, blocks, &[vec![0.8; blocks * BLOCK_SAMPLES], vec![0.8; blocks * BLOCK_SAMPLES]]);
+    let tail = &out[0][out[0].len() - BLOCK_SAMPLES..];
+    assert!(tail.iter().all(|&s| s <= 1.0 && s > 0.9), "{:?}", &tail[..2]);
+    assert!(r.taps[0].stats().overloads() > 0);
+}

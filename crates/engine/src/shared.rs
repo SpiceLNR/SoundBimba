@@ -76,10 +76,16 @@ pub struct PortStats {
     pub underruns: AtomicU32,
     pub overflows: AtomicU32,
     pub skips: AtomicU32,
+    /// Блоков, где сумма на выходе была громче максимума и сработал ограничитель.
+    pub overloads: AtomicU32,
 }
 
 impl PortStats {
     pub fn snapshot(&self) -> (u32, u32, u32) {
         (self.underruns.load(Relaxed), self.overflows.load(Relaxed), self.skips.load(Relaxed))
+    }
+
+    pub fn overloads(&self) -> u32 {
+        self.overloads.load(Relaxed)
     }
 }
