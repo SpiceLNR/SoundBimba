@@ -9,7 +9,7 @@
   "toolbar.import": "Import",
   "toolbar.diagnostics": "Save diagnostics",
   "toolbar.language": "Language",
-  "toolbar.languageSystem": "Language: system",
+  "toolbar.languageSystem": "System default",
   "toolbar.theme": "Theme",
   "save.saving": "Saving…",
   "save.saved": "Saved",
@@ -92,5 +92,6 @@
   "action.export": "Export project",
   "action.import": "Import project",
   "action.diagnostics": "Save diagnostics",
-  "action.add": "Add: {node}"
+  "action.add": "Add: {node}",
+  "toolbar.settings": "Settings"
 }

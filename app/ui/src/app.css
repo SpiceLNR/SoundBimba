@@ -148,21 +148,126 @@ input[type='range']:focus-visible {
   min-width: 8px;
 }
 
-/* Списки панели фиксированной ширины: иначе ширину задаёт самый длинный пункт. */
-.add-node {
-  width: 170px;
+/* Выпадающие списки панели (свои, не системные — оформлены по теме). */
+.dropdown {
+  position: relative;
 }
 
-.lang-select {
-  width: 190px;
+.dropdown-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
 }
 
-.theme-select {
-  width: 130px;
-}
-
-.toolbar select {
+.dropdown-label {
+  flex: 1;
+  overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.dropdown-caret {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+/* Ширина кнопок: список «Добавить узел» той же ширины, что кнопка. */
+.add-node {
+  width: var(--add-node-width);
+}
+
+.settings-menu {
+  width: 150px;
+}
+
+/* Кнопки панели не сжимаются: лучше спрятать название программы, чем обрезать их. */
+.toolbar > * {
+  flex: none;
+}
+
+.toolbar > .toolbar-gap {
+  flex: 1;
+}
+
+.dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100%;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow);
+}
+
+.dropdown-list.match-width {
+  width: 100%;
+}
+
+.dropdown-list.align-left {
+  left: 0;
+}
+
+.dropdown-list.align-right {
+  right: 0;
+}
+
+.dropdown-group + .dropdown-group {
+  margin-top: 4px;
+}
+
+.dropdown-group-title {
+  padding: 6px 8px 2px;
+  color: var(--text-muted);
+  font-size: 0.8em;
+  text-transform: var(--title-transform);
+  letter-spacing: var(--title-spacing);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.dropdown-item:hover {
+  background: var(--control-bg-hover);
+  border-color: transparent;
+}
+
+.dropdown-item.selected {
+  color: var(--accent);
+  font-weight: var(--title-weight);
+}
+
+.dropdown-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Клавиша в цвете узла (в списке «Добавить узел»). */
+.key-badge {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: var(--radius-small);
+  background: var(--cat);
+  color: var(--bg);
+  font-size: 0.85em;
+  font-weight: 700;
 }
 
 /* Узкое окно: название программы есть в заголовке окна, на панели его можно спрятать. */
@@ -170,36 +275,6 @@ input[type='range']:focus-visible {
   .brand {
     display: none;
   }
-}
-
-/* Меню «Проект». */
-.menu {
-  position: relative;
-}
-
-.menu-list {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  min-width: 100%;
-  padding: 4px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-small);
-  box-shadow: var(--shadow);
-}
-
-.menu-list button {
-  text-align: left;
-  border-color: transparent;
-  background: transparent;
-}
-
-.menu-list button:hover {
-  background: var(--control-bg-hover);
 }
 
 .save-state {

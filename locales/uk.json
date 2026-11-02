@@ -9,7 +9,7 @@
   "toolbar.import": "Імпорт",
   "toolbar.diagnostics": "Зберегти діагностику",
   "toolbar.language": "Мова",
-  "toolbar.languageSystem": "Мова: як у системі",
+  "toolbar.languageSystem": "Як у системі",
   "toolbar.theme": "Тема",
   "save.saving": "Зберігаю…",
   "save.saved": "Збережено",
@@ -92,5 +92,6 @@
   "action.export": "Експорт проєкту",
   "action.import": "Імпорт проєкту",
   "action.diagnostics": "Зберегти діагностику",
-  "action.add": "Додати: {node}"
+  "action.add": "Додати: {node}",
+  "toolbar.settings": "Налаштування"
 }

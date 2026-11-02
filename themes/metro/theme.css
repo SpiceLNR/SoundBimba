@@ -29,6 +29,9 @@
   --control-border-hover: transparent;
   --control-border: transparent;
 
+  /* Ширина списка «Добавить узел» под шрифт темы. */
+  --add-node-width: 252px;
+
   --slider-track: #3a3245;
   --slider-track-height: 4px;
   --slider-thumb-bg: #f3eef7;

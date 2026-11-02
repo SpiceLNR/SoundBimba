@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Верхняя панель — одна строка: слева работа с картой, справа меню «Проект», язык и тема.
-import { useEffect, useRef, useState } from 'react';
+// Верхняя панель — одна строка: слева работа с картой, справа «Проект», «Клавиши» и «Настройки»
+// (язык и тема).
 import type { Settings } from '../api';
 import { CATEGORY_ORDER, KIND_ORDER, KINDS, type NodeKind } from '../graph';
 import { formatCombo, type Bindings } from '../hotkeys';
 import { LANGUAGES, isLang, useT, type Lang } from '../i18n';
 import { THEMES } from '../theme';
+import Dropdown from './Dropdown';
 
 export type SaveState = 'saved' | 'saving' | 'error';
 
@@ -23,114 +24,81 @@ interface Props {
   onSettings: (s: Settings) => void;
 }
 
-/** Меню «Проект»: импорт, экспорт, диагностика. Закрывается после выбора или щелчка мимо. */
-function ProjectMenu({ items }: { items: { label: string; action: () => void }[] }) {
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    // Перехват на этапе погружения: карта React Flow сама гасит события мыши.
-    window.addEventListener('pointerdown', close, true);
-    return () => window.removeEventListener('pointerdown', close, true);
-  }, [open]);
-  return (
-    <div className="menu" ref={ref}>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        {t('toolbar.project')} ▾
-      </button>
-      {open && (
-        <div className="menu-list" role="menu">
-          {items.map((it) => (
-            <button
-              key={it.label}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                it.action();
-              }}
-            >
-              {it.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function Toolbar(p: Props) {
   const t = useT();
+  const projectActions: Record<string, () => void> = {
+    import: p.onImport,
+    export: p.onExport,
+    diagnostics: p.onDiagnostics,
+  };
   return (
     <header className="toolbar">
       <div className="brand">{t('app.title')}</div>
-      <select
+      <Dropdown
         className="add-node"
-        value=""
-        aria-label={t('toolbar.add')}
-        onChange={(e) => {
-          if (e.target.value) p.onAdd(e.target.value as NodeKind);
-        }}
-      >
-        <option value="">{t('toolbar.add')}</option>
-        {CATEGORY_ORDER.map((cat) => (
-          <optgroup key={cat} label={t(`category.${cat}`)}>
-            {KIND_ORDER.filter((k) => KINDS[k].category === cat).map((k) => (
-              <option key={k} value={k}>
-                {p.bindings[`add-${k}`]
-                  ? `${t(`node.${k}.title`)} — ${formatCombo(p.bindings[`add-${k}`])}`
-                  : t(`node.${k}.title`)}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+        label={t('toolbar.add')}
+        matchWidth
+        onSelect={(k) => p.onAdd(k as NodeKind)}
+        groups={CATEGORY_ORDER.map((cat) => ({
+          title: t(`category.${cat}`),
+          items: KIND_ORDER.filter((k) => KINDS[k].category === cat).map((k) => ({
+            value: k,
+            label: t(`node.${k}.title`),
+            // Клавиша слева, в цвете узла этого типа.
+            left: <span className={`key-badge cat-${cat}`}>{p.bindings[`add-${k}`] ? formatCombo(p.bindings[`add-${k}`]) : ''}</span>,
+          })),
+        }))}
+      />
       <button type="button" onClick={p.onArrange}>
         {t('toolbar.arrange')}
       </button>
       <span className="toolbar-gap" />
       <span className={`save-state save-${p.saveState}`}>{t(`save.${p.saveState}`)}</span>
-      <ProjectMenu
-        items={[
-          { label: t('toolbar.import'), action: p.onImport },
-          { label: t('toolbar.export'), action: p.onExport },
-          { label: t('toolbar.diagnostics'), action: p.onDiagnostics },
+      <Dropdown
+        label={t('toolbar.project')}
+        align="right"
+        onSelect={(v) => projectActions[v]?.()}
+        groups={[
+          {
+            items: [
+              { value: 'import', label: t('toolbar.import') },
+              { value: 'export', label: t('toolbar.export') },
+              { value: 'diagnostics', label: t('toolbar.diagnostics') },
+            ],
+          },
         ]}
       />
       <button type="button" onClick={p.onHotkeys}>
         {t('toolbar.hotkeys')}
       </button>
-      <select
-        className="lang-select"
-        value={p.settings.language ?? ''}
-        aria-label={t('toolbar.language')}
-        title={t('toolbar.language')}
-        onChange={(e) => p.onSettings({ ...p.settings, language: isLang(e.target.value) ? e.target.value : null })}
-      >
-        <option value="">{t('toolbar.languageSystem')}</option>
-        {LANGUAGES.map((l) => (
-          <option key={l} value={l}>
-            {t(`lang.${l}`)}
-          </option>
-        ))}
-      </select>
-      <select
-        className="theme-select"
-        value={p.settings.theme}
-        aria-label={t('toolbar.theme')}
-        title={t('toolbar.theme')}
-        onChange={(e) => p.onSettings({ ...p.settings, theme: e.target.value })}
-      >
-        {THEMES.map((th) => (
-          <option key={th.id} value={th.id}>
-            {`${t('toolbar.theme')}: ${th.names[p.lang] ?? th.names.en}`}
-          </option>
-        ))}
-      </select>
+      <Dropdown
+        className="settings-menu"
+        label={t('toolbar.settings')}
+        matchWidth
+        align="right"
+        onSelect={(v) => {
+          const [what, value] = v.split(':');
+          if (what === 'lang') p.onSettings({ ...p.settings, language: isLang(value) ? value : null });
+          if (what === 'theme') p.onSettings({ ...p.settings, theme: value });
+        }}
+        groups={[
+          {
+            title: t('toolbar.language'),
+            items: [
+              { value: 'lang:system', label: t('toolbar.languageSystem'), selected: !p.settings.language },
+              ...LANGUAGES.map((l) => ({ value: `lang:${l}`, label: t(`lang.${l}`), selected: p.settings.language === l })),
+            ],
+          },
+          {
+            title: t('toolbar.theme'),
+            items: THEMES.map((th) => ({
+              value: `theme:${th.id}`,
+              label: th.names[p.lang] ?? th.names.en,
+              selected: th.id === p.settings.theme,
+            })),
+          },
+        ]}
+      />
     </header>
   );
 }

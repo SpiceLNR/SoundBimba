@@ -26,6 +26,9 @@
   --control-border-hover: #ff1493;
   --control-border: #3a3245;
 
+  /* Ширина списка «Добавить узел» под шрифт темы. */
+  --add-node-width: 228px;
+
   --slider-track: #3a3245;
   --slider-track-height: 6px;
   --slider-thumb-bg: #ff1493;
