@@ -44,6 +44,9 @@ pub struct NodeShared {
     reduction: AtomicF32,
     /// Морфер голоса: сила эффектов (пишет интерфейс).
     morph: crate::morpher::MorpherParams,
+    /// Шумоподавление: сила (пишет интерфейс) и наибольшая вероятность голоса с прошлого опроса.
+    denoise_amount: AtomicF32,
+    voice: AtomicF32,
 }
 
 /// Настройки компрессора (см. `graph::COMPRESSOR_RANGES`).
@@ -89,6 +92,8 @@ impl Default for NodeShared {
             comp: CompressorParams::default(),
             reduction: AtomicF32::new(0.0),
             morph: crate::morpher::MorpherParams::default(),
+            denoise_amount: AtomicF32::new(1.0),
+            voice: AtomicF32::new(0.0),
         }
     }
 }
@@ -108,6 +113,10 @@ impl NodeShared {
                 cell.store(v.clamp(*range.start(), *range.end()) as f32);
             }
         }
+        if node.kind == graph::NodeKind::Denoise {
+            let v = node.params.get("amount").and_then(|v| v.as_f64()).unwrap_or(1.0);
+            self.denoise_amount.store(v.clamp(0.0, 1.0) as f32);
+        }
         if node.kind == graph::NodeKind::VoiceMorpher {
             let m = &self.morph;
             for (cell, (name, range)) in [&m.pitch, &m.robot, &m.radio, &m.echo, &m.wobble].into_iter().zip(graph::MORPHER_RANGES) {
@@ -115,6 +124,19 @@ impl NodeShared {
                 cell.store(v.clamp(*range.start(), *range.end()) as f32);
             }
         }
+    }
+
+    pub fn denoise_amount(&self) -> &AtomicF32 {
+        &self.denoise_amount
+    }
+
+    pub(crate) fn report_voice(&self, p: f32) {
+        self.voice.fetch_max_positive(p);
+    }
+
+    /// Вероятность голоса (0…1) у шумоподавления с прошлого вызова — для индикатора.
+    pub fn take_voice(&self) -> f32 {
+        self.voice.swap(0.0)
     }
 
     pub fn morpher(&self) -> &crate::morpher::MorpherParams {

@@ -67,6 +67,20 @@ export const TEMPLATES: Template[] = [
     ],
   },
   {
+    id: 'clean-voice',
+    nodes: [
+      { key: 'mic', kind: 'mic-input' },
+      { key: 'clean', kind: 'denoise' },
+      { key: 'comp', kind: 'compressor' },
+      { key: 'virt', kind: 'virtual-out' },
+    ],
+    edges: [
+      ['mic', 'clean'],
+      ['clean', 'comp'],
+      ['comp', 'virt'],
+    ],
+  },
+  {
     id: 'voice-changer',
     nodes: [
       { key: 'mic', kind: 'mic-input' },

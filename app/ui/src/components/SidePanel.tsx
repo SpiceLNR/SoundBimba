@@ -9,6 +9,7 @@ import { isProblem, useAudio } from '../audio';
 import { KINDS, type NodeKind, type Params, type SoundNode } from '../graph';
 import { useT } from '../i18n';
 import CompressorParams from './CompressorParams';
+import DenoiseParams from './DenoiseParams';
 import MorpherParams from './MorpherParams';
 import ButtonDisc from './ButtonDisc';
 import Dropdown from './Dropdown';
@@ -192,6 +193,8 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
       return <CompressorParams node={node} onParams={onParams} />;
     case 'voice-morpher':
       return <MorpherParams node={node} onParams={onParams} />;
+    case 'denoise':
+      return <DenoiseParams node={node} onParams={onParams} />;
     case 'mic-input':
     case 'speaker-out':
     case 'virtual-out': {

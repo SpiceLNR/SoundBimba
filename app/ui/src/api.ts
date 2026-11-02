@@ -90,6 +90,8 @@ export interface AudioState {
   buttons: Record<string, ButtonPlayback>;
   /** Компрессоры: насколько сжимают сейчас, дБ (нет записи — не сжимают). */
   reductions?: Record<string, number>;
+  /** Шумоподавление: вероятность голоса 0…1 (нет записи — тишина). */
+  voices?: Record<string, number>;
 }
 
 /** Проект и настройки без побочных действий (для кнопочной панели). */

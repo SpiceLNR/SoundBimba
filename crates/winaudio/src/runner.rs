@@ -64,6 +64,7 @@ pub fn start(mut graph: Graph) -> Runner {
             let mut task = 0u32;
             let mmcss = unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut task) }.ok();
             let timer = Timer::new();
+            graph.warm_up();
             let block = Duration::from_secs_f64(BLOCK as f64 / RATE as f64);
             let mut next = Instant::now();
             while !s.load(Relaxed) {

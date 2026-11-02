@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 graph = { path = "../graph" }
+nnnoiseless = { version = "0.5.2", default-features = false }
 rtrb = "0.4"
 
 [dev-dependencies]

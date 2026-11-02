@@ -43,6 +43,8 @@ pub enum NodeKind {
     Compressor,
     /// Морфер голоса: высота, «робот», «рация», эхо.
     VoiceMorpher,
+    /// Шумоподавление (RNNoise): оставляет голос, убирает фон.
+    Denoise,
     /// Выход «Наушники» (реальное устройство вывода).
     SpeakerOut,
     /// Выход «Виртуальный микрофон» (динамик виртуального кабеля).
@@ -59,13 +61,14 @@ pub enum Category {
 }
 
 impl NodeKind {
-    pub const ALL: [NodeKind; 8] = [
+    pub const ALL: [NodeKind; 9] = [
         NodeKind::AppSource,
         NodeKind::MicInput,
         NodeKind::SoundButton,
         NodeKind::Volume,
         NodeKind::Compressor,
         NodeKind::VoiceMorpher,
+        NodeKind::Denoise,
         NodeKind::SpeakerOut,
         NodeKind::VirtualOut,
     ];
@@ -73,7 +76,12 @@ impl NodeKind {
     pub fn has_input(self) -> bool {
         matches!(
             self,
-            NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher | NodeKind::SpeakerOut | NodeKind::VirtualOut
+            NodeKind::Volume
+                | NodeKind::Compressor
+                | NodeKind::VoiceMorpher
+                | NodeKind::Denoise
+                | NodeKind::SpeakerOut
+                | NodeKind::VirtualOut
         )
     }
 
@@ -85,7 +93,7 @@ impl NodeKind {
         match self {
             NodeKind::AppSource | NodeKind::MicInput => Category::Source,
             NodeKind::SoundButton => Category::Button,
-            NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher => Category::Processing,
+            NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher | NodeKind::Denoise => Category::Processing,
             NodeKind::SpeakerOut | NodeKind::VirtualOut => Category::Output,
         }
     }
@@ -245,6 +253,9 @@ pub const MORPHER_RANGES: [(&str, std::ops::RangeInclusive<f64>); 5] = [
     ("wobble", 0.0..=1.0),
 ];
 
+/// Шумоподавление: сила 0…1 (смесь очищенного и исходного).
+pub const DENOISE_RANGES: [(&str, std::ops::RangeInclusive<f64>); 1] = [("amount", 0.0..=1.0)];
+
 fn check_params(n: &Node) -> Result<(), GraphError> {
     let bad = |param| GraphError::BadParam { node: n.id.clone(), param };
     if n.kind == NodeKind::Volume {
@@ -261,6 +272,7 @@ fn check_params(n: &Node) -> Result<(), GraphError> {
     let ranges: &[(&'static str, std::ops::RangeInclusive<f64>)] = match n.kind {
         NodeKind::Compressor => &COMPRESSOR_RANGES,
         NodeKind::VoiceMorpher => &MORPHER_RANGES,
+        NodeKind::Denoise => &DENOISE_RANGES,
         _ => &[],
     };
     for &(param, ref range) in ranges {

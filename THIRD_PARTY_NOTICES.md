@@ -16,6 +16,8 @@ Keep this list up to date: every dependency and bundled resource must appear her
 | Tauri dialog plugin (`tauri-plugin-dialog`, `@tauri-apps/plugin-dialog`) | File dialogs for export, import, diagnostics | MIT or Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
 | serde, serde_json | Project file (de)serialization | MIT or Apache-2.0 | https://github.com/serde-rs |
 | rtrb | Real-time safe ring buffers between audio devices and the engine | MIT or Apache-2.0 | https://github.com/mgeier/rtrb |
+| nnnoiseless (Rust port of RNNoise, with its trained model) | Noise suppression node | BSD-3-Clause | https://github.com/jneem/nnnoiseless (RNNoise: https://github.com/xiph/rnnoise) |
+| rustfft, realfft, easyfft, generic_singleton, transpose, strength_reduce, primal-check, num-complex, anymap3 (nnnoiseless dependencies) | FFT for noise suppression | MIT or Apache-2.0 (realfft: MIT) | https://crates.io |
 | Symphonia (`symphonia` and its codec crates: WAV/PCM, MP3, OGG/Vorbis, FLAC) | Decoding sound files for buttons | MPL-2.0 | https://github.com/pdeljanov/Symphonia |
 | Nunito font (via Fontsource) | Theme "Bimba" font, bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/nunito , https://fontsource.org |
 | Open Sans font (via Fontsource) | Theme "Metro" font (free alternative to Segoe UI), bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/opensans , https://fontsource.org |

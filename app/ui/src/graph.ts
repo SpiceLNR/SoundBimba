@@ -5,7 +5,7 @@ import { signed } from './compressor';
 import { voiceOf } from './morpher';
 import type { Translate } from './i18n';
 
-export type NodeKind = 'app-source' | 'mic-input' | 'sound-button' | 'volume' | 'compressor' | 'voice-morpher' | 'speaker-out' | 'virtual-out';
+export type NodeKind = 'app-source' | 'mic-input' | 'sound-button' | 'volume' | 'compressor' | 'voice-morpher' | 'denoise' | 'speaker-out' | 'virtual-out';
 export type Category = 'source' | 'processing' | 'output' | 'button';
 export type Params = Record<string, unknown>;
 
@@ -30,6 +30,7 @@ export const KINDS: Record<NodeKind, KindInfo> = {
   },
   // Голос «Обычный»: все эффекты выключены, голос проходит без изменений.
   'voice-morpher': { category: 'processing', input: true, output: true, defaults: { pitch: 0, robot: 0, radio: 0, echo: 0, wobble: 0 } },
+  denoise: { category: 'processing', input: true, output: true, defaults: { amount: 1 } },
   'speaker-out': { category: 'output', input: true, output: false, defaults: { device: 'default' } },
   'virtual-out': { category: 'output', input: true, output: false, defaults: { device: 'virtual-1' } },
 };
@@ -244,6 +245,8 @@ export function summary(kind: NodeKind, params: Params, t: Translate): string {
     }
     case 'compressor':
       return `${signed(Number(params.threshold ?? -24))} ${t('unit.db')} · ${Number(params.ratio ?? 3)}:1 · +${Number(params.makeup ?? 12)} ${t('unit.db')}`;
+    case 'denoise':
+      return `${t('param.amount')} ${Math.round(Number(params.amount ?? 1) * 100)} %`;
     case 'voice-morpher': {
       const voice = voiceOf(params);
       return voice ? t(`voice.${voice}`) : t('voice.custom');

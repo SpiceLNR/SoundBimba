@@ -89,6 +89,8 @@ struct StateEvent<'a> {
     buttons: HashMap<String, ButtonEvent>,
     /// Компрессоры: наибольшее сжатие с прошлого события, дБ — для индикатора.
     reductions: HashMap<String, f32>,
+    /// Шумоподавление: вероятность голоса 0…1 с прошлого события — для индикатора.
+    voices: HashMap<String, f32>,
 }
 
 #[derive(Serialize, Clone)]
@@ -197,7 +199,11 @@ fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
                     None => (None, NodeStatus::DeviceMissing),
                 },
             },
-            NodeKind::SoundButton | NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher => (None, NodeStatus::Ok),
+            NodeKind::SoundButton
+            | NodeKind::Volume
+            | NodeKind::Compressor
+            | NodeKind::VoiceMorpher
+            | NodeKind::Denoise => (None, NodeStatus::Ok),
         };
         if let Some(port) = port {
             r.ports.insert(n.id.clone(), port);
@@ -543,7 +549,7 @@ impl Audio {
             .name("sb-audio-levels".into())
             .spawn(move || loop {
                 std::thread::sleep(LEVELS_EVERY);
-                let (levels, buttons, reductions) = {
+                let (levels, buttons, reductions, voices) = {
                     let shared = sh.lock().unwrap();
                     let levels: HashMap<String, f32> = shared.iter().map(|(id, s)| (id.clone(), s.take_peak())).collect();
                     let secs = |frames: u64| frames as f64 / RATE as f64;
@@ -556,10 +562,11 @@ impl Audio {
                         })
                         .collect();
                     let reductions: HashMap<String, f32> = shared.iter().map(|(id, s)| (id.clone(), s.take_reduction())).filter(|(_, r)| *r > 0.0).collect();
-                    (levels, buttons, reductions)
+                    let voices: HashMap<String, f32> = shared.iter().map(|(id, s)| (id.clone(), s.take_voice())).filter(|(_, v)| *v > 0.0).collect();
+                    (levels, buttons, reductions, voices)
                 };
                 let snapshot = snap.lock().unwrap().clone();
-                if app.emit("audio-state", StateEvent { snapshot: &snapshot, levels, buttons, reductions }).is_err() {
+                if app.emit("audio-state", StateEvent { snapshot: &snapshot, levels, buttons, reductions, voices }).is_err() {
                     break;
                 }
             })

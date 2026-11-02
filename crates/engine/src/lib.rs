@@ -17,6 +17,7 @@ use graph::{NodeKind, Project};
 
 pub use ring::{ring, RingReader, RingWriter};
 pub mod compressor;
+pub mod denoise;
 pub mod morpher;
 
 pub use shared::{AtomicF32, ButtonState, CompressorParams, NodeShared, PortStats, COMPRESSOR_DEFAULTS};
@@ -111,6 +112,8 @@ enum Op {
     Compressor(compressor::State),
     /// Морфер голоса: сумма входов → высота, робот, рация, эхо.
     Morpher(Box<morpher::State>),
+    /// Шумоподавление: сумма входов → RNNoise (моно), задержка 20 мс.
+    Denoise(Box<denoise::State>),
     /// Выход: сумма входов → внешний выход. None — выхода нет.
     Output(Option<usize>),
 }
@@ -151,7 +154,9 @@ pub fn plan(project: &Project, resolver: &dyn PortResolver) -> Result<PortPlan, 
         let list = match n.kind {
             NodeKind::AppSource | NodeKind::MicInput => &mut inputs,
             NodeKind::SpeakerOut | NodeKind::VirtualOut => &mut outputs,
-            NodeKind::SoundButton | NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher => continue,
+            NodeKind::SoundButton | NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher | NodeKind::Denoise => {
+                continue
+            }
         };
         // Два узла на одном устройстве делят один порт.
         if let Some(key) = resolver.port_for(n) {
@@ -193,6 +198,7 @@ impl Graph {
                 NodeKind::Volume => Op::Volume,
                 NodeKind::Compressor => Op::Compressor(compressor::State::new(sh.compressor())),
                 NodeKind::VoiceMorpher => Op::Morpher(Box::default()),
+                NodeKind::Denoise => Op::Denoise(Box::default()),
                 NodeKind::SpeakerOut | NodeKind::VirtualOut => {
                     Op::Output(port.and_then(|k| plan.outputs.iter().position(|p| *p == k)))
                 }
@@ -227,7 +233,7 @@ impl Graph {
                     None => out.fill(0.0),
                 },
                 Op::Button(src, pb) => play_button(src.as_mut(), pb, &step.shared, &mut out[..]),
-                Op::Volume | Op::Compressor(_) | Op::Morpher(_) | Op::Output(_) => {
+                Op::Volume | Op::Compressor(_) | Op::Morpher(_) | Op::Denoise(_) | Op::Output(_) => {
                     out.fill(0.0);
                     for &src in &step.inputs {
                         for (o, s) in out.iter_mut().zip(before[src].iter()) {
@@ -239,6 +245,10 @@ impl Graph {
             if let Op::Compressor(state) = &mut step.op {
                 let reduction = state.process(&mut out[..], step.shared.compressor());
                 step.shared.report_reduction(reduction);
+            }
+            if let Op::Denoise(state) = &mut step.op {
+                let voice = state.process(&mut out[..], step.shared.denoise_amount());
+                step.shared.report_voice(voice);
             }
             if let Op::Morpher(state) = &mut step.op {
                 state.process(&mut out[..], step.shared.morpher());
@@ -262,6 +272,16 @@ impl Graph {
             }
             writer.write(&buf[..]);
             buf.fill(0.0);
+        }
+    }
+
+    /// Первые вызовы, которым нужна своя память в потоке (FFT шумоподавления), — в потоке движка
+    /// до начала реального времени (вызывает runner).
+    pub fn warm_up(&mut self) {
+        for step in &mut self.steps {
+            if let Op::Denoise(state) = &mut step.op {
+                state.warm_up();
+            }
         }
     }
 

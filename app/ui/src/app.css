@@ -1141,3 +1141,28 @@ details.more > .field + .field {
   background: var(--node-processing);
   transition: width 0.08s linear;
 }
+
+/* Шумоподавление: «слышу голос». */
+.voice-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.voice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--slider-track);
+  transition: background 0.1s;
+}
+
+.voice-state.speaking {
+  color: var(--text);
+}
+
+.voice-state.speaking .voice-dot {
+  background: var(--node-source);
+}

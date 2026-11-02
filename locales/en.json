@@ -274,5 +274,13 @@
   "simple.morpherNone": "No morpher yet. Take the “Changed voice” template (“Project → Templates…”) or put a “Voice morpher” node between the microphone and an output on the map.",
   "template.voice-changer.title": "Changed voice",
   "template.voice-changer.desc": "Your voice goes through the morpher into the virtual microphone — in Discord you will sound like a robot, monster or chipmunk.",
-  "param.wobble": "Wobble"
+  "param.wobble": "Wobble",
+  "node.denoise.title": "Noise suppression",
+  "node.denoise.desc": "Keeps your voice and removes background: fans, hum, keyboard. Put it right after the microphone.",
+  "param.amount": "Strength",
+  "param.voiceHeard": "Voice detected",
+  "param.voiceNone": "Background only — removing it",
+  "param.denoiseHint": "Runs the RNNoise neural network right on your computer, offline. Adds about 20 ms of delay to your voice. A flat “shhh” hiss is reduced only a little — it sounds like speech.",
+  "template.clean-voice.title": "Clean voice",
+  "template.clean-voice.desc": "Noise suppression removes the background, the compressor makes your voice even and louder — then it goes to the virtual microphone."
 }
