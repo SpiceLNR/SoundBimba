@@ -15,6 +15,8 @@ export interface Settings {
   panelFrame?: boolean;
   /** Режим основного окна: карта («expert») или простой («simple»). */
   mode?: 'expert' | 'simple';
+  /** Приветствие при первом запуске уже показано. */
+  welcomeDone?: boolean;
 }
 
 export interface LoadState {

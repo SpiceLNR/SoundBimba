@@ -54,6 +54,9 @@ pub struct Settings {
     /// Режим основного окна: «expert» (карта) или «simple».
     #[serde(default = "default_mode")]
     pub mode: String,
+    /// Приветствие при первом запуске уже показано.
+    #[serde(default)]
+    pub welcome_done: bool,
 }
 
 fn default_true() -> bool {
@@ -77,6 +80,7 @@ impl Default for Settings {
             audio_enabled: false,
             panel_frame: true,
             mode: default_mode(),
+            welcome_done: false,
         }
     }
 }

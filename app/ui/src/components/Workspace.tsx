@@ -36,13 +36,17 @@ import {
 } from '../graph';
 import { ACTIONS, actionFor, addedKind, eventToCombo, isTyping, mergeBindings, type Action, type Bindings } from '../hotkeys';
 import { DICTS, useT, type Lang } from '../i18n';
+import { applyTemplate, type Template } from '../templates';
+import CableWizard from './CableWizard';
 import HotkeysDialog from './HotkeysDialog';
 import type { Notify } from './Notices';
 import SidePanel from './SidePanel';
 import SimpleView from './SimpleView';
 import SoundNodeView from './SoundNodeView';
+import TemplatesDialog from './TemplatesDialog';
 import Toolbar, { type SaveState } from './Toolbar';
 import Watermark from './Watermark';
+import WelcomeDialog from './WelcomeDialog';
 
 const nodeTypes = { sound: SoundNodeView };
 const SAVE_DELAY_MS = 600;
@@ -66,6 +70,11 @@ export default function Workspace({ project, version, settings, lang, onSettings
   const [selected, setSelected] = useState<{ node?: string; edge?: string }>({});
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [cableOpen, setCableOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
+  const welcome = !settings.welcomeDone;
+  const dialogOpen = hotkeysOpen || templatesOpen || cableOpen || clearOpen || welcome;
   const mapRef = useRef<HTMLDivElement>(null);
   const bindings = useMemo(() => mergeBindings(settings.hotkeys), [settings.hotkeys]);
 
@@ -177,6 +186,30 @@ export default function Workspace({ project, version, settings, lang, onSettings
     fitSoon();
   }, [edges, setNodes, fitSoon]);
 
+  const addTemplate = useCallback(
+    (tpl: Template) => {
+      const r = applyTemplate(nodes, edges, tpl);
+      setNodes(r.nodes);
+      setEdges(r.edges);
+      setSelected({});
+      setTemplatesOpen(false);
+      fitSoon();
+      notify('notice.templateAdded', { name: t(`template.${tpl.id}.title`) });
+    },
+    [nodes, edges, setNodes, setEdges, fitSoon, notify, t],
+  );
+
+  // Приветствие показывается один раз: любой выбор в нём отмечает, что человек его видел.
+  const closeWelcome = useCallback(() => onSettings({ ...settings, welcomeDone: true }), [onSettings, settings]);
+
+  const clearAll = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+    setSelected({});
+    setClearOpen(false);
+    notify('notice.cleared');
+  }, [setNodes, setEdges, notify]);
+
   const projectFilter = useMemo(() => [{ name: t('dialog.projectFilter'), extensions: ['json'] }], [t]);
 
   const onExport = useCallback(async () => {
@@ -254,7 +287,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
     diagnostics: () => void onDiagnostics(),
   };
   useEffect(() => {
-    if (hotkeysOpen) return; // в окне «Клавиши» нажатия идут на переназначение
+    if (dialogOpen) return; // пока открыто окно (в «Клавишах» нажатия идут на переназначение)
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || isTyping(e.target)) return;
       const combo = eventToCombo(e);
@@ -265,7 +298,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [bindings, hotkeysOpen]);
+  }, [bindings, dialogOpen]);
 
   const changeBindings = useCallback(
     (b: Bindings) => onSettings({ ...settings, hotkeys: b }),
@@ -346,6 +379,9 @@ export default function Workspace({ project, version, settings, lang, onSettings
         onDiagnostics={() => void onDiagnostics()}
         onLatency={() => void onLatency()}
         onHotkeys={() => setHotkeysOpen(true)}
+        onTemplates={() => setTemplatesOpen(true)}
+        onCable={() => setCableOpen(true)}
+        onClear={() => setClearOpen(true)}
         onSettings={onSettings}
         onOpenPanel={() => void openPanel()}
         simple={settings.mode === 'simple'}
@@ -358,6 +394,15 @@ export default function Workspace({ project, version, settings, lang, onSettings
       <main className="main">
         <div className="map" ref={mapRef}>
           <Watermark />
+          {nodes.length === 0 && (
+            <div className="empty-hint">
+              <strong>{t('empty.title')}</strong>
+              <span className="panel-desc">{t('empty.hint')}</span>
+              <button type="button" className="primary" onClick={() => setTemplatesOpen(true)}>
+                {t('welcome.templates')}
+              </button>
+            </div>
+          )}
           <ReactFlow
             nodes={nodes}
             edges={shownEdges}
@@ -397,6 +442,40 @@ export default function Workspace({ project, version, settings, lang, onSettings
           onDeleteEdge={deleteEdge}
         />
       </main>
+      )}
+      {templatesOpen && <TemplatesDialog onPick={addTemplate} onClose={() => setTemplatesOpen(false)} />}
+      {cableOpen && <CableWizard onClose={() => setCableOpen(false)} />}
+      {clearOpen && (
+        <div className="dialog-backdrop">
+          <div className="dialog dialog-narrow" role="alertdialog" aria-modal="true" aria-labelledby="clear-title">
+            <h2 id="clear-title" className="panel-title">
+              {t('clear.title')}
+            </h2>
+            <p className="panel-desc">{t('clear.text')}</p>
+            <div className="dialog-actions">
+              <span className="toolbar-gap" />
+              <button type="button" autoFocus onClick={() => setClearOpen(false)}>
+                {t('clear.no')}
+              </button>
+              <button type="button" className="danger" onClick={clearAll}>
+                {t('clear.yes')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {welcome && !templatesOpen && !cableOpen && (
+        <WelcomeDialog
+          onTemplates={() => {
+            closeWelcome();
+            setTemplatesOpen(true);
+          }}
+          onCable={() => {
+            closeWelcome();
+            setCableOpen(true);
+          }}
+          onClose={closeWelcome}
+        />
       )}
       {hotkeysOpen && <HotkeysDialog bindings={bindings} onChange={changeBindings} onClose={() => setHotkeysOpen(false)} />}
     </div>

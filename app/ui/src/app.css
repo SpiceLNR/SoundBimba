@@ -901,3 +901,114 @@ button:disabled {
 .simple-later {
   opacity: 0.7;
 }
+
+/* Окно «Готовые схемы». */
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.template-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-radius: var(--radius-small);
+}
+
+.template-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.template-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.template-part {
+  padding: 1px 8px;
+  font-size: 0.82em;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-small);
+}
+
+/* Мастер «Виртуальный кабель». */
+.cable-status {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-left: 4px solid var(--border);
+  border-radius: var(--radius-small);
+}
+
+.cable-ok {
+  border-left-color: var(--node-source);
+}
+
+.cable-missing {
+  border-left-color: var(--danger);
+}
+
+.cable-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+  line-height: 1.45;
+}
+
+.cable-url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.cable-url code {
+  padding: 4px 8px;
+  background: var(--surface-2);
+  border-radius: var(--radius-small);
+  user-select: all;
+}
+
+.dialog-actions {
+  gap: 8px;
+}
+
+/* Приветствие и подсказка на пустой карте. */
+.dialog-narrow {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.welcome-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(420px, calc(100% - 32px));
+  padding: 18px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transform: translate(-50%, -50%);
+}

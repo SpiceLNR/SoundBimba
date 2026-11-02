@@ -23,6 +23,9 @@ interface Props {
   onDiagnostics: () => void;
   onLatency: () => void;
   onHotkeys: () => void;
+  onTemplates: () => void;
+  onCable: () => void;
+  onClear: () => void;
   onSettings: (s: Settings) => void;
   onOpenPanel: () => void;
   /** Простой режим: без кнопок работы с картой. */
@@ -36,6 +39,9 @@ export default function Toolbar(p: Props) {
     export: p.onExport,
     diagnostics: p.onDiagnostics,
     latency: p.onLatency,
+    templates: p.onTemplates,
+    cable: p.onCable,
+    clear: p.onClear,
   };
   return (
     <header className="toolbar">
@@ -81,10 +87,13 @@ export default function Toolbar(p: Props) {
         groups={[
           {
             items: [
+              { value: 'templates', label: t('toolbar.templates') },
+              { value: 'cable', label: t('toolbar.cable') },
               { value: 'import', label: t('toolbar.import') },
               { value: 'export', label: t('toolbar.export') },
               { value: 'latency', label: t('toolbar.latency') },
               { value: 'diagnostics', label: t('toolbar.diagnostics') },
+              { value: 'clear', label: t('toolbar.clear') },
             ],
           },
         ]}
