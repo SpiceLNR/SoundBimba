@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use engine::{ring, PortStats, RingReader, RingWriter, RATE};
+use engine::{ring, PortStats, RingReader, RingWriter, BLOCK, RATE};
 use windows::core::{Interface, Result as WinResult, HSTRING};
 use windows::Win32::Media::Audio::{
     IAudioCaptureClient, IAudioClient, IAudioClient3, IAudioRenderClient, IMMDeviceEnumerator, MMDeviceEnumerator,
@@ -39,8 +39,19 @@ pub struct StreamInfo {
     pub format: String,
     /// Размер буфера устройства, кадров.
     pub buffer_frames: u32,
+    /// Порция, которой устройство отдаёт или забирает звук, кадров.
+    pub period_frames: u32,
     /// Запас в кольцевом буфере, мс (добавленная задержка).
     pub reserve_ms: f64,
+}
+
+/// Запас кольцевого буфера, мс. Запрошенного может не хватить: устройство берёт звук порциями
+/// (у одних ≈3 мс, у других 10 мс), а движок пишет блоками по 5 мс. Запаса должно хватать на
+/// порцию устройства и блок движка, иначе звук рвётся (трещит).
+fn safe_reserve_ms(requested_ms: f64, period_frames: u32, rate: u32, share_of_period: f64) -> f64 {
+    let period_ms = period_frames as f64 * 1000.0 / rate as f64;
+    let block_ms = BLOCK as f64 * 1000.0 / RATE as f64;
+    requested_ms.max(period_ms * share_of_period + block_ms + 2.0)
 }
 
 /// Работающий поток устройства. Остановка — при удалении.
@@ -107,10 +118,10 @@ fn device_client(id: &str) -> WinResult<IAudioClient> {
     }
 }
 
-/// Открывает клиент в формате устройства (shared, событийный). Возвращает формат.
-/// Если устройство умеет порции меньше обычных 10 мс (IAudioClient3, Windows 10+), берём
-/// самую маленькую — это заметно снижает задержку. Иначе — обычный режим.
-fn init_shared(client: &IAudioClient, extra_flags: u32) -> WinResult<Fmt> {
+/// Открывает клиент в формате устройства (shared, событийный). Возвращает формат и порцию
+/// (кадров). Если устройство умеет порции меньше обычных 10 мс (IAudioClient3, Windows 10+),
+/// берём самую маленькую — это заметно снижает задержку. Иначе — обычный режим.
+fn init_shared(client: &IAudioClient, extra_flags: u32) -> WinResult<(Fmt, u32)> {
     unsafe {
         let mix = client.GetMixFormat()?;
         let fmt = Fmt::from_ptr(mix);
@@ -120,12 +131,21 @@ fn init_shared(client: &IAudioClient, extra_flags: u32) -> WinResult<Fmt> {
             c3.GetSharedModeEnginePeriod(mix, &mut def, &mut fund, &mut min, &mut max).ok()?;
             (min > 0 && min < def).then_some((c3, min))
         });
-        let r = match low_latency {
-            Some((c3, period)) => c3.InitializeSharedAudioStream(flags, period, mix, None),
+        let r = match &low_latency {
+            Some((c3, period)) => c3.InitializeSharedAudioStream(flags, *period, mix, None),
             None => client.Initialize(AUDCLNT_SHAREMODE_SHARED, flags, 0, 0, mix, None),
         };
         CoTaskMemFree(Some(mix as _));
-        r.map(|_| fmt)
+        r?;
+        let period = match low_latency {
+            Some((_, p)) => p,
+            None => {
+                let mut def = 0i64;
+                client.GetDevicePeriod(Some(&mut def), None)?;
+                (def as f64 * fmt.rate as f64 / 10_000_000.0).round() as u32
+            }
+        };
+        Ok((fmt, period.max(1)))
     }
 }
 
@@ -134,11 +154,11 @@ pub fn open_capture(source: Source, reserve_ms: f64) -> Result<(Stream, RingRead
     spawn("sb-capture", move |stop, error, ready| {
         let opened = (|| -> WinResult<_> {
             ensure_com()?;
-            let (client, fmt) = match &source {
+            let (client, fmt, period) = match &source {
                 Source::Device(id) => {
                     let c = device_client(id)?;
-                    let f = init_shared(&c, 0)?;
-                    (c, f)
+                    let (f, p) = init_shared(&c, 0)?;
+                    (c, f, p)
                 }
                 Source::Process(pid) => {
                     // У захвата процесса нет своего формата — задаём 48 кГц float стерео.
@@ -157,26 +177,31 @@ pub fn open_capture(source: Source, reserve_ms: f64) -> Result<(Stream, RingRead
                             None,
                         )?
                     };
-                    (c, unsafe { Fmt::from_ptr(&wf) })
+                    // Захват процесса отдаёт звук порциями по 10 мс.
+                    (c, unsafe { Fmt::from_ptr(&wf) }, RATE / 100)
                 }
             };
             let event = EventHandle::new()?;
             unsafe { client.SetEventHandle(event.0)? };
             let cap: IAudioCaptureClient = unsafe { client.GetService()? };
             let buffer = unsafe { client.GetBufferSize() }.unwrap_or(fmt.rate / 10).max(fmt.rate / 100);
-            Ok((client, fmt, event, cap, buffer))
+            Ok((client, fmt, period, event, cap, buffer))
         })();
-        let (client, fmt, event, cap, buffer) = match opened {
+        let (client, fmt, period, event, cap, buffer) = match opened {
             Ok(v) => v,
             Err(e) => {
                 let _ = ready.send(Err(describe(&e)));
                 return;
             }
         };
+        // Порция приходит целиком, но Windows иногда отдаёт её с опозданием (особенно захват
+        // программы: у него буфер всего на одну порцию). Запас — целая порция + блок движка.
+        let reserve_ms = safe_reserve_ms(reserve_ms, period, fmt.rate, 1.0);
         let reserve = (reserve_ms / 1000.0 * fmt.rate as f64) as usize;
         let (mut writer, reader) = ring(fmt.rate as usize, fmt.rate, RATE, reserve);
         let stats = writer.stats().clone();
-        let info = StreamInfo { rate: fmt.rate, format: fmt.describe(), buffer_frames: buffer, reserve_ms };
+        let info =
+            StreamInfo { rate: fmt.rate, format: fmt.describe(), buffer_frames: buffer, period_frames: period, reserve_ms };
         if ready.send(Ok((info, reader, stats))).is_err() {
             return;
         }
@@ -220,24 +245,29 @@ pub fn open_render(device_id: &str, reserve_ms: f64) -> Result<(Stream, RingWrit
         let opened = (|| -> WinResult<_> {
             ensure_com()?;
             let client = device_client(&id)?;
-            let fmt = init_shared(&client, 0)?;
+            let (fmt, period) = init_shared(&client, 0)?;
             let event = EventHandle::new()?;
             unsafe { client.SetEventHandle(event.0)? };
             let rc: IAudioRenderClient = unsafe { client.GetService()? };
             let buffer = unsafe { client.GetBufferSize()? };
-            Ok((client, fmt, event, rc, buffer))
+            Ok((client, fmt, period, event, rc, buffer))
         })();
-        let (client, fmt, event, rc, buffer) = match opened {
+        let (client, fmt, period, event, rc, buffer) = match opened {
             Ok(v) => v,
             Err(e) => {
                 let _ = ready.send(Err(describe(&e)));
                 return;
             }
         };
+        // Устройство забирает целую порцию разом: запас — порция + блок движка.
+        let reserve_ms = safe_reserve_ms(reserve_ms, period, fmt.rate, 1.0);
         let reserve = (reserve_ms / 1000.0 * RATE as f64) as usize;
         let (writer, mut reader) = ring(RATE as usize, RATE, fmt.rate, reserve);
         let stats = writer.stats().clone();
-        let info = StreamInfo { rate: fmt.rate, format: fmt.describe(), buffer_frames: buffer, reserve_ms };
+        let info =
+            StreamInfo { rate: fmt.rate, format: fmt.describe(), buffer_frames: buffer, period_frames: period, reserve_ms };
+        // В буфере устройства держим две порции, не больше: лишнее — лишняя задержка.
+        let keep = buffer.min(period * 2);
         if ready.send(Ok((info, writer, stats))).is_err() {
             return;
         }
@@ -254,16 +284,17 @@ pub fn open_render(device_id: &str, reserve_ms: f64) -> Result<(Stream, RingWrit
                     continue;
                 }
                 unsafe {
-                    let free = buffer - client.GetCurrentPadding()?;
-                    if free == 0 {
+                    let padding = client.GetCurrentPadding()?;
+                    let want = keep.saturating_sub(padding).min(buffer - padding);
+                    if want == 0 {
                         continue;
                     }
-                    let n = free as usize;
+                    let n = want as usize;
                     reader.read(&mut stereo[..n * 2]);
-                    let data = rc.GetBuffer(free)?;
+                    let data = rc.GetBuffer(want)?;
                     let bytes = std::slice::from_raw_parts_mut(data, n * fmt.block_align as usize);
                     fmt.from_stereo(&stereo[..n * 2], bytes);
-                    rc.ReleaseBuffer(free, 0)?;
+                    rc.ReleaseBuffer(want, 0)?;
                 }
             }
             Ok(())
@@ -273,4 +304,21 @@ pub fn open_render(device_id: &str, reserve_ms: f64) -> Result<(Stream, RingWrit
             *error.lock().unwrap() = Some(describe(&e));
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::safe_reserve_ms;
+
+    #[test]
+    fn reserve_covers_device_period_and_engine_block() {
+        // VB-CABLE в режиме низкой задержки: порция 128 кадров (2,67 мс) — запас ≈ 9,7 мс.
+        assert!((safe_reserve_ms(8.0, 128, 48_000, 1.0) - 9.6667).abs() < 1e-3);
+        // Большой запрошенный запас не урезается.
+        assert_eq!(safe_reserve_ms(30.0, 128, 48_000, 1.0), 30.0);
+        // Обычное устройство: порция 10 мс — запас 10 + 5 + 2 = 17 мс.
+        assert!((safe_reserve_ms(8.0, 480, 48_000, 1.0) - 17.0).abs() < 1e-9);
+        // Захват с порцией 10 мс: 10 + 5 + 2 = 17 мс.
+        assert!((safe_reserve_ms(12.0, 480, 48_000, 1.0) - 17.0).abs() < 1e-9);
+    }
 }

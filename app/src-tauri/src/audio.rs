@@ -23,9 +23,8 @@ use winaudio::{processes, runner};
 
 use crate::applog;
 
-/// Запас в кольцевых буферах, мс (часть общей задержки). Устройства вывода в режиме низкой
-/// задержки отдают звук мелкими порциями (≈3 мс), устройства ввода — по 10 мс; запас чуть больше
-/// порции, чтобы не было пропусков. Подобрано замером на VB-CABLE (этап 2).
+/// Наименьший запас в кольцевых буферах, мс (часть общей задержки). Для устройств с крупными
+/// порциями (10 мс) поток сам берёт больше — см. `winaudio::streams` (иначе треск).
 pub const RENDER_RESERVE_MS: f64 = 8.0;
 pub const CAPTURE_RESERVE_MS: f64 = 12.0;
 const TICK: Duration = Duration::from_secs(2);
@@ -192,6 +191,8 @@ struct Controller {
     shared: Arc<Mutex<HashMap<String, Arc<NodeShared>>>>,
     snapshot: Arc<Mutex<Snapshot>>,
     last_status: HashMap<String, NodeStatus>,
+    last_glitches: HashMap<String, (u32, u32, u32)>,
+    last_late: u32,
 }
 
 impl Controller {
@@ -240,6 +241,8 @@ impl Controller {
 
     fn restart(&mut self, project: &Project, resolved: &Resolved) {
         self.stop();
+        self.last_glitches.clear();
+        self.last_late = 0;
         self.last_restart = Instant::now();
         let plan = match engine::plan(project, resolved) {
             Ok(p) => p,
@@ -258,6 +261,7 @@ impl Controller {
             };
             match streams::open_capture(source, CAPTURE_RESERVE_MS) {
                 Ok((stream, reader)) => {
+                    applog::info(&format!("opened {}: {:?}", port_name(key), stream.info));
                     inputs.push(reader);
                     streams_info.push((key.clone(), Some(stream), None));
                 }
@@ -274,6 +278,7 @@ impl Controller {
             let PortKey::Render(id) = key else { unreachable!("capture port in outputs") };
             match streams::open_render(id, RENDER_RESERVE_MS) {
                 Ok((stream, writer)) => {
+                    applog::info(&format!("opened {}: {:?}", port_name(key), stream.info));
                     outputs.push(writer);
                     streams_info.push((key.clone(), Some(stream), None));
                 }
@@ -336,6 +341,25 @@ impl Controller {
             }
         }
         self.last_status = status.clone();
+        // Сбои звука (пропуски, переполнения, сбросы, опоздания движка) — в журнал по приросту.
+        for p in &ports {
+            let now = (p.underruns, p.overflows, p.skips);
+            let before = self.last_glitches.insert(p.port.clone(), now).unwrap_or_default();
+            if now != before && (now.0 > before.0 || now.1 > before.1 || now.2 > before.2) {
+                applog::info(&format!(
+                    "audio glitches on {}: underruns +{}, overflows +{}, skips +{}",
+                    p.port,
+                    now.0.saturating_sub(before.0),
+                    now.1.saturating_sub(before.1),
+                    now.2.saturating_sub(before.2)
+                ));
+            }
+        }
+        let late = self.running.as_ref().map(|r| r.late.load(std::sync::atomic::Ordering::Relaxed)).unwrap_or(0);
+        if late > self.last_late {
+            applog::info(&format!("audio engine was late {} time(s)", late - self.last_late));
+        }
+        self.last_late = late;
         let mut s = self.snapshot.lock().unwrap();
         s.enabled = true;
         s.running = self.running.is_some();
@@ -369,6 +393,8 @@ impl Audio {
             shared: shared.clone(),
             snapshot: snapshot.clone(),
             last_status: HashMap::new(),
+            last_glitches: HashMap::new(),
+            last_late: 0,
         };
         let control = std::thread::Builder::new()
             .name("sb-audio-control".into())
