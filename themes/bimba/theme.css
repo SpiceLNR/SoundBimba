@@ -21,6 +21,18 @@
   --radius-small: 8px;
   --shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 
+  --control-bg: #2c2635;
+  --control-bg-hover: #352d40;
+  --control-border-hover: #ff1493;
+  --control-border: #3a3245;
+
+  --slider-track: #3a3245;
+  --slider-track-height: 6px;
+  --slider-thumb-bg: #ff1493;
+  --slider-thumb-width: 18px;
+  --slider-thumb-height: 18px;
+  --slider-thumb-radius: 50%;
+
   --node-bg: #241f2b;
   --node-text: #f3eef7;
   --node-source: #4fc3f7;

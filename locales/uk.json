@@ -9,7 +9,7 @@
   "toolbar.import": "Імпорт",
   "toolbar.diagnostics": "Зберегти діагностику",
   "toolbar.language": "Мова",
-  "toolbar.languageSystem": "Як у системі",
+  "toolbar.languageSystem": "Мова: як у системі",
   "toolbar.theme": "Тема",
   "save.saving": "Зберігаю…",
   "save.saved": "Збережено",
@@ -72,5 +72,6 @@
   "map.minimap": "Міні-мапа",
   "map.handle": "Точка під'єднання проводу",
   "map.nodeDesc": "Вузол мапи. Перетягніть мишею, щоб перемістити.",
-  "map.edgeDesc": "Провід між вузлами."
+  "map.edgeDesc": "Провід між вузлами.",
+  "toolbar.project": "Проєкт"
 }

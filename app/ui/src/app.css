@@ -30,8 +30,8 @@ input {
 
 button,
 select {
-  background: var(--surface-2);
-  border: var(--border-width) solid var(--border);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-small);
   padding: 6px 12px;
   cursor: pointer;
@@ -39,7 +39,14 @@ select {
 
 button:hover,
 select:hover {
-  border-color: var(--accent);
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-hover);
+}
+
+option,
+optgroup {
+  background: var(--surface);
+  color: var(--text);
 }
 
 button.danger {
@@ -65,13 +72,41 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
-input[type='range'],
 input[type='checkbox'] {
   accent-color: var(--accent);
 }
 
+/* Ползунок: вид из темы (у «Метро» — тонкая полоса и прямоугольный бегунок).
+   --fill (доля заполнения) задаёт компонент. */
 input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: var(--slider-track-height);
+  border-radius: var(--slider-thumb-radius);
+  background: linear-gradient(to right, var(--accent) var(--fill, 50%), var(--slider-track) var(--fill, 50%));
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--slider-thumb-width);
+  height: var(--slider-thumb-height);
+  margin-top: calc((var(--slider-track-height) - var(--slider-thumb-height)) / 2);
+  border: none;
+  border-radius: var(--slider-thumb-radius);
+  background: var(--slider-thumb-bg);
+}
+
+input[type='range']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .loading {
@@ -84,15 +119,17 @@ input[type='range'] {
 .workspace {
   display: grid;
   grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
 }
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px 12px;
+  white-space: nowrap;
   background: var(--surface);
   border-bottom: var(--border-width) solid var(--border);
 }
@@ -108,13 +145,61 @@ input[type='range'] {
 
 .toolbar-gap {
   flex: 1;
+  min-width: 8px;
 }
 
-.toolbar-field {
+/* Списки панели фиксированной ширины: иначе ширину задаёт самый длинный пункт. */
+.add-node {
+  width: 170px;
+}
+
+.lang-select {
+  width: 190px;
+}
+
+.theme-select {
+  width: 130px;
+}
+
+.toolbar select {
+  text-overflow: ellipsis;
+}
+
+/* Узкое окно: название программы есть в заголовке окна, на панели его можно спрятать. */
+@media (max-width: 1000px) {
+  .brand {
+    display: none;
+  }
+}
+
+/* Меню «Проект». */
+.menu {
+  position: relative;
+}
+
+.menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
+  flex-direction: column;
+  min-width: 100%;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow);
+}
+
+.menu-list button {
+  text-align: left;
+  border-color: transparent;
+  background: transparent;
+}
+
+.menu-list button:hover {
+  background: var(--control-bg-hover);
 }
 
 .save-state {
@@ -128,7 +213,7 @@ input[type='range'] {
 
 .main {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   min-height: 0;
 }
 

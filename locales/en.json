@@ -9,7 +9,7 @@
   "toolbar.import": "Import",
   "toolbar.diagnostics": "Save diagnostics",
   "toolbar.language": "Language",
-  "toolbar.languageSystem": "System default",
+  "toolbar.languageSystem": "Language: system",
   "toolbar.theme": "Theme",
   "save.saving": "Saving…",
   "save.saved": "Saved",
@@ -72,5 +72,6 @@
   "map.minimap": "Mini map",
   "map.handle": "Wire connection point",
   "map.nodeDesc": "Map node. Drag with the mouse to move it.",
-  "map.edgeDesc": "Wire between nodes."
+  "map.edgeDesc": "Wire between nodes.",
+  "toolbar.project": "Project"
 }

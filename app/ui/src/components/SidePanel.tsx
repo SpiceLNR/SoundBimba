@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Боковая панель: настройки выбранного узла или провода.
 import type { Edge } from '@xyflow/react';
+import type React from 'react';
 import { KINDS, type Params, type SoundNode } from '../graph';
 import { useT } from '../i18n';
 
@@ -45,6 +46,7 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
               max={200}
               step={5}
               value={percent}
+              style={{ '--fill': `${percent / 2}%` } as React.CSSProperties}
               onChange={(e) => set({ gain: Number(e.target.value) / 100 })}
             />
           </label>

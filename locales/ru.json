@@ -9,7 +9,7 @@
   "toolbar.import": "Импорт",
   "toolbar.diagnostics": "Сохранить диагностику",
   "toolbar.language": "Язык",
-  "toolbar.languageSystem": "Как в системе",
+  "toolbar.languageSystem": "Язык: как в системе",
   "toolbar.theme": "Тема",
   "save.saving": "Сохраняю…",
   "save.saved": "Сохранено",
@@ -72,5 +72,6 @@
   "map.minimap": "Мини-карта",
   "map.handle": "Точка подключения провода",
   "map.nodeDesc": "Узел карты. Перетащите мышью, чтобы переместить.",
-  "map.edgeDesc": "Провод между узлами."
+  "map.edgeDesc": "Провод между узлами.",
+  "toolbar.project": "Проект"
 }

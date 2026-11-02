@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
-/* Тема «Метро»: плоские плитки, без скруглений, лёгкие заглавные, насыщенные цвета.
+/* Тема «Метро»: цвета как у «Бимбы», но плоско — без скруглений и теней, лёгкие заглавные,
+   панель инструментов одной полосой, прямоугольные ползунки.
    Шрифт Segoe UI поставлять нельзя (лицензия Microsoft) — вместо него Open Sans (SIL OFL). */
 [data-theme='metro'] {
   --font: 'Open Sans', sans-serif;
@@ -8,35 +9,48 @@
   --title-transform: uppercase;
   --title-spacing: 0.06em;
 
-  --bg: #111111;
-  --surface: #1d1d1d;
-  --surface-2: #2a2a2a;
-  --text: #ffffff;
-  --text-muted: #b5b5b5;
-  --border: #2a2a2a;
+  --bg: #17141c;
+  --surface: #221d29;
+  --surface-2: #2c2635;
+  --text: #f3eef7;
+  --text-muted: #a99db6;
+  --border: #3a3245;
   --border-width: 0px;
-  --accent: #0078d7;
+  --accent: #ff1493;
   --accent-text: #ffffff;
-  --danger: #e51400;
+  --danger: #ff5c6c;
   --radius: 0px;
   --radius-small: 0px;
   --shadow: none;
 
-  --node-bg: #1d1d1d;
-  --node-text: #ffffff;
-  --node-source: #1ba1e2;
-  --node-processing: #a200ff;
-  --node-output: #60a917;
-  --node-button: #f09609;
-  --node-selected: #ffffff;
+  /* Кнопки и списки панели инструментов — без рамок и фона, сливаются в одну полосу. */
+  --control-bg: transparent;
+  --control-bg-hover: #2c2635;
+  --control-border-hover: transparent;
+  --control-border: transparent;
+
+  --slider-track: #3a3245;
+  --slider-track-height: 4px;
+  --slider-thumb-bg: #f3eef7;
+  --slider-thumb-width: 10px;
+  --slider-thumb-height: 22px;
+  --slider-thumb-radius: 0px;
+
+  --node-bg: #241f2b;
+  --node-text: #f3eef7;
+  --node-source: #4fc3f7;
+  --node-processing: #b388ff;
+  --node-output: #69f0ae;
+  --node-button: #ffb74d;
+  --node-selected: #ff1493;
   --handle-size: 16px;
 
-  --wire: #8a8a8a;
-  --wire-selected: #ffffff;
-  --dots: #262626;
-  --watermark-color: #ffffff;
-  --watermark-opacity: 0.03;
+  --wire: #8c7fa0;
+  --wire-selected: #ff1493;
+  --dots: #3a3245;
+  --watermark-color: #ff1493;
+  --watermark-opacity: 0.05;
 
-  --notice-bg: #0078d7;
-  --notice-error-bg: #e51400;
+  --notice-bg: #2c2635;
+  --notice-error-bg: #4a1f2b;
 }
