@@ -527,3 +527,27 @@ fn after_seek_waits_for_a_reserve_instead_of_stuttering() {
     g.process();
     assert!(out.take_peak() > 0.29);
 }
+
+#[test]
+fn track_ends_when_the_file_ends_even_if_the_header_promised_more() {
+    use std::sync::atomic::Ordering::{Acquire, Release};
+    // По заголовку — 4 блока, но с диска придёт на 2 кадра меньше (так бывает у MP3).
+    let head = BLOCK;
+    let (mut g, _r, shared, feed) = button_rig_with(head, (BLOCK * 4) as u64);
+    let (mut prod, ctl) = feed.unwrap();
+    let btn = shared["btn"].clone();
+    btn.press();
+    g.process();
+    let gen = ctl.want_gen.load(Acquire);
+    prod.push(f32::NAN).unwrap();
+    prod.push(gen as f32).unwrap();
+    for _ in 0..(BLOCK * 3 - 2) * CHANNELS {
+        prod.push(0.2).unwrap();
+    }
+    ctl.eof_gen.store(gen, Release);
+    for _ in 0..5 {
+        g.process();
+    }
+    let s = btn.button_state().unwrap();
+    assert!(!s.playing && s.pos_frames == 0, "кончился файл — стоп и шкала на начало: {s:?}");
+}

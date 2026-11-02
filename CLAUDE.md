@@ -66,6 +66,8 @@
 - Проверки на железе (нужен VB-CABLE, звука в колонках нет): `cargo test -p winaudio --test
   cable_loop -- --ignored --nocapture` (тон через кабель 20 с), `--test cable_latency` (задержка),
   `--test cable_listen` (что сейчас приходит на «микрофон» кабеля).
+- Проверки кнопок на настоящем треке: `set SB_TRACK=путь\к\треку.mp3`, затем `cargo test -p clips
+  --test seek_real_file -- --ignored --nocapture` (перемотка без провалов) и `--test real_track_end` (конец трека).
 - Проба: `cargo build --release -p probe` → `target\release\probe.exe` (`--help`; без окна: `--no-pause`).
 - Данные приложения: `%APPDATA%\SoundBimba\` — `project.json`, `settings.json`, `logs\soundbimba.log`.
 

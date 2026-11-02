@@ -63,11 +63,13 @@ pub struct TailFeed {
     pub ctl: Arc<TailControl>,
 }
 
-/// Просьба движка к подкачке: «с какого кадра» и номер просьбы.
+/// Просьба движка к подкачке: «с какого кадра» и номер просьбы; ответ подкачки — «файл кончился»
+/// (номер просьбы, для которой отдано всё до конца файла).
 #[derive(Debug, Default)]
 pub struct TailControl {
     pub want_gen: std::sync::atomic::AtomicU32,
     pub want_pos: std::sync::atomic::AtomicU64,
+    pub eof_gen: std::sync::atomic::AtomicU32,
 }
 
 /// Затухание при паузе и плавное вступление звука — без щелчков: 5 мс.
@@ -337,15 +339,21 @@ fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeS
                         break;
                     }
                     let avail = (tail.cons.slots() / CHANNELS) as u64;
+                    // Подкачка отдала всё до конца файла (длина в заголовке бывает чуть больше).
+                    let file_ended = tail.ctl.eof_gen.load(std::sync::atomic::Ordering::Acquire) == pb.gen;
                     if pb.buffering {
                         // Ждём запаса (или всего, что осталось до конца), потом — плавно.
-                        if avail < TAIL_PREFILL.min(total - pb.pos) {
+                        if avail < TAIL_PREFILL.min(total - pb.pos) && !file_ended {
                             break;
                         }
                         pb.buffering = false;
                         pb.fade_in = STOP_FADE;
                     }
                     if avail == 0 {
+                        if file_ended {
+                            pb.pos = total; // звук кончился — дальше обычный конец трека
+                            break;
+                        }
                         pb.buffering = true; // диск не успел — подождём запаса, а не будем заикаться
                         break;
                     }

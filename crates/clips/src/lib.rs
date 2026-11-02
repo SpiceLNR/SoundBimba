@@ -325,6 +325,9 @@ fn stream(path: &Path, mut prod: rtrb::Producer<f32>, ctl: &TailControl, stop: &
             pending.clear();
             sent = 0;
             if eof {
+                // Всё до конца файла уже в буфере — сообщаем движку, иначе он ждал бы последних
+                // кадров, которые есть только в заголовке.
+                ctl.eof_gen.store(my_gen, Ordering::Release);
                 wait();
                 continue;
             }
@@ -423,11 +426,21 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(5));
         }
+        // Дочитываем до конца файла: подкачка должна сообщить «файл кончился».
+        for _ in 0..400 {
+            while tail.cons.pop().is_ok() {}
+            if tail.ctl.eof_gen.load(std::sync::atomic::Ordering::Acquire) == 1 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let ctl_eof = tail.ctl.eof_gen.load(std::sync::atomic::Ordering::Acquire);
         drop(streamer);
         std::fs::remove_file(&p).ok();
         assert!(got[0].is_nan() && got[1] == 1.0, "сначала метка перемотки");
         let expected = 7.0 * 3000.0 / 32768.0;
         assert!((got[2] - expected).abs() < 1e-3, "звук с 7-й секунды: {}", got[2]);
+        assert_eq!(ctl_eof, 1, "дочитала до конца — сообщила движку");
     }
 
     #[test]

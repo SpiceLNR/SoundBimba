@@ -333,6 +333,8 @@ name = "clips"
 version = "0.1.0"
 dependencies = [
  "engine",
+ "graph",
+ "rtrb",
  "symphonia",
 ]
 
