@@ -24,10 +24,11 @@ function SoundNodeView({ id, data, selected }: NodeProps<SoundNode>) {
       <div className="sound-node-row">
         {isButton && (
           <ButtonDisc
-            size={34}
-            progress={audio.buttons[id]}
+            size={76}
+            state={audio.enabled ? audio.buttons[id] : undefined}
             disabled={!audio.enabled || status !== 'ok'}
             onPress={() => void api.pressButton(id)}
+            onSeek={(f) => void api.seekButton(id, f)}
           />
         )}
         <div className="sound-node-text">

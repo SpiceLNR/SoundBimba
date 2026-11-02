@@ -53,8 +53,14 @@ export type NodeStatus =
   | 'error'
   | 'file-not-chosen'
   | 'file-missing'
-  | 'file-unsupported'
-  | 'file-too-long';
+  | 'file-unsupported';
+
+/** Кнопка-звук: играет ли, позиция и длина в секундах. */
+export interface ButtonPlayback {
+  playing: boolean;
+  pos: number;
+  len: number;
+}
 
 /** Состояние звука, приходит из Rust ~15 раз в секунду. */
 export interface AudioState {
@@ -62,8 +68,8 @@ export interface AudioState {
   running: boolean;
   status: Record<string, NodeStatus>;
   levels: Record<string, number>;
-  /** Играющие кнопки: доля прозвучавшего (0…1). */
-  buttons: Record<string, number>;
+  /** Кнопки со звуком: играет ли, позиция и длина. */
+  buttons: Record<string, ButtonPlayback>;
 }
 
 /** Проект и настройки без побочных действий (для кнопочной панели). */
@@ -93,11 +99,13 @@ const previewProject: Project = {
     { id: 'n2', type: 'mic-input', pos: [0, 160], params: { device: 'default' } },
     { id: 'n3', type: 'volume', pos: [260, 0], params: { gain: 1, mute: false } },
     { id: 'n4', type: 'virtual-out', pos: [520, 60], params: { device: 'virtual-1' } },
+    { id: 'n5', type: 'sound-button', pos: [0, 320], params: { file: 'D:/Sounds/fanfare.mp3' } },
   ],
   edges: [
     { from: 'n1', to: 'n3' },
     { from: 'n2', to: 'n4' },
     { from: 'n3', to: 'n4' },
+    { from: 'n5', to: 'n4' },
   ],
 };
 
@@ -109,7 +117,7 @@ const previewDevices: AudioDevice[] = [
 ];
 
 let previewEnabled = false;
-const previewPlaying: Record<string, number> = {};
+const previewPlaying: Record<string, ButtonPlayback> = {};
 
 function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!browserPreview) return invoke<T>(cmd, args);
@@ -125,8 +133,14 @@ function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (cmd === 'set_audio_enabled') previewEnabled = Boolean(args?.enabled);
   if (cmd === 'press_button') {
     const id = String(args?.nodeId);
-    if (id in previewPlaying) delete previewPlaying[id];
-    else previewPlaying[id] = 0;
+    const b = (previewPlaying[id] ??= { playing: false, pos: 0, len: 95 });
+    b.playing = !b.playing;
+    b.pos = 0;
+  }
+  if (cmd === 'seek_button') {
+    const b = (previewPlaying[String(args?.nodeId)] ??= { playing: false, pos: 0, len: 95 });
+    b.playing = true;
+    b.pos = Number(args?.fraction) * b.len;
   }
   if (cmd === 'get_ui_state') return Promise.resolve({ project: previewProject, settings: { language: null, theme: 'bimba' } } as T);
   return Promise.resolve(answers[cmd] as T);
@@ -142,11 +156,15 @@ export function onAudioState(handler: (s: AudioState) => void): () => void {
       const status: Record<string, NodeStatus> = {};
       for (const n of previewProject.nodes) status[n.id] = previewEnabled ? 'ok' : 'off';
       if (previewEnabled) status.n1 = 'app-not-chosen';
-      for (const id of Object.keys(previewPlaying)) {
-        previewPlaying[id] += 0.01;
-        if (previewPlaying[id] >= 1) delete previewPlaying[id];
+      for (const b of Object.values(previewPlaying)) {
+        if (!b.playing) continue;
+        b.pos += 0.066;
+        if (b.pos >= b.len) b.playing = false;
       }
-      handler({ enabled: previewEnabled, running: previewEnabled, status, levels, buttons: { ...previewPlaying } });
+      if (previewEnabled) previewPlaying.n5 ??= { playing: false, pos: 0, len: 95 };
+      const buttons: Record<string, ButtonPlayback> = {};
+      for (const [id, b] of Object.entries(previewPlaying)) buttons[id] = { ...b };
+      handler({ enabled: previewEnabled, running: previewEnabled, status, levels, buttons });
     }, 66);
     return () => clearInterval(h);
   }
@@ -174,6 +192,7 @@ export const api = {
   listAudioApps: () => call<AudioApp[]>('list_audio_apps'),
   measureLatency: () => call<Latency>('measure_latency'),
   pressButton: (nodeId: string) => call<void>('press_button', { nodeId }),
+  seekButton: (nodeId: string, fraction: number) => call<void>('seek_button', { nodeId, fraction }),
   getUiState: () => call<UiState>('get_ui_state'),
   log: (level: 'info' | 'error', message: string) => call<void>('log_ui', { level, message }).catch(() => {}),
 };

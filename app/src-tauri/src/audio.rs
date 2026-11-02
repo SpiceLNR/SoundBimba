@@ -13,7 +13,7 @@ use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use engine::{Clip, Graph, NodeShared, PortKey, PortResolver, RATE};
+use engine::{ButtonSource, Graph, NodeShared, PortKey, PortResolver, RATE};
 use graph::{Node, NodeKind, Project};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
@@ -49,8 +49,6 @@ pub enum NodeStatus {
     FileMissing,
     /// Кнопка: формат не поддерживается или файл повреждён.
     FileUnsupported,
-    /// Кнопка: звук длиннее 3 минут.
-    FileTooLong,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -85,14 +83,22 @@ struct StateEvent<'a> {
     #[serde(flatten)]
     snapshot: &'a Snapshot,
     levels: HashMap<String, f32>,
-    /// Играющие кнопки: доля прозвучавшего (0…1) — для кругового индикатора.
-    buttons: HashMap<String, f32>,
+    /// Кнопки со звуком: играет ли, позиция и длина (секунды) — для кругового индикатора и времени.
+    buttons: HashMap<String, ButtonEvent>,
+}
+
+#[derive(Serialize, Clone)]
+struct ButtonEvent {
+    playing: bool,
+    pos: f64,
+    len: f64,
 }
 
 /// Как узлы проекта связаны с устройствами, процессами и файлами прямо сейчас.
 struct Resolved {
     ports: HashMap<String, PortKey>,
-    clips: HashMap<String, (String, Clip)>,
+    /// Кнопки с годным файлом: id узла → путь.
+    clips: HashMap<String, String>,
     status: HashMap<String, NodeStatus>,
 }
 
@@ -100,20 +106,16 @@ impl PortResolver for Resolved {
     fn port_for(&self, node: &Node) -> Option<PortKey> {
         self.ports.get(&node.id).cloned()
     }
-    fn clip_for(&self, node: &Node) -> Option<Clip> {
-        self.clips.get(&node.id).map(|(_, c)| c.clone())
-    }
 }
 
-/// Звуки кнопок, уже прочитанные с диска (по пути к файлу). Ошибку «нет файла» не запоминаем —
-/// файл может появиться; остальные ошибки запоминаем, чтобы не читать плохой файл каждые 2 с.
-type ClipCache = HashMap<String, Result<Clip, clips::ClipError>>;
+/// Проверенные файлы кнопок (по пути). «Нет файла» не запоминаем — файл может появиться;
+/// «не звук» запоминаем, чтобы не проверять плохой файл каждые 2 секунды.
+type ClipCache = HashMap<String, Result<(), clips::ClipError>>;
 
 fn clip_status(e: &clips::ClipError) -> NodeStatus {
     match e {
         clips::ClipError::Missing(_) => NodeStatus::FileMissing,
         clips::ClipError::Unsupported(_) => NodeStatus::FileUnsupported,
-        clips::ClipError::TooLong => NodeStatus::FileTooLong,
     }
 }
 
@@ -137,25 +139,24 @@ fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
             let status = match param(n, "file") {
                 None => NodeStatus::FileNotChosen,
                 Some(path) => {
-                    let loaded = match cache.get(path) {
-                        Some(Ok(c)) => Ok(c.clone()),
-                        _ => {
-                            let res = clips::load(std::path::Path::new(path));
-                            // «Нет файла» не запоминаем (файл может появиться) и не пишем в журнал
-                            // каждые 2 с — смену состояния узла журнал и так записывает.
+                    let checked = match cache.get(path) {
+                        Some(res) => res.clone(),
+                        None => {
+                            let res = clips::probe(std::path::Path::new(path));
+                            // «Нет файла» не запоминаем и не пишем в журнал каждые 2 с — смену
+                            // состояния узла журнал и так записывает.
                             if !matches!(res, Err(clips::ClipError::Missing(_))) {
-                                match &res {
-                                    Ok(_) => applog::info(&format!("sound loaded for button {}", n.id)),
-                                    Err(e) => applog::error(&format!("button {}: {e}", n.id)),
+                                if let Err(e) = &res {
+                                    applog::error(&format!("button {}: {e}", n.id));
                                 }
                                 cache.insert(path.to_string(), res.clone());
                             }
                             res
                         }
                     };
-                    match loaded {
-                        Ok(clip) => {
-                            r.clips.insert(n.id.clone(), (path.to_string(), clip));
+                    match checked {
+                        Ok(()) => {
+                            r.clips.insert(n.id.clone(), path.to_string());
                             NodeStatus::Ok
                         }
                         Err(e) => clip_status(&e),
@@ -215,7 +216,7 @@ impl Structure {
     fn of(p: &Project, r: &Resolved) -> Structure {
         let mut ports: Vec<_> = r.ports.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         ports.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut clips: Vec<_> = r.clips.iter().map(|(id, (path, _))| (id.clone(), path.clone())).collect();
+        let mut clips: Vec<_> = r.clips.iter().map(|(id, path)| (id.clone(), path.clone())).collect();
         clips.sort();
         Structure {
             nodes: p.nodes.iter().map(|n| (n.id.clone(), n.kind)).collect(),
@@ -238,6 +239,10 @@ struct Running {
     _runner: runner::Runner,
     late: Arc<std::sync::atomic::AtomicU32>,
     streams: Vec<(PortKey, Option<Stream>, Option<String>)>,
+    /// Подкачка длинных звуков кнопок (останавливается вместе с движком).
+    _streamers: Vec<clips::Streamer>,
+    /// Кнопки, чей файл не открылся при запуске.
+    button_errors: HashMap<String, NodeStatus>,
 }
 
 enum Cmd {
@@ -356,9 +361,24 @@ impl Controller {
                 }
             }
         }
+        let mut buttons: HashMap<String, ButtonSource> = HashMap::new();
+        let mut streamers = Vec::new();
+        let mut button_errors = HashMap::new();
+        for (id, path) in &resolved.clips {
+            match clips::open(std::path::Path::new(path)) {
+                Ok((source, streamer)) => {
+                    buttons.insert(id.clone(), source);
+                    streamers.extend(streamer);
+                }
+                Err(e) => {
+                    applog::error(&format!("button {id}: {e}"));
+                    button_errors.insert(id.clone(), clip_status(&e));
+                }
+            }
+        }
         let graph = {
             let mut shared = self.shared.lock().unwrap();
-            match Graph::compile(project, resolved, &plan, inputs, outputs, &mut shared) {
+            match Graph::compile(project, resolved, &plan, inputs, outputs, &mut buttons, &mut shared) {
                 Ok(g) => g,
                 Err(e) => {
                     applog::error(&format!("audio graph is invalid: {e}"));
@@ -373,13 +393,14 @@ impl Controller {
             plan.inputs.len(),
             plan.outputs.len()
         ));
-        self.running = Some(Running { _runner: runner, late, streams: streams_info });
+        self.running = Some(Running { _runner: runner, late, streams: streams_info, _streamers: streamers, button_errors });
     }
 
     fn publish(&mut self, project: &Project, resolved: &Resolved) {
         let mut status = resolved.status.clone();
         let mut ports = Vec::new();
         if let Some(r) = &self.running {
+            status.extend(r.button_errors.iter().map(|(id, s)| (id.clone(), *s)));
             for (key, stream, open_error) in &r.streams {
                 let error = open_error.clone().or_else(|| stream.as_ref().and_then(|s| s.failed()));
                 if error.is_some() {
@@ -510,8 +531,15 @@ impl Audio {
                 let (levels, buttons) = {
                     let shared = sh.lock().unwrap();
                     let levels: HashMap<String, f32> = shared.iter().map(|(id, s)| (id.clone(), s.take_peak())).collect();
-                    let buttons: HashMap<String, f32> =
-                        shared.iter().filter_map(|(id, s)| s.playback().map(|p| (id.clone(), p))).collect();
+                    let secs = |frames: u64| frames as f64 / RATE as f64;
+                    let buttons: HashMap<String, ButtonEvent> = shared
+                        .iter()
+                        .filter_map(|(id, s)| {
+                            s.button_state().map(|b| {
+                                (id.clone(), ButtonEvent { playing: b.playing, pos: secs(b.pos_frames), len: secs(b.total_frames) })
+                            })
+                        })
+                        .collect();
                     (levels, buttons)
                 };
                 let snapshot = snap.lock().unwrap().clone();
@@ -544,6 +572,13 @@ impl Audio {
     pub fn press(&self, node_id: &str) {
         if let Some(sh) = self.shared.lock().unwrap().get(node_id) {
             sh.press();
+        }
+    }
+
+    /// Перемотка кнопки на долю звука (0…1); если стояла — начинает играть оттуда.
+    pub fn seek(&self, node_id: &str, fraction: f32) {
+        if let Some(sh) = self.shared.lock().unwrap().get(node_id) {
+            sh.seek(fraction);
         }
     }
 

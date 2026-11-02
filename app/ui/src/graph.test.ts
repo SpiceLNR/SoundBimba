@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 import { arrange, canConnect, fromFlow, newNode, nextNodeId, summary, toFlow, volumeRoutes, wouldCreateCycle, type Project } from './graph';
+import { formatTime, ringFraction } from './components/ButtonDisc';
 import { translate } from './i18n';
 
 // Тот же проект, что в crates/graph (default_project) и в примере из ARCHITECTURE.md.
@@ -143,5 +144,15 @@ describe('graph', () => {
     expect(summary('volume', { gain: 1.5, mute: true }, t)).toBe('150 % · звук выключен');
     expect(summary('app-source', { exe: '' }, t)).toBe('программа не выбрана');
     expect(summary('mic-input', { device: 'default' }, t)).toBe('по умолчанию');
+  });
+
+  it('formats button time and maps the ring to the track', () => {
+    expect(formatTime(0)).toBe('0:00');
+    expect(formatTime(75.9)).toBe('1:15');
+    expect(formatTime(3725)).toBe('1:02:05');
+    expect(ringFraction(0, -10)).toBeCloseTo(0); // верх — начало
+    expect(ringFraction(10, 0)).toBeCloseTo(0.25); // справа — четверть
+    expect(ringFraction(0, 10)).toBeCloseTo(0.5); // низ — середина
+    expect(ringFraction(-10, 0)).toBeCloseTo(0.75); // слева — три четверти
   });
 });

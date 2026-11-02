@@ -127,6 +127,7 @@ function ButtonParams({ node, onParams }: { node: SoundNode; onParams: Props['on
           {t('param.pickFile')}
         </button>
         <p className="later">{t('param.fileFormats')}</p>
+        <p className="later">{t('button.seekHint')}</p>
       </div>
       <label className="field">
         <span>{t('param.label')}</span>
@@ -140,10 +141,11 @@ function ButtonParams({ node, onParams }: { node: SoundNode; onParams: Props['on
       <div className="field">
         <span>{t('param.tryButton')}</span>
         <ButtonDisc
-          size={48}
-          progress={audio.buttons[node.id]}
+          size={120}
+          state={audio.enabled ? audio.buttons[node.id] : undefined}
           disabled={!audio.enabled || audio.status[node.id] !== 'ok'}
           onPress={() => void api.pressButton(node.id)}
+          onSeek={(f) => void api.seekButton(node.id, f)}
         />
       </div>
     </>

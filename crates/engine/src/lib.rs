@@ -16,7 +16,7 @@ use std::sync::Arc;
 use graph::{NodeKind, Project};
 
 pub use ring::{ring, RingReader, RingWriter};
-pub use shared::{AtomicF32, NodeShared, PortStats};
+pub use shared::{AtomicF32, ButtonState, NodeShared, PortStats};
 
 /// Частота дискретизации движка.
 pub const RATE: u32 = 48_000;
@@ -44,14 +44,31 @@ pub trait PortResolver {
     /// Порт для узла-источника или выхода; None — узел молчит (программа не запущена, нет устройства).
     fn port_for(&self, node: &graph::Node) -> Option<PortKey>;
 
-    /// Готовый звук для кнопки (48 кГц, стерео); None — файл не выбран или не прочитался.
-    fn clip_for(&self, _node: &graph::Node) -> Option<Clip> {
-        None
-    }
 }
 
-/// Звук кнопки: 48 кГц, стерео, отсчёты по очереди. Готовится заранее, вне потока звука.
-pub type Clip = Arc<[f32]>;
+/// Звук кнопки. Начало лежит в памяти (звук стартует мгновенно), остальное — если файл длинный —
+/// подкачивается с диска через кольцевой буфер `tail`.
+pub struct ButtonSource {
+    /// Первые секунды звука: 48 кГц, стерео, отсчёты по очереди.
+    pub head: Arc<[f32]>,
+    /// Длина всего звука, кадров 48 кГц.
+    pub total_frames: u64,
+    pub tail: Option<TailFeed>,
+}
+
+/// Подкачка остального звука. В буфере — отсчёты стерео; метка перемотки — пара (NaN, номер
+/// просьбы): всё после неё идёт с позиции, которую движок попросил под этим номером.
+pub struct TailFeed {
+    pub cons: rtrb::Consumer<f32>,
+    pub ctl: Arc<TailControl>,
+}
+
+/// Просьба движка к подкачке: «с какого кадра» и номер просьбы.
+#[derive(Debug, Default)]
+pub struct TailControl {
+    pub want_gen: std::sync::atomic::AtomicU32,
+    pub want_pos: std::sync::atomic::AtomicU64,
+}
 
 /// Затухание при остановке кнопки — без щелчка: 5 мс.
 const STOP_FADE: usize = RATE as usize / 200;
@@ -59,17 +76,20 @@ const STOP_FADE: usize = RATE as usize / 200;
 /// Состояние проигрывания кнопки (живёт в потоке звука).
 #[derive(Default)]
 struct Playback {
-    pos: usize,
+    pos: u64,
     playing: bool,
     /// Сколько кадров затухания осталось; Some — сейчас затухаем перед остановкой.
     fade_left: Option<usize>,
+    /// Номер последней просьбы к подкачке и пришла ли уже её метка.
+    gen: u32,
+    synced: bool,
 }
 
 enum Op {
     /// Источник: читает внешний вход. None — источник молчит.
     Source(Option<usize>),
-    /// Кнопка-звук: проигрывает готовый звук по нажатию.
-    Button(Option<Clip>, Playback),
+    /// Кнопка-звук: проигрывает звук по нажатию, с перемоткой.
+    Button(Option<ButtonSource>, Playback),
     /// Громкость: сумма входов × усиление.
     Volume,
     /// Выход: сумма входов → внешний выход. None — выхода нет.
@@ -125,14 +145,16 @@ pub fn plan(project: &Project, resolver: &dyn PortResolver) -> Result<PortPlan, 
 }
 
 impl Graph {
-    /// Собирает граф. `inputs`/`outputs` — открытые порты в порядке `PortPlan`; `shared` — общие
-    /// с интерфейсом значения узлов (громкость, уровни), переживают перекомпиляцию.
+    /// Собирает граф. `inputs`/`outputs` — открытые порты в порядке `PortPlan`; `buttons` — звуки
+    /// кнопок по id узла (забираются в граф); `shared` — общие с интерфейсом значения узлов
+    /// (громкость, уровни, кнопки), переживают перекомпиляцию.
     pub fn compile(
         project: &Project,
         resolver: &dyn PortResolver,
         plan: &PortPlan,
         inputs: Vec<RingReader>,
         outputs: Vec<RingWriter>,
+        buttons: &mut HashMap<String, ButtonSource>,
         shared: &mut HashMap<String, Arc<NodeShared>>,
     ) -> Result<Graph, graph::GraphError> {
         let order = graph::topo_order(project)?;
@@ -148,7 +170,7 @@ impl Graph {
                 NodeKind::AppSource | NodeKind::MicInput => {
                     Op::Source(port.and_then(|k| plan.inputs.iter().position(|p| *p == k)))
                 }
-                NodeKind::SoundButton => Op::Button(resolver.clip_for(node), Playback::default()),
+                NodeKind::SoundButton => Op::Button(buttons.remove(&node.id), Playback::default()),
                 NodeKind::Volume => Op::Volume,
                 NodeKind::SpeakerOut | NodeKind::VirtualOut => {
                     Op::Output(port.and_then(|k| plan.outputs.iter().position(|p| *p == k)))
@@ -183,7 +205,7 @@ impl Graph {
                     Some(p) => out.copy_from_slice(&self.in_bufs[p][..]),
                     None => out.fill(0.0),
                 },
-                Op::Button(clip, pb) => play_button(clip.as_deref(), pb, &step.shared, &mut out[..]),
+                Op::Button(src, pb) => play_button(src.as_mut(), pb, &step.shared, &mut out[..]),
                 Op::Volume | Op::Output(_) => {
                     out.fill(0.0);
                     for &src in &step.inputs {
@@ -221,22 +243,53 @@ impl Graph {
     }
 }
 
-/// Один блок кнопки: нажатие запускает звук с начала, повторное — останавливает (с затуханием).
-fn play_button(clip: Option<&[f32]>, pb: &mut Playback, shared: &NodeShared, out: &mut [f32]) {
+/// Начать играть с кадра `pos`; если позиция за пределами начала в памяти — попросить подкачку.
+fn start_button(src: &ButtonSource, pb: &mut Playback, pos: u64) {
+    use std::sync::atomic::Ordering::Release;
+    pb.pos = pos.min(src.total_frames);
+    pb.playing = true;
+    pb.fade_left = None;
+    if let Some(tail) = &src.tail {
+        let head_frames = (src.head.len() / CHANNELS) as u64;
+        pb.gen = pb.gen.wrapping_add(1).max(1);
+        pb.synced = false;
+        tail.ctl.want_pos.store(pb.pos.max(head_frames), Release);
+        tail.ctl.want_gen.store(pb.gen, Release);
+    }
+}
+
+/// Один блок кнопки: нажатие — играть с начала, повторное — стоп (с затуханием);
+/// перемотка — играть с указанной доли звука.
+fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeShared, out: &mut [f32]) {
     out.fill(0.0);
     let pressed = shared.take_press();
-    let Some(clip) = clip else {
-        shared.set_playback(false, 0.0);
+    let seek = shared.take_seek();
+    let Some(src) = src else {
+        shared.set_button(false, 0, 0);
         return;
     };
-    if pressed {
+    let total = src.total_frames;
+    if let Some(frac) = seek {
+        start_button(src, pb, (frac.clamp(0.0, 1.0) as f64 * total as f64) as u64);
+    } else if pressed {
         if pb.playing && pb.fade_left.is_none() {
             pb.fade_left = Some(STOP_FADE);
         } else if !pb.playing {
-            *pb = Playback { pos: 0, playing: true, fade_left: None };
+            start_button(src, pb, 0);
         }
     }
-    let frames = clip.len() / CHANNELS;
+    let head_frames = (src.head.len() / CHANNELS) as u64;
+    // Ждём метку свежей просьбы: всё, что подкачка успела положить раньше, — выбрасываем.
+    if let Some(tail) = &mut src.tail {
+        while !pb.synced {
+            let Ok(v) = tail.cons.pop() else { break };
+            if v.is_nan() {
+                if let Ok(g) = tail.cons.pop() {
+                    pb.synced = g as u32 == pb.gen;
+                }
+            }
+        }
+    }
     for f in 0..out.len() / CHANNELS {
         if !pb.playing {
             break;
@@ -252,20 +305,37 @@ fn play_button(clip: Option<&[f32]>, pb: &mut Playback, shared: &NodeShared, out
             }
             None => 1.0,
         };
-        if pb.pos >= frames {
+        if pb.pos >= total {
             pb.playing = false;
             break;
         }
-        for ch in 0..CHANNELS {
-            out[f * CHANNELS + ch] = clip[pb.pos * CHANNELS + ch] * gain;
-        }
+        let (l, r) = if pb.pos < head_frames {
+            let i = pb.pos as usize * CHANNELS;
+            (src.head[i], src.head[i + 1])
+        } else {
+            match &mut src.tail {
+                // Подкачка ещё не догнала (перемотка, медленный диск) — тишина, позиция стоит.
+                Some(tail) if pb.synced && tail.cons.slots() >= CHANNELS => {
+                    (tail.cons.pop().unwrap_or(0.0), tail.cons.pop().unwrap_or(0.0))
+                }
+                Some(_) => break,
+                None => {
+                    pb.playing = false;
+                    break;
+                }
+            }
+        };
+        out[f * CHANNELS] = l * gain;
+        out[f * CHANNELS + 1] = r * gain;
         pb.pos += 1;
+    }
+    if pb.pos >= total {
+        pb.playing = false; // кончилось ровно на границе блока
     }
     if !pb.playing {
         pb.fade_left = None;
     }
-    let progress = if pb.playing { pb.pos as f32 / frames.max(1) as f32 } else { 0.0 };
-    shared.set_playback(pb.playing, progress);
+    shared.set_button(pb.playing, if pb.playing { pb.pos } else { 0 }, total);
 }
 
 /// Порог мягкого ограничителя: тише — звук не меняется вовсе.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Значения, общие для потока звука и интерфейса: только атомарные операции, без блокировок.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering::Relaxed};
 
 /// f32 в атомарной ячейке (через биты u32).
 #[derive(Debug)]
@@ -34,8 +34,19 @@ pub struct NodeShared {
     mute: AtomicBool,
     peak: AtomicF32,
     press: AtomicBool,
+    /// Запрос перемотки: доля звука 0…1; отрицательное — запроса нет.
+    seek: AtomicF32,
     playing: AtomicBool,
-    progress: AtomicF32,
+    pos_frames: AtomicU64,
+    total_frames: AtomicU64,
+}
+
+/// Состояние кнопки для интерфейса: позиция и длина в кадрах 48 кГц.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ButtonState {
+    pub playing: bool,
+    pub pos_frames: u64,
+    pub total_frames: u64,
 }
 
 impl Default for NodeShared {
@@ -45,8 +56,10 @@ impl Default for NodeShared {
             mute: AtomicBool::new(false),
             peak: AtomicF32::new(0.0),
             press: AtomicBool::new(false),
+            seek: AtomicF32::new(-1.0),
             playing: AtomicBool::new(false),
-            progress: AtomicF32::new(0.0),
+            pos_frames: AtomicU64::new(0),
+            total_frames: AtomicU64::new(0),
         }
     }
 }
@@ -89,14 +102,36 @@ impl NodeShared {
         self.press.swap(false, Relaxed)
     }
 
-    pub(crate) fn set_playback(&self, playing: bool, progress: f32) {
+    /// Перемотка: играть с доли `fraction` (0…1) звука, даже если кнопка стояла.
+    pub fn seek(&self, fraction: f32) {
+        self.seek.store(fraction.clamp(0.0, 1.0));
+    }
+
+    pub(crate) fn take_seek(&self) -> Option<f32> {
+        let v = self.seek.swap(-1.0);
+        (v >= 0.0).then_some(v)
+    }
+
+    pub(crate) fn set_button(&self, playing: bool, pos: u64, total: u64) {
         self.playing.store(playing, Relaxed);
-        self.progress.store(progress);
+        self.pos_frames.store(pos, Relaxed);
+        self.total_frames.store(total, Relaxed);
+    }
+
+    /// Состояние кнопки; None — у узла нет звука (файл не выбран или не прочитался).
+    pub fn button_state(&self) -> Option<ButtonState> {
+        let total = self.total_frames.load(Relaxed);
+        (total > 0).then(|| ButtonState {
+            playing: self.playing.load(Relaxed),
+            pos_frames: self.pos_frames.load(Relaxed),
+            total_frames: total,
+        })
     }
 
     /// Играет ли кнопка и какая доля звука уже прозвучала (0…1).
     pub fn playback(&self) -> Option<f32> {
-        self.playing.load(Relaxed).then(|| self.progress.load())
+        let s = self.button_state()?;
+        s.playing.then(|| s.pos_frames as f32 / s.total_frames as f32)
     }
 }
 

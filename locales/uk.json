@@ -121,9 +121,8 @@
   "status.file-not-chosen": "файл не вибрано",
   "status.file-missing": "файл не знайдено",
   "status.file-unsupported": "формат не підтримується",
-  "status.file-too-long": "звук довший за 3 хвилини",
   "param.pickFile": "Вибрати файл…",
-  "param.fileFormats": "Підходять WAV, MP3, OGG і FLAC, до 3 хвилин.",
+  "param.fileFormats": "Підходять WAV, MP3, OGG і FLAC будь-якої довжини.",
   "param.label": "Назва кнопки",
   "param.labelPlaceholder": "за іменем файлу",
   "param.tryButton": "Перевірити",
@@ -143,5 +142,6 @@
   "simple.noVolume": "Регуляторів поки немає. У робочому середовищі поставте вузол «Гучність» між джерелом і виходом — він з'явиться тут.",
   "simple.nothing": "нічого не під'єднано",
   "simple.morpher": "Морфер голосу",
-  "simple.morpherLater": "Тут будуть готові голоси (пресети морфера). З'являться на етапі 6."
+  "simple.morpherLater": "Тут будуть готові голоси (пресети морфера). З'являться на етапі 6.",
+  "button.seekHint": "Натисніть на кільце, щоб перемотати: верх — початок, за годинниковою стрілкою — до кінця."
 }

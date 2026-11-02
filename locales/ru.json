@@ -121,9 +121,8 @@
   "status.file-not-chosen": "файл не выбран",
   "status.file-missing": "файл не найден",
   "status.file-unsupported": "формат не поддерживается",
-  "status.file-too-long": "звук длиннее 3 минут",
   "param.pickFile": "Выбрать файл…",
-  "param.fileFormats": "Подходят WAV, MP3, OGG и FLAC, до 3 минут.",
+  "param.fileFormats": "Подходят WAV, MP3, OGG и FLAC любой длины.",
   "param.label": "Название кнопки",
   "param.labelPlaceholder": "по имени файла",
   "param.tryButton": "Проверить",
@@ -143,5 +142,6 @@
   "simple.noVolume": "Регуляторов пока нет. В рабочей среде поставьте узел «Громкость» между источником и выходом — он появится здесь.",
   "simple.nothing": "ничего не подключено",
   "simple.morpher": "Морфер голоса",
-  "simple.morpherLater": "Здесь будут готовые голоса (пресеты морфера). Появятся на этапе 6."
+  "simple.morpherLater": "Здесь будут готовые голоса (пресеты морфера). Появятся на этапе 6.",
+  "button.seekHint": "Нажмите на кольцо, чтобы перемотать: верх — начало, по часовой стрелке — к концу."
 }

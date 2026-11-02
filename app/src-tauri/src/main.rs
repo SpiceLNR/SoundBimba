@@ -88,6 +88,12 @@ fn press_button(audio: State<Audio>, node_id: String) {
     audio.press(&node_id);
 }
 
+/// Перемотка кнопки-звука: нажатие на кольцо (доля 0…1).
+#[tauri::command]
+fn seek_button(audio: State<Audio>, node_id: String, fraction: f32) {
+    audio.seek(&node_id, fraction);
+}
+
 /// Включить или выключить звук (сама настройка сохраняется вместе с остальными).
 #[tauri::command]
 fn set_audio_enabled(audio: State<Audio>, enabled: bool) {
@@ -227,6 +233,7 @@ fn main() {
             list_audio_apps,
             measure_latency,
             press_button,
+            seek_button,
             get_ui_state
         ])
         .on_window_event(|window, event| {

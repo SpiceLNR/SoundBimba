@@ -121,9 +121,8 @@
   "status.file-not-chosen": "no file selected",
   "status.file-missing": "file not found",
   "status.file-unsupported": "format not supported",
-  "status.file-too-long": "sound is longer than 3 minutes",
   "param.pickFile": "Choose file…",
-  "param.fileFormats": "WAV, MP3, OGG and FLAC, up to 3 minutes.",
+  "param.fileFormats": "WAV, MP3, OGG and FLAC of any length.",
   "param.label": "Button name",
   "param.labelPlaceholder": "from the file name",
   "param.tryButton": "Try it",
@@ -143,5 +142,6 @@
   "simple.noVolume": "No volume controls yet. In the workspace, put a “Volume” node between a source and an output — it will appear here.",
   "simple.nothing": "nothing connected",
   "simple.morpher": "Voice morpher",
-  "simple.morpherLater": "Ready-made voices (morpher presets) will be here. Coming in stage 6."
+  "simple.morpherLater": "Ready-made voices (morpher presets) will be here. Coming in stage 6.",
+  "button.seekHint": "Click the ring to jump: the top is the start, clockwise towards the end."
 }

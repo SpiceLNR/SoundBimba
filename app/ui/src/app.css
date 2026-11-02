@@ -394,6 +394,11 @@ input[type='range']:focus-visible {
   box-shadow: var(--shadow);
 }
 
+/* Узел-кнопка шире: слева большая круглая кнопка. */
+.sound-node.cat-button {
+  width: 250px;
+}
+
 .sound-node.selected {
   outline: 2px solid var(--node-selected);
   outline-offset: 2px;
@@ -734,12 +739,32 @@ button:disabled {
   stroke-linecap: round;
 }
 
+/* Кольцо — шкала времени: при наведении чуть ярче, чтобы было видно, что по нему можно нажать. */
+.button-disc:not(:disabled):hover .disc-track {
+  stroke: var(--text-muted);
+}
+
 .button-disc .disc-icon {
   fill: var(--text);
 }
 
 .button-disc.playing .disc-icon {
   fill: var(--node-button);
+}
+
+.button-disc text {
+  text-anchor: middle;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+}
+
+.button-disc .disc-time-now {
+  fill: var(--text);
+  font-weight: 700;
+}
+
+.button-disc .disc-time-total {
+  fill: var(--text-muted);
 }
 
 .file-value {
@@ -751,7 +776,6 @@ button:disabled {
 /* Сетка кнопок (кнопочная панель, простой режим). */
 .button-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 14px;
 }
 

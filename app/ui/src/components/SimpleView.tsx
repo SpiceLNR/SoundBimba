@@ -17,7 +17,7 @@ export default function SimpleView({ project, onParams }: Props) {
     <div className="simple-view">
       <section className="simple-section">
         <h2 className="panel-title">{t('simple.buttons')}</h2>
-        <ButtonGrid nodes={project.nodes} size={72} />
+        <ButtonGrid nodes={project.nodes} size={124} />
       </section>
 
       <section className="simple-section">

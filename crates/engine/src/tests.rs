@@ -17,18 +17,6 @@ impl PortResolver for Ports {
     }
 }
 
-/// Порты + звуки кнопок.
-struct WithClips(Ports, HashMap<String, Clip>);
-
-impl PortResolver for WithClips {
-    fn port_for(&self, node: &Node) -> Option<PortKey> {
-        self.0.port_for(node)
-    }
-    fn clip_for(&self, node: &Node) -> Option<Clip> {
-        self.1.get(&node.id).cloned()
-    }
-}
-
 fn node(id: &str, kind: NodeKind, params: serde_json::Value) -> Node {
     Node { id: id.into(), kind, pos: [0.0, 0.0], params: params.as_object().cloned().unwrap_or_default() }
 }
@@ -163,7 +151,7 @@ fn rig(project: &Project, ports: &[(&str, PortKey)]) -> Rig {
         taps.push(r);
     }
     let mut shared = HashMap::new();
-    let graph = Graph::compile(project, &resolver, &plan, inputs, outputs, &mut shared).unwrap();
+    let graph = Graph::compile(project, &resolver, &plan, inputs, outputs, &mut HashMap::new(), &mut shared).unwrap();
     Rig { graph, feeds, taps, shared }
 }
 
@@ -271,7 +259,7 @@ fn shared_values_survive_recompile_and_unused_are_dropped() {
     let plan = plan(&q, &resolver).unwrap();
     let ins = plan.inputs.iter().map(|_| ring(64, RATE, RATE, 1).1).collect();
     let outs = plan.outputs.iter().map(|_| ring(64, RATE, RATE, 1).0).collect();
-    Graph::compile(&q, &resolver, &plan, ins, outs, &mut r.shared).unwrap();
+    Graph::compile(&q, &resolver, &plan, ins, outs, &mut HashMap::new(), &mut r.shared).unwrap();
     assert!(Arc::ptr_eq(&before, &r.shared["vol"]));
     assert!(!r.shared.contains_key("mic"));
 }
@@ -331,22 +319,38 @@ fn loud_mix_is_limited_and_counted() {
 
 // ---------- кнопки ----------
 
-/// Кнопка → выход; звук кнопки — `frames` кадров с уровнем 0,5.
-fn button_rig(frames: usize) -> (Graph, RingReader, HashMap<String, Arc<NodeShared>>) {
+/// Кнопка → выход. Звук: `head` кадров в памяти (уровень 0,5), всего `total` кадров;
+/// если total > head — остальное приходит через подкачку, которой управляет сам тест.
+/// Подкачка, которой управляет тест: куда класть звук и что просил движок.
+type TestFeed = Option<(rtrb::Producer<f32>, Arc<TailControl>)>;
+
+fn button_rig_with(head: usize, total: u64) -> (Graph, RingReader, HashMap<String, Arc<NodeShared>>, TestFeed) {
     let p = Project {
         schema: 1,
         nodes: vec![node("btn", NodeKind::SoundButton, json!({ "file": "x.wav" })), node("out", NodeKind::VirtualOut, json!({}))],
         edges: vec![edge("btn", "out")],
     };
-    let ports = Ports([("out".to_string(), PortKey::Render("cable".into()))].into_iter().collect());
-    let clip: Clip = vec![0.5f32; frames * CHANNELS].into();
-    let resolver = WithClips(ports, [("btn".to_string(), clip)].into_iter().collect());
+    let resolver = Ports([("out".to_string(), PortKey::Render("cable".into()))].into_iter().collect());
+    let (feed, tail) = if total > head as u64 {
+        let (prod, cons) = rtrb::RingBuffer::new(48_000 * CHANNELS);
+        let ctl = Arc::new(TailControl::default());
+        (Some((prod, ctl.clone())), Some(TailFeed { cons, ctl }))
+    } else {
+        (None, None)
+    };
+    let src = ButtonSource { head: vec![0.5f32; head * CHANNELS].into(), total_frames: total, tail };
     let plan = plan(&p, &resolver).unwrap();
     // Запас = ровно 4 блока минус 3 кадра: после 4 блоков читатель стартует, ничего не отбросив.
     let (w, r) = ring(48_000, RATE, RATE, BLOCK * 4 - 3);
     let mut shared = HashMap::new();
-    let g = Graph::compile(&p, &resolver, &plan, vec![], vec![w], &mut shared).unwrap();
-    (g, r, shared)
+    let mut buttons = HashMap::from([("btn".to_string(), src)]);
+    let g = Graph::compile(&p, &resolver, &plan, vec![], vec![w], &mut buttons, &mut shared).unwrap();
+    (g, r, shared, feed)
+}
+
+fn button_rig(frames: usize) -> (Graph, RingReader, HashMap<String, Arc<NodeShared>>) {
+    let (g, r, s, _) = button_rig_with(frames, frames as u64);
+    (g, r, s)
 }
 
 fn drain(r: &mut RingReader) -> Vec<f32> {
@@ -369,6 +373,7 @@ fn button_is_silent_until_pressed_then_plays_to_the_end() {
     let btn = shared["btn"].clone();
     g.process();
     assert_eq!(btn.playback(), None, "до нажатия молчит");
+    assert_eq!(btn.button_state().unwrap().total_frames, (BLOCK * 3 + 10) as u64, "длина известна заранее");
     btn.press();
     g.process();
     let p1 = btn.playback().expect("играет");
@@ -392,7 +397,6 @@ fn second_press_stops_with_a_short_fade() {
     assert_eq!(btn.playback(), None, "повторное нажатие — стоп");
     let out = drain(&mut r);
     let left: Vec<f32> = out.iter().step_by(2).copied().collect();
-    // Играло ~2 блока на 0,5, затем плавно к нулю: без скачка больше 1/200 за отсчёт.
     assert!(left.iter().any(|&s| (s - 0.5).abs() < 1e-6));
     let max_step = left.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
     assert!(max_step <= 0.5 / STOP_FADE as f32 + 1e-4, "скачок {max_step}");
@@ -409,6 +413,66 @@ fn press_after_end_starts_again_from_the_beginning() {
     assert_eq!(btn.playback(), None, "доиграла");
     btn.press();
     g.process();
-    // Снова с начала: после одного блока — ровно половина звука.
     assert!((btn.playback().unwrap() - 0.5).abs() < 1e-6);
+}
+
+#[test]
+fn seek_within_memory_starts_playing_there() {
+    let (mut g, _r, shared) = button_rig(BLOCK * 10);
+    let btn = shared["btn"].clone();
+    btn.seek(0.5); // кнопка стояла — перемотка запускает с середины
+    g.process();
+    let s = btn.button_state().unwrap();
+    assert!(s.playing);
+    assert_eq!(s.pos_frames, (BLOCK * 5 + BLOCK) as u64);
+}
+
+#[test]
+fn long_sound_continues_from_disk_after_the_head() {
+    use std::sync::atomic::Ordering::Acquire;
+    let head = BLOCK * 2;
+    let (mut g, mut r, shared, feed) = button_rig_with(head, (BLOCK * 6) as u64);
+    let (mut prod, ctl) = feed.unwrap();
+    let btn = shared["btn"].clone();
+    btn.press();
+    g.process();
+    // Движок попросил подкачку с конца «головы».
+    assert_eq!(ctl.want_gen.load(Acquire), 1);
+    assert_eq!(ctl.want_pos.load(Acquire), head as u64);
+    // Подкачка: сначала старый мусор, потом метка и звук 0,25.
+    for _ in 0..10 {
+        prod.push(9.0).unwrap();
+    }
+    prod.push(f32::NAN).unwrap();
+    prod.push(1.0).unwrap();
+    for _ in 0..BLOCK * 4 * CHANNELS {
+        prod.push(0.25).unwrap();
+    }
+    // Пики на выходе по блокам: 1-й блок уже сыгран (память), дальше — ещё блок памяти и диск.
+    let out = shared["out"].clone();
+    let mut peaks = vec![out.take_peak()];
+    for _ in 0..5 {
+        g.process();
+        peaks.push(out.take_peak());
+    }
+    assert_eq!(btn.playback(), None, "доиграла весь звук");
+    assert_eq!(peaks[0], 0.5, "начало — из памяти");
+    assert_eq!(peaks[1], 0.5);
+    assert!(peaks[2..].iter().all(|&p| p == 0.25), "дальше — с диска: {peaks:?}");
+    let _ = &mut r;
+}
+
+#[test]
+fn seek_past_the_head_asks_disk_and_waits_silently() {
+    use std::sync::atomic::Ordering::Acquire;
+    let (mut g, _r, shared, feed) = button_rig_with(BLOCK, (BLOCK * 100) as u64);
+    let (_prod, ctl) = feed.unwrap();
+    let btn = shared["btn"].clone();
+    btn.seek(0.5);
+    g.process();
+    assert_eq!(ctl.want_pos.load(Acquire), (BLOCK * 50) as u64);
+    // Подкачка ещё не ответила — позиция стоит, кнопка считается играющей.
+    let s = btn.button_state().unwrap();
+    assert!(s.playing);
+    assert_eq!(s.pos_frames, (BLOCK * 50) as u64);
 }
