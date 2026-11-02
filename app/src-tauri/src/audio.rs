@@ -197,7 +197,7 @@ fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
                     None => (None, NodeStatus::DeviceMissing),
                 },
             },
-            NodeKind::SoundButton | NodeKind::Volume | NodeKind::Compressor => (None, NodeStatus::Ok),
+            NodeKind::SoundButton | NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher => (None, NodeStatus::Ok),
         };
         if let Some(port) = port {
             r.ports.insert(n.id.clone(), port);

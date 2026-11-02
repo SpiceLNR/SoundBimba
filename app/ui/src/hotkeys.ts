@@ -34,12 +34,13 @@ export const DEFAULT_BINDINGS: Bindings = {
   export: 'Ctrl+KeyS',
   import: 'Ctrl+KeyO',
   diagnostics: '',
-  // Цифры 1–7 (без Ctrl): быстро добавить узел, когда курсор не в поле ввода.
+  // Цифры 1–8 (без Ctrl): быстро добавить узел, когда курсор не в поле ввода.
   'add-app-source': 'Digit1',
   'add-mic-input': 'Digit2',
   'add-sound-button': 'Digit3',
   'add-volume': 'Digit4',
   'add-compressor': 'Digit7',
+  'add-voice-morpher': 'Digit8',
   'add-speaker-out': 'Digit5',
   'add-virtual-out': 'Digit6',
 };

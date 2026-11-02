@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Простой режим: без карты. Кнопки-звуки, громкость с подписью «откуда → куда», место под морфер.
+// Простой режим: без карты. Кнопки-звуки, громкость с подписью «откуда → куда», голоса морфера.
 import type React from 'react';
 import { volumeRoutes, type Params, type Project } from '../graph';
 import { useT } from '../i18n';
 import ButtonGrid from './ButtonGrid';
+import { VoicePicker } from './MorpherParams';
 
 interface Props {
   project: Project;
@@ -13,6 +14,7 @@ interface Props {
 export default function SimpleView({ project, onParams }: Props) {
   const t = useT();
   const routes = volumeRoutes(project, t);
+  const morphers = volumeRoutes(project, t, 'voice-morpher');
   return (
     <div className="simple-view">
       <section className="simple-section">
@@ -59,9 +61,19 @@ export default function SimpleView({ project, onParams }: Props) {
         })}
       </section>
 
-      <section className="simple-section simple-later">
+      <section className="simple-section">
         <h2 className="panel-title">{t('simple.morpher')}</h2>
-        <p className="panel-hint">{t('simple.morpherLater')}</p>
+        {morphers.length === 0 && <p className="panel-hint">{t('simple.morpherNone')}</p>}
+        {morphers.map((r) => (
+          <div key={r.id} className="simple-volume">
+            <div className="simple-route">
+              <span>{r.from || t('simple.nothing')}</span>
+              <span className="simple-arrow">→</span>
+              <span>{r.to || t('simple.nothing')}</span>
+            </div>
+            <VoicePicker params={project.nodes.find((n) => n.id === r.id)!.params} onPick={(p) => onParams(r.id, p)} />
+          </div>
+        ))}
       </section>
     </div>
   );

@@ -67,6 +67,18 @@ export const TEMPLATES: Template[] = [
     ],
   },
   {
+    id: 'voice-changer',
+    nodes: [
+      { key: 'mic', kind: 'mic-input' },
+      { key: 'morph', kind: 'voice-morpher', params: { pitch: 0, robot: 1, radio: 0, echo: 0.2 } },
+      { key: 'virt', kind: 'virtual-out' },
+    ],
+    edges: [
+      ['mic', 'morph'],
+      ['morph', 'virt'],
+    ],
+  },
+  {
     id: 'hear-myself',
     nodes: [
       { key: 'mic', kind: 'mic-input' },

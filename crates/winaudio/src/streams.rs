@@ -33,6 +33,8 @@ pub enum Source {
     Device(String),
     /// Звук процесса (и его дочерних) по PID.
     Process(u32),
+    /// То, что Windows выводит на устройство вывода (режим loopback) — для проверок на железе.
+    Loopback(String),
 }
 
 #[derive(Debug, Clone)]
@@ -175,6 +177,23 @@ pub fn open_capture(source: Source, reserve_ms: f64) -> Result<(Stream, RingRead
                     let c = device_client(id)?;
                     let (f, p) = init_shared(&c, 0)?;
                     (c, f, p)
+                }
+                Source::Loopback(id) => {
+                    let c = device_client(id)?;
+                    let mix = unsafe { c.GetMixFormat()? };
+                    unsafe {
+                        c.Initialize(
+                            AUDCLNT_SHAREMODE_SHARED,
+                            AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                            200_000,
+                            0,
+                            mix,
+                            None,
+                        )?
+                    };
+                    let f = unsafe { Fmt::from_ptr(mix) };
+                    unsafe { CoTaskMemFree(Some(mix as *const _)) };
+                    (c, f, f.rate / 100)
                 }
                 Source::Process(pid) => {
                     // У захвата процесса нет своего формата — задаём 48 кГц float стерео.

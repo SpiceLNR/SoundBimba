@@ -4559,6 +4559,8 @@ name = "winaudio"
 version = "0.1.0"
 dependencies = [
  "engine",
+ "graph",
+ "serde_json",
  "windows",
  "windows-core",
 ]

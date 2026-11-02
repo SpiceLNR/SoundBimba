@@ -2,9 +2,10 @@
 // Модель карты на стороне интерфейса: та же схема, что в crates/graph (Rust проверяет её при сохранении).
 import type { Edge, Node } from '@xyflow/react';
 import { signed } from './compressor';
+import { voiceOf } from './morpher';
 import type { Translate } from './i18n';
 
-export type NodeKind = 'app-source' | 'mic-input' | 'sound-button' | 'volume' | 'compressor' | 'speaker-out' | 'virtual-out';
+export type NodeKind = 'app-source' | 'mic-input' | 'sound-button' | 'volume' | 'compressor' | 'voice-morpher' | 'speaker-out' | 'virtual-out';
 export type Category = 'source' | 'processing' | 'output' | 'button';
 export type Params = Record<string, unknown>;
 
@@ -27,6 +28,8 @@ export const KINDS: Record<NodeKind, KindInfo> = {
     output: true,
     defaults: { threshold: -24, ratio: 3, attack: 5, release: 120, makeup: 12 },
   },
+  // Голос «Обычный»: все эффекты выключены, голос проходит без изменений.
+  'voice-morpher': { category: 'processing', input: true, output: true, defaults: { pitch: 0, robot: 0, radio: 0, echo: 0, wobble: 0 } },
   'speaker-out': { category: 'output', input: true, output: false, defaults: { device: 'default' } },
   'virtual-out': { category: 'output', input: true, output: false, defaults: { device: 'virtual-1' } },
 };
@@ -241,6 +244,10 @@ export function summary(kind: NodeKind, params: Params, t: Translate): string {
     }
     case 'compressor':
       return `${signed(Number(params.threshold ?? -24))} ${t('unit.db')} · ${Number(params.ratio ?? 3)}:1 · +${Number(params.makeup ?? 12)} ${t('unit.db')}`;
+    case 'voice-morpher': {
+      const voice = voiceOf(params);
+      return voice ? t(`voice.${voice}`) : t('voice.custom');
+    }
     case 'mic-input':
     case 'speaker-out':
       return params.device === 'default' || params.device === undefined ? t('param.deviceDefault') : String(params.device);
@@ -269,13 +276,13 @@ export interface VolumeRoute {
   to: string;
 }
 
-/** Регуляторы громкости для простого режима: «откуда → куда» по соседним узлам. */
-export function volumeRoutes(p: Project, t: Translate): VolumeRoute[] {
+/** Регуляторы для простого режима (громкость, морфер): «откуда → куда» по соседним узлам. */
+export function volumeRoutes(p: Project, t: Translate, kind: NodeKind = 'volume'): VolumeRoute[] {
   const byId = new Map(p.nodes.map((n) => [n.id, n]));
   const names = (ids: string[]) =>
     [...new Set(ids.map((id) => byId.get(id)).filter((n): n is ProjectNode => !!n).map((n) => shortName(n, t)))].join(', ');
   return p.nodes
-    .filter((n) => n.type === 'volume')
+    .filter((n) => n.type === kind)
     .map((n) => ({
       id: n.id,
       from: names(p.edges.filter((e) => e.to === n.id).map((e) => e.from)),

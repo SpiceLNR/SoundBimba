@@ -904,10 +904,6 @@ button:disabled {
   color: var(--text-muted);
 }
 
-.simple-later {
-  opacity: 0.7;
-}
-
 /* Окно «Готовые схемы». */
 .template-list {
   display: flex;

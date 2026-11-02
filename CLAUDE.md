@@ -70,6 +70,9 @@
   cable_loop -- --ignored --nocapture` (тон через кабель 20 с), `--test cable_latency` (задержка),
   `--test cable_listen` (что сейчас приходит на «микрофон» кабеля), `--test mic_level` (громкость
   голоса с микрофона по умолчанию и действие наборов компрессора; человек говорит во время записи).
+  `--test morpher_outputs -- --test-threads 1` (кнопка-тон → морфер → кабель и наушники, щелчки по
+  отсчётам; `tone_straight_to_headphones` — тон прямо в наушники, `SB_DEVICE` — часть названия устройства;
+  в наушниках будет слышен тихий тон).
 - Проверки кнопок на настоящем треке: `set SB_TRACK=путь\к\треку.mp3`, затем `cargo test -p clips
   --test seek_real_file -- --ignored --nocapture` (перемотка без провалов) и `--test real_track_end` (конец трека).
 - Проба: `cargo build --release -p probe` → `target\release\probe.exe` (`--help`; без окна: `--no-pause`).
