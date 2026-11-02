@@ -78,6 +78,24 @@ fn tone_goes_through_the_cable() {
     println!("амплитуда 440 Гц (окна 20 мс): средняя {avg_amp:.3}, наименьшая {min_amp:.3}; пик {peak:.3}");
     println!("частота ≈ {freq:.2} Гц");
     println!("счётчики (пропуски, переполнения, сбросы): вывод {:?}, захват {:?}", out_stream.stats.snapshot(), in_stream.stats.snapshot());
+    // Щелчки: у чистой синусоиды вторая разность не больше A·(2πf/fs)² ≈ 0,0017. Любой разрыв
+    // (потерянный или лишний кусочек звука) даёт скачок в десятки раз больше. Смотрим всё после
+    // первой секунды (пока звук устанавливается).
+    let steady = &left[RATE as usize..];
+    let clicks: Vec<usize> = steady
+        .windows(3)
+        .enumerate()
+        .filter(|(_, w)| (w[2] - 2.0 * w[1] + w[0]).abs() > 0.02)
+        .map(|(i, _)| i)
+        .collect();
+    let mut events: Vec<usize> = Vec::new(); // соседние отсчёты одного щелчка — один щелчок
+    for &i in &clicks {
+        if events.last().is_none_or(|&l| i > l + 50) {
+            events.push(i);
+        }
+    }
+    let when: Vec<String> = events.iter().take(10).map(|&i| format!("{:.2} с", 1.0 + i as f64 / RATE as f64)).collect();
+    println!("щелчков (разрывов звука) за {:.0} с: {} {when:?}", steady.len() as f64 / RATE as f64, events.len());
     assert!((avg_amp - 0.5).abs() < 0.05, "уровень не тот: {avg_amp}");
     assert!(min_amp > 0.4, "провал звука: {min_amp}");
     assert!((freq - 440.0).abs() < 440.0 * 0.01, "частота уплыла: {freq}");

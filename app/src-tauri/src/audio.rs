@@ -62,6 +62,8 @@ pub struct PortReport {
     pub skips: u32,
     /// Блоков с перегрузом (сработал ограничитель) — только у выходов.
     pub overloads: u32,
+    /// Провалы на стороне Windows (потеря данных при захвате, пустой буфер вывода).
+    pub device_gaps: u32,
     pub error: Option<String>,
 }
 
@@ -262,6 +264,7 @@ struct Controller {
     last_status: HashMap<String, NodeStatus>,
     last_glitches: HashMap<String, (u32, u32, u32)>,
     last_overloads: HashMap<String, u32>,
+    last_gaps: HashMap<String, u32>,
     clip_cache: ClipCache,
     last_late: u32,
 }
@@ -314,6 +317,7 @@ impl Controller {
         self.stop();
         self.last_glitches.clear();
         self.last_overloads.clear();
+        self.last_gaps.clear();
         self.last_late = 0;
         self.last_restart = Instant::now();
         let plan = match engine::plan(project, resolved) {
@@ -412,6 +416,7 @@ impl Controller {
                 }
                 let (underruns, overflows, skips) = stream.as_ref().map(|s| s.stats.snapshot()).unwrap_or_default();
                 let overloads = stream.as_ref().map(|s| s.stats.overloads()).unwrap_or_default();
+                let device_gaps = stream.as_ref().map(|s| s.stats.device_gaps()).unwrap_or_default();
                 ports.push(PortReport {
                     port: port_name(key),
                     format: stream.as_ref().map(|s| s.info.format.clone()).unwrap_or_default(),
@@ -420,6 +425,7 @@ impl Controller {
                     overflows,
                     skips,
                     overloads,
+                    device_gaps,
                     error,
                 });
             }
@@ -453,6 +459,12 @@ impl Controller {
                     p.port,
                     p.overloads - before
                 ));
+            }
+        }
+        for p in &ports {
+            let before = self.last_gaps.insert(p.port.clone(), p.device_gaps).unwrap_or_default();
+            if p.device_gaps > before {
+                applog::info(&format!("audio device gaps on {}: +{}", p.port, p.device_gaps - before));
             }
         }
         let late = self.running.as_ref().map(|r| r.late.load(std::sync::atomic::Ordering::Relaxed)).unwrap_or(0);
@@ -496,6 +508,7 @@ impl Audio {
             last_status: HashMap::new(),
             last_glitches: HashMap::new(),
             last_overloads: HashMap::new(),
+            last_gaps: HashMap::new(),
             clip_cache: HashMap::new(),
             last_late: 0,
         };

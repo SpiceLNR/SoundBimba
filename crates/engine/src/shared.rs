@@ -143,6 +143,9 @@ pub struct PortStats {
     pub skips: AtomicU32,
     /// Блоков, где сумма на выходе была громче максимума и сработал ограничитель.
     pub overloads: AtomicU32,
+    /// Провалы на стороне Windows: захват сообщил о потере данных, или буфер вывода опустел
+    /// (поток вывода не успел подложить звук).
+    pub device_gaps: AtomicU32,
 }
 
 impl PortStats {
@@ -152,5 +155,9 @@ impl PortStats {
 
     pub fn overloads(&self) -> u32 {
         self.overloads.load(Relaxed)
+    }
+
+    pub fn device_gaps(&self) -> u32 {
+        self.device_gaps.load(Relaxed)
     }
 }

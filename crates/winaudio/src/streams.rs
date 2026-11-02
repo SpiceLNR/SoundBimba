@@ -15,10 +15,12 @@ use engine::{ring, PortStats, RingReader, RingWriter, BLOCK, RATE};
 use windows::core::{Interface, Result as WinResult, HSTRING};
 use windows::Win32::Media::Audio::{
     IAudioCaptureClient, IAudioClient, IAudioClient3, IAudioRenderClient, IMMDeviceEnumerator, MMDeviceEnumerator,
-    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+    AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
     AUDCLNT_STREAMFLAGS_EVENTCALLBACK, AUDCLNT_STREAMFLAGS_LOOPBACK, AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
 };
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL};
+use windows::Win32::System::Threading::{AvRevertMmThreadCharacteristics, AvSetMmThreadCharacteristicsW};
+use windows::core::w;
 
 use crate::devices::ensure_com;
 use crate::format::{float_format, Fmt};
@@ -48,6 +50,10 @@ pub struct StreamInfo {
 /// Запас кольцевого буфера, мс. Запрошенного может не хватить: устройство берёт звук порциями
 /// (у одних ≈3 мс, у других 10 мс), а движок пишет блоками по 5 мс. Запаса должно хватать на
 /// порцию устройства и блок движка, иначе звук рвётся (трещит).
+/// Запас захвата в порциях устройства. С целой порцией микрофон (порция 10 мс) на ПК автора
+/// проваливался раз в 3 секунды (27 раз за 90 с) — опоздания Windows бывают больше 10 мс.
+const CAPTURE_SHARE: f64 = 1.5;
+
 fn safe_reserve_ms(requested_ms: f64, period_frames: u32, rate: u32, share_of_period: f64) -> f64 {
     let period_ms = period_frames as f64 * 1000.0 / rate as f64;
     let block_ms = BLOCK as f64 * 1000.0 / RATE as f64;
@@ -96,7 +102,17 @@ fn spawn<T: Send + 'static>(
     let (s, e) = (stop.clone(), error.clone());
     let thread = std::thread::Builder::new()
         .name(name.into())
-        .spawn(move || body(s, e, tx))
+        .spawn(move || {
+            // Как у движка: приоритет «Pro Audio» службы мультимедиа Windows (MMCSS). С обычным
+            // приоритетом поток вывода иногда опаздывал больше чем на порцию — Windows играла
+            // тишину (щелчки в наушниках, на ПК автора — больше раза в секунду).
+            let mut task = 0u32;
+            let mmcss = unsafe { AvSetMmThreadCharacteristicsW(w!("Pro Audio"), &mut task) }.ok();
+            body(s, e, tx);
+            if let Some(h) = mmcss {
+                let _ = unsafe { AvRevertMmThreadCharacteristics(h) };
+            }
+        })
         .map_err(|e| e.to_string())?;
     match rx.recv_timeout(Duration::from_secs(10)) {
         Ok(Ok((info, end, stats))) => Ok((Stream { stop, thread: Some(thread), info, error, stats }, end)),
@@ -195,18 +211,19 @@ pub fn open_capture(source: Source, reserve_ms: f64) -> Result<(Stream, RingRead
             }
         };
         // Порция приходит целиком, но Windows иногда отдаёт её с опозданием (особенно захват
-        // программы: у него буфер всего на одну порцию). Запас — целая порция + блок движка.
-        let reserve_ms = safe_reserve_ms(reserve_ms, period, fmt.rate, 1.0);
+        // программы: у него буфер всего на одну порцию). Запас — полторы порции + блок движка.
+        let reserve_ms = safe_reserve_ms(reserve_ms, period, fmt.rate, CAPTURE_SHARE);
         let reserve = (reserve_ms / 1000.0 * fmt.rate as f64) as usize;
         let (mut writer, reader) = ring(fmt.rate as usize, fmt.rate, RATE, reserve);
         let stats = writer.stats().clone();
         let info =
             StreamInfo { rate: fmt.rate, format: fmt.describe(), buffer_frames: buffer, period_frames: period, reserve_ms };
-        if ready.send(Ok((info, reader, stats))).is_err() {
+        if ready.send(Ok((info, reader, stats.clone()))).is_err() {
             return;
         }
         let mut scratch = Vec::with_capacity(buffer as usize * fmt.channels.max(1) as usize);
         let mut stereo = Vec::with_capacity(buffer as usize * 2);
+        let mut first_packet = true;
         let run = (|| -> WinResult<()> {
             unsafe { client.Start()? };
             while !stop.load(Relaxed) {
@@ -217,6 +234,12 @@ pub fn open_capture(source: Source, reserve_ms: f64) -> Result<(Stream, RingRead
                     while cap.GetNextPacketSize()? > 0 {
                         let (mut data, mut frames, mut flags) = (std::ptr::null_mut(), 0u32, 0u32);
                         cap.GetBuffer(&mut data, &mut frames, &mut flags, None, None)?;
+                        // Windows сама сообщает, что часть звука потеряна (первая порция после
+                        // старта всегда с этим флагом — её не считаем).
+                        if flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY.0 as u32 != 0 && !first_packet {
+                            stats.device_gaps.fetch_add(1, Relaxed);
+                        }
+                        first_packet = false;
                         stereo.clear();
                         if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 || data.is_null() {
                             stereo.resize(frames as usize * 2, 0.0);
@@ -268,7 +291,7 @@ pub fn open_render(device_id: &str, reserve_ms: f64) -> Result<(Stream, RingWrit
             StreamInfo { rate: fmt.rate, format: fmt.describe(), buffer_frames: buffer, period_frames: period, reserve_ms };
         // В буфере устройства держим две порции, не больше: лишнее — лишняя задержка.
         let keep = buffer.min(period * 2);
-        if ready.send(Ok((info, writer, stats))).is_err() {
+        if ready.send(Ok((info, writer, stats.clone()))).is_err() {
             return;
         }
         let mut stereo = vec![0.0f32; buffer as usize * 2];
@@ -285,6 +308,10 @@ pub fn open_render(device_id: &str, reserve_ms: f64) -> Result<(Stream, RingWrit
                 }
                 unsafe {
                     let padding = client.GetCurrentPadding()?;
+                    // Буфер устройства пуст — значит, Windows уже играла тишину вместо звука.
+                    if padding == 0 {
+                        stats.device_gaps.fetch_add(1, Relaxed);
+                    }
                     let want = keep.saturating_sub(padding).min(buffer - padding);
                     if want == 0 {
                         continue;
@@ -308,7 +335,7 @@ pub fn open_render(device_id: &str, reserve_ms: f64) -> Result<(Stream, RingWrit
 
 #[cfg(test)]
 mod tests {
-    use super::safe_reserve_ms;
+    use super::{safe_reserve_ms, CAPTURE_SHARE};
 
     #[test]
     fn reserve_covers_device_period_and_engine_block() {
@@ -318,7 +345,7 @@ mod tests {
         assert_eq!(safe_reserve_ms(30.0, 128, 48_000, 1.0), 30.0);
         // Обычное устройство: порция 10 мс — запас 10 + 5 + 2 = 17 мс.
         assert!((safe_reserve_ms(8.0, 480, 48_000, 1.0) - 17.0).abs() < 1e-9);
-        // Захват с порцией 10 мс: 10 + 5 + 2 = 17 мс.
-        assert!((safe_reserve_ms(12.0, 480, 48_000, 1.0) - 17.0).abs() < 1e-9);
+        // Захват с порцией 10 мс: 15 + 5 + 2 = 22 мс.
+        assert!((safe_reserve_ms(12.0, 480, 48_000, CAPTURE_SHARE) - 22.0).abs() < 1e-9);
     }
 }
