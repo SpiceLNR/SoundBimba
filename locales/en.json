@@ -91,5 +91,6 @@
   "action.fitView": "Show the whole map",
   "action.export": "Export project",
   "action.import": "Import project",
-  "action.diagnostics": "Save diagnostics"
+  "action.diagnostics": "Save diagnostics",
+  "action.add": "Add: {node}"
 }

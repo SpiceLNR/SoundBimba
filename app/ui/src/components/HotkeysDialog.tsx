@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Окно «Клавиши»: список действий, у каждого — своё сочетание; можно изменить или отключить.
 import { useEffect, useState } from 'react';
-import { ACTIONS, assign, DEFAULT_BINDINGS, eventToCombo, formatCombo, type Action, type Bindings } from '../hotkeys';
+import { ACTIONS, actionLabel, assign, DEFAULT_BINDINGS, eventToCombo, formatCombo, type Action, type Bindings } from '../hotkeys';
 import { useT } from '../i18n';
 
 interface Props {
@@ -42,7 +42,7 @@ export default function HotkeysDialog({ bindings, onChange, onClose }: Props) {
         <div className="hotkey-list">
           {ACTIONS.map((a) => (
             <div key={a} className="hotkey-row">
-              <span>{t(`action.${a}`)}</span>
+              <span>{actionLabel(a, t)}</span>
               <span className={`hotkey-combo${bindings[a] ? '' : ' hotkey-none'}`}>
                 {capturing === a ? t('hotkeys.press') : bindings[a] ? formatCombo(bindings[a]) : t('hotkeys.none')}
               </span>
@@ -74,7 +74,7 @@ export default function HotkeysDialog({ bindings, onChange, onClose }: Props) {
             </div>
           ))}
         </div>
-        {displaced && <p className="later">{t('hotkeys.displaced', { action: t(`action.${displaced}`) })}</p>}
+        {displaced && <p className="later">{t('hotkeys.displaced', { action: actionLabel(displaced, t) })}</p>}
         <div className="dialog-actions">
           <button
             type="button"

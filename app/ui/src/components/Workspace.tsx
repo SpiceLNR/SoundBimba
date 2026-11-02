@@ -33,7 +33,7 @@ import {
   type Project,
   type SoundNode,
 } from '../graph';
-import { actionFor, eventToCombo, isTyping, mergeBindings, type Action, type Bindings } from '../hotkeys';
+import { ACTIONS, actionFor, addedKind, eventToCombo, isTyping, mergeBindings, type Action, type Bindings } from '../hotkeys';
 import { DICTS, useT, type Lang } from '../i18n';
 import HotkeysDialog from './HotkeysDialog';
 import type { Notify } from './Notices';
@@ -229,6 +229,12 @@ export default function Workspace({ project, version, settings, lang, onSettings
   // Горячие клавиши — только пока окно SoundBimba активно и человек не печатает в поле ввода.
   const commands = useRef<Record<Action, () => void>>(null as unknown as Record<Action, () => void>);
   commands.current = {
+    ...(Object.fromEntries(
+      ACTIONS.flatMap((a) => {
+        const kind = addedKind(a);
+        return kind ? [[a, () => addNode(kind)]] : [];
+      }),
+    ) as Record<Action, () => void>),
     deleteSelected: () => {
       if (selected.node) deleteNode(selected.node);
       else if (selected.edge) deleteEdge(selected.edge);
@@ -288,6 +294,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
         lang={lang}
         settings={settings}
         saveState={saveState}
+        bindings={bindings}
         onAdd={addNode}
         onArrange={onArrange}
         onExport={() => void onExport()}

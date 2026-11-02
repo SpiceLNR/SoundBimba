@@ -3,8 +3,26 @@
 // Сочетание хранится по физической клавише (KeyboardEvent.code), чтобы работать в любой раскладке:
 // «Ctrl+KeyL» срабатывает и в английской, и в русской («Ctrl+Д»).
 
-export const ACTIONS = ['deleteSelected', 'deselect', 'arrange', 'fitView', 'export', 'import', 'diagnostics'] as const;
-export type Action = (typeof ACTIONS)[number];
+import { KIND_ORDER, type NodeKind } from './graph';
+import type { Translate } from './i18n';
+
+const BASE_ACTIONS = ['deleteSelected', 'deselect', 'arrange', 'fitView', 'export', 'import', 'diagnostics'] as const;
+type BaseAction = (typeof BASE_ACTIONS)[number];
+/** «Добавить узел» — отдельное действие для каждого типа узла. */
+type AddAction = `add-${NodeKind}`;
+export type Action = BaseAction | AddAction;
+
+export const ACTIONS: readonly Action[] = [...BASE_ACTIONS, ...KIND_ORDER.map((k): AddAction => `add-${k}`)];
+
+/** Тип узла для действия «Добавить …» или undefined. */
+export function addedKind(a: Action): NodeKind | undefined {
+  return a.startsWith('add-') ? (a.slice(4) as NodeKind) : undefined;
+}
+
+export function actionLabel(a: Action, t: Translate): string {
+  const kind = addedKind(a);
+  return kind ? t('action.add', { node: t(`node.${kind}.title`) }) : t(`action.${a}`);
+}
 /** Действие → сочетание; пустая строка — клавиша отключена. */
 export type Bindings = Record<Action, string>;
 
@@ -16,6 +34,13 @@ export const DEFAULT_BINDINGS: Bindings = {
   export: 'Ctrl+KeyS',
   import: 'Ctrl+KeyO',
   diagnostics: '',
+  // Цифры 1–6 (без Ctrl): быстро добавить узел, когда курсор не в поле ввода.
+  'add-app-source': 'Digit1',
+  'add-mic-input': 'Digit2',
+  'add-sound-button': 'Digit3',
+  'add-volume': 'Digit4',
+  'add-speaker-out': 'Digit5',
+  'add-virtual-out': 'Digit6',
 };
 
 const MODIFIERS = new Set(['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight']);

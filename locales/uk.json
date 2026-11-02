@@ -91,5 +91,6 @@
   "action.fitView": "Показати всю мапу",
   "action.export": "Експорт проєкту",
   "action.import": "Імпорт проєкту",
-  "action.diagnostics": "Зберегти діагностику"
+  "action.diagnostics": "Зберегти діагностику",
+  "action.add": "Додати: {node}"
 }

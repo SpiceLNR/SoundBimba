@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { ACTIONS, actionFor, assign, DEFAULT_BINDINGS, eventToCombo, formatCombo, mergeBindings } from './hotkeys';
-import { DICTS } from './i18n';
+import { KIND_ORDER } from './graph';
+import { ACTIONS, actionFor, actionLabel, addedKind, assign, DEFAULT_BINDINGS, eventToCombo, formatCombo, mergeBindings } from './hotkeys';
+import { DICTS, translate } from './i18n';
 
 const key = (code: string, mods: Partial<{ ctrlKey: boolean; shiftKey: boolean; altKey: boolean; metaKey: boolean }> = {}) => ({
   code,
@@ -49,6 +50,15 @@ describe('hotkeys', () => {
   it('default combos are unique and every action has a name', () => {
     const used = ACTIONS.map((a) => DEFAULT_BINDINGS[a]).filter(Boolean);
     expect(new Set(used).size).toBe(used.length);
-    for (const a of ACTIONS) expect(DICTS.en).toHaveProperty([`action.${a}`]);
+    for (const a of ACTIONS) if (!addedKind(a)) expect(DICTS.en).toHaveProperty([`action.${a}`]);
+  });
+
+  it('has an add action with a readable name for every node kind', () => {
+    for (const k of KIND_ORDER) {
+      expect(ACTIONS).toContain(`add-${k}`);
+      expect(addedKind(`add-${k}`)).toBe(k);
+    }
+    expect(actionLabel('add-volume', (k, v) => translate('ru', k, v))).toBe('Добавить: Громкость');
+    expect(actionFor(DEFAULT_BINDINGS, 'Digit4')).toBe('add-volume');
   });
 });

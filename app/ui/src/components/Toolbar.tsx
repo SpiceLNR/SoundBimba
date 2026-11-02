@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Settings } from '../api';
 import { CATEGORY_ORDER, KIND_ORDER, KINDS, type NodeKind } from '../graph';
+import { formatCombo, type Bindings } from '../hotkeys';
 import { LANGUAGES, isLang, useT, type Lang } from '../i18n';
 import { THEMES } from '../theme';
 
@@ -12,6 +13,7 @@ interface Props {
   lang: Lang;
   settings: Settings;
   saveState: SaveState;
+  bindings: Bindings;
   onAdd: (kind: NodeKind) => void;
   onArrange: () => void;
   onExport: () => void;
@@ -79,7 +81,9 @@ export default function Toolbar(p: Props) {
           <optgroup key={cat} label={t(`category.${cat}`)}>
             {KIND_ORDER.filter((k) => KINDS[k].category === cat).map((k) => (
               <option key={k} value={k}>
-                {t(`node.${k}.title`)}
+                {p.bindings[`add-${k}`]
+                  ? `${t(`node.${k}.title`)} — ${formatCombo(p.bindings[`add-${k}`])}`
+                  : t(`node.${k}.title`)}
               </option>
             ))}
           </optgroup>
