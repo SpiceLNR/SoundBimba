@@ -8,6 +8,7 @@ import { api, type AudioApp, type AudioDevice } from '../api';
 import { isProblem, useAudio } from '../audio';
 import { KINDS, type NodeKind, type Params, type SoundNode } from '../graph';
 import { useT } from '../i18n';
+import CompressorParams from './CompressorParams';
 import ButtonDisc from './ButtonDisc';
 import Dropdown from './Dropdown';
 
@@ -186,6 +187,8 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
     }
     case 'sound-button':
       return <ButtonParams node={node} onParams={onParams} />;
+    case 'compressor':
+      return <CompressorParams node={node} onParams={onParams} />;
     case 'mic-input':
     case 'speaker-out':
     case 'virtual-out': {

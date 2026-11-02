@@ -206,6 +206,34 @@ fn inputs_are_summed_and_volume_applied() {
 }
 
 #[test]
+fn compressor_in_the_graph_evens_out_loud_and_quiet() {
+    // Микрофон → компрессор (порог −20 дБ, сила 4, усиление +6 дБ) → выход.
+    let p = Project {
+        schema: 1,
+        nodes: vec![
+            node("mic", NodeKind::MicInput, json!({})),
+            node("comp", NodeKind::Compressor, json!({ "threshold": -20.0, "ratio": 4.0, "attack": 1.0, "release": 50.0, "makeup": 6.0 })),
+            node("out", NodeKind::VirtualOut, json!({})),
+        ],
+        edges: vec![edge("mic", "comp"), edge("comp", "out")],
+    };
+    let ports = [("mic", PortKey::Capture("mic-id".into())), ("out", PortKey::Render("cable-id".into()))];
+    let level = |amp: f32| {
+        let mut r = rig(&p, &ports);
+        let blocks = 200;
+        let out = run_blocks(&mut r, blocks, &[vec![amp; blocks * BLOCK_SAMPLES]]);
+        let tail = &out[0][out[0].len() - BLOCK_SAMPLES..];
+        (20.0 * tail[0].abs().log10(), r.shared["comp"].take_reduction())
+    };
+    // Тихое (−40 дБ) — только +6 дБ; громкое (−4 дБ) — превышение 16 дБ сжато до 4, плюс 6.
+    let (quiet, quiet_red) = level(0.01);
+    let (loud, loud_red) = level(10f32.powf(-4.0 / 20.0));
+    assert!((quiet - (-34.0)).abs() < 0.1, "{quiet}");
+    assert!((loud - (-10.0)).abs() < 0.2, "{loud}");
+    assert!(quiet_red < 0.01 && (loud_red - 12.0).abs() < 0.3, "{quiet_red} {loud_red}");
+}
+
+#[test]
 fn mute_silences_only_that_branch() {
     let p = mixer_project(1.0, true);
     let mut r = rig(&p, &ports());

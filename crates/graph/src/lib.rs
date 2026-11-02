@@ -39,6 +39,8 @@ pub enum NodeKind {
     SoundButton,
     /// Громкость.
     Volume,
+    /// Компрессор: громкое тише, затем всё громче (ровный голос без перегруза).
+    Compressor,
     /// Выход «Наушники» (реальное устройство вывода).
     SpeakerOut,
     /// Выход «Виртуальный микрофон» (динамик виртуального кабеля).
@@ -55,17 +57,18 @@ pub enum Category {
 }
 
 impl NodeKind {
-    pub const ALL: [NodeKind; 6] = [
+    pub const ALL: [NodeKind; 7] = [
         NodeKind::AppSource,
         NodeKind::MicInput,
         NodeKind::SoundButton,
         NodeKind::Volume,
+        NodeKind::Compressor,
         NodeKind::SpeakerOut,
         NodeKind::VirtualOut,
     ];
 
     pub fn has_input(self) -> bool {
-        matches!(self, NodeKind::Volume | NodeKind::SpeakerOut | NodeKind::VirtualOut)
+        matches!(self, NodeKind::Volume | NodeKind::Compressor | NodeKind::SpeakerOut | NodeKind::VirtualOut)
     }
 
     pub fn has_output(self) -> bool {
@@ -76,7 +79,7 @@ impl NodeKind {
         match self {
             NodeKind::AppSource | NodeKind::MicInput => Category::Source,
             NodeKind::SoundButton => Category::Button,
-            NodeKind::Volume => Category::Processing,
+            NodeKind::Volume | NodeKind::Compressor => Category::Processing,
             NodeKind::SpeakerOut | NodeKind::VirtualOut => Category::Output,
         }
     }
@@ -217,6 +220,16 @@ pub fn validate(p: &Project) -> Result<(), GraphError> {
     topo_order(p).map(|_| ())
 }
 
+/// Допустимые значения параметров компрессора: порог (дБ), сила (во сколько раз), атака и
+/// восстановление (мс), усиление после сжатия (дБ).
+pub const COMPRESSOR_RANGES: [(&str, std::ops::RangeInclusive<f64>); 5] = [
+    ("threshold", -60.0..=0.0),
+    ("ratio", 1.0..=20.0),
+    ("attack", 0.1..=100.0),
+    ("release", 10.0..=2000.0),
+    ("makeup", 0.0..=24.0),
+];
+
 fn check_params(n: &Node) -> Result<(), GraphError> {
     let bad = |param| GraphError::BadParam { node: n.id.clone(), param };
     if n.kind == NodeKind::Volume {
@@ -228,6 +241,16 @@ fn check_params(n: &Node) -> Result<(), GraphError> {
         }
         if let Some(m) = n.params.get("mute") {
             m.as_bool().ok_or_else(|| bad("mute"))?;
+        }
+    }
+    if n.kind == NodeKind::Compressor {
+        for (param, range) in COMPRESSOR_RANGES {
+            if let Some(v) = n.params.get(param) {
+                let v = v.as_f64().ok_or_else(|| bad(param))?;
+                if !range.contains(&v) {
+                    return Err(bad(param));
+                }
+            }
         }
     }
     Ok(())
@@ -424,6 +447,22 @@ mod tests {
         assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
         p.nodes[2].params.insert("gain".into(), serde_json::json!("loud"));
         assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
+    }
+
+    #[test]
+    fn checks_compressor_params() {
+        let mut p = default_project();
+        p.nodes.push(Node { id: "c".into(), kind: NodeKind::Compressor, pos: [0.0, 0.0], params: Map::new() });
+        p.edges.push(edge("n1", "c"));
+        p.edges.push(edge("c", "n4"));
+        validate(&p).unwrap();
+        p.nodes.last_mut().unwrap().params.insert("ratio".into(), serde_json::json!(0.5));
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
+        p.nodes.last_mut().unwrap().params.insert("ratio".into(), serde_json::json!(4));
+        p.nodes.last_mut().unwrap().params.insert("threshold".into(), serde_json::json!(6));
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
+        let text = to_json(&p);
+        assert!(text.contains("\"compressor\""));
     }
 
     #[test]

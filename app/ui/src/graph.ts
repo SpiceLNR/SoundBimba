@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Модель карты на стороне интерфейса: та же схема, что в crates/graph (Rust проверяет её при сохранении).
 import type { Edge, Node } from '@xyflow/react';
+import { signed } from './compressor';
 import type { Translate } from './i18n';
 
-export type NodeKind = 'app-source' | 'mic-input' | 'sound-button' | 'volume' | 'speaker-out' | 'virtual-out';
+export type NodeKind = 'app-source' | 'mic-input' | 'sound-button' | 'volume' | 'compressor' | 'speaker-out' | 'virtual-out';
 export type Category = 'source' | 'processing' | 'output' | 'button';
 export type Params = Record<string, unknown>;
 
@@ -19,6 +20,13 @@ export const KINDS: Record<NodeKind, KindInfo> = {
   'mic-input': { category: 'source', input: false, output: true, defaults: { device: 'default' } },
   'sound-button': { category: 'button', input: false, output: true, defaults: { file: '' } },
   volume: { category: 'processing', input: true, output: true, defaults: { gain: 1, mute: false } },
+  // Те же значения, что набор «Голос» и COMPRESSOR_DEFAULTS в движке.
+  compressor: {
+    category: 'processing',
+    input: true,
+    output: true,
+    defaults: { threshold: -24, ratio: 3, attack: 5, release: 120, makeup: 12 },
+  },
   'speaker-out': { category: 'output', input: true, output: false, defaults: { device: 'default' } },
   'virtual-out': { category: 'output', input: true, output: false, defaults: { device: 'virtual-1' } },
 };
@@ -231,6 +239,8 @@ export function summary(kind: NodeKind, params: Params, t: Translate): string {
       const gain = `${Math.round(Number(params.gain ?? 1) * 100)} %`;
       return params.mute === true ? `${gain} · ${t('param.muted')}` : gain;
     }
+    case 'compressor':
+      return `${signed(Number(params.threshold ?? -24))} ${t('unit.db')} · ${Number(params.ratio ?? 3)}:1 · +${Number(params.makeup ?? 12)} ${t('unit.db')}`;
     case 'mic-input':
     case 'speaker-out':
       return params.device === 'default' || params.device === undefined ? t('param.deviceDefault') : String(params.device);

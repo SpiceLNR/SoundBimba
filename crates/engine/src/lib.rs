@@ -16,7 +16,9 @@ use std::sync::Arc;
 use graph::{NodeKind, Project};
 
 pub use ring::{ring, RingReader, RingWriter};
-pub use shared::{AtomicF32, ButtonState, NodeShared, PortStats};
+pub mod compressor;
+
+pub use shared::{AtomicF32, ButtonState, CompressorParams, NodeShared, PortStats, COMPRESSOR_DEFAULTS};
 
 /// Частота дискретизации движка.
 pub const RATE: u32 = 48_000;
@@ -104,6 +106,8 @@ enum Op {
     Button(Option<ButtonSource>, Playback),
     /// Громкость: сумма входов × усиление.
     Volume,
+    /// Компрессор: сумма входов, громкое сжимается, всё вместе поднимается.
+    Compressor(compressor::State),
     /// Выход: сумма входов → внешний выход. None — выхода нет.
     Output(Option<usize>),
 }
@@ -144,7 +148,7 @@ pub fn plan(project: &Project, resolver: &dyn PortResolver) -> Result<PortPlan, 
         let list = match n.kind {
             NodeKind::AppSource | NodeKind::MicInput => &mut inputs,
             NodeKind::SpeakerOut | NodeKind::VirtualOut => &mut outputs,
-            NodeKind::SoundButton | NodeKind::Volume => continue,
+            NodeKind::SoundButton | NodeKind::Volume | NodeKind::Compressor => continue,
         };
         // Два узла на одном устройстве делят один порт.
         if let Some(key) = resolver.port_for(n) {
@@ -184,6 +188,7 @@ impl Graph {
                 }
                 NodeKind::SoundButton => Op::Button(buttons.remove(&node.id), Playback::default()),
                 NodeKind::Volume => Op::Volume,
+                NodeKind::Compressor => Op::Compressor(compressor::State::new(sh.compressor())),
                 NodeKind::SpeakerOut | NodeKind::VirtualOut => {
                     Op::Output(port.and_then(|k| plan.outputs.iter().position(|p| *p == k)))
                 }
@@ -218,7 +223,7 @@ impl Graph {
                     None => out.fill(0.0),
                 },
                 Op::Button(src, pb) => play_button(src.as_mut(), pb, &step.shared, &mut out[..]),
-                Op::Volume | Op::Output(_) => {
+                Op::Volume | Op::Compressor(_) | Op::Output(_) => {
                     out.fill(0.0);
                     for &src in &step.inputs {
                         for (o, s) in out.iter_mut().zip(before[src].iter()) {
@@ -226,6 +231,10 @@ impl Graph {
                         }
                     }
                 }
+            }
+            if let Op::Compressor(state) = &mut step.op {
+                let reduction = state.process(&mut out[..], step.shared.compressor());
+                step.shared.report_reduction(reduction);
             }
             if let Op::Volume = step.op {
                 let target = step.shared.target_gain();

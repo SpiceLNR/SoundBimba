@@ -39,6 +39,30 @@ pub struct NodeShared {
     playing: AtomicBool,
     pos_frames: AtomicU64,
     total_frames: AtomicU64,
+    /// Компрессор: настройки (пишет интерфейс) и наибольшее сжатие с прошлого опроса, дБ.
+    comp: CompressorParams,
+    reduction: AtomicF32,
+}
+
+/// Настройки компрессора (см. `graph::COMPRESSOR_RANGES`).
+#[derive(Debug)]
+pub struct CompressorParams {
+    pub threshold_db: AtomicF32,
+    pub ratio: AtomicF32,
+    pub attack_ms: AtomicF32,
+    pub release_ms: AtomicF32,
+    pub makeup_db: AtomicF32,
+}
+
+/// Значения по умолчанию — те же, что у нового узла в интерфейсе.
+pub const COMPRESSOR_DEFAULTS: [(&str, f32); 5] =
+    [("threshold", -24.0), ("ratio", 3.0), ("attack", 5.0), ("release", 120.0), ("makeup", 12.0)];
+
+impl Default for CompressorParams {
+    fn default() -> Self {
+        let d = |i: usize| AtomicF32::new(COMPRESSOR_DEFAULTS[i].1);
+        CompressorParams { threshold_db: d(0), ratio: d(1), attack_ms: d(2), release_ms: d(3), makeup_db: d(4) }
+    }
 }
 
 /// Состояние кнопки для интерфейса: позиция и длина в кадрах 48 кГц.
@@ -60,6 +84,8 @@ impl Default for NodeShared {
             playing: AtomicBool::new(false),
             pos_frames: AtomicU64::new(0),
             total_frames: AtomicU64::new(0),
+            comp: CompressorParams::default(),
+            reduction: AtomicF32::new(0.0),
         }
     }
 }
@@ -72,6 +98,26 @@ impl NodeShared {
             self.gain.store(gain.clamp(0.0, 2.0));
             self.mute.store(node.params.get("mute").and_then(|v| v.as_bool()).unwrap_or(false), Relaxed);
         }
+        if node.kind == graph::NodeKind::Compressor {
+            let cells = [&self.comp.threshold_db, &self.comp.ratio, &self.comp.attack_ms, &self.comp.release_ms, &self.comp.makeup_db];
+            for ((cell, (name, default)), (_, range)) in cells.into_iter().zip(COMPRESSOR_DEFAULTS).zip(graph::COMPRESSOR_RANGES) {
+                let v = node.params.get(name).and_then(|v| v.as_f64()).unwrap_or(default as f64);
+                cell.store(v.clamp(*range.start(), *range.end()) as f32);
+            }
+        }
+    }
+
+    pub fn compressor(&self) -> &CompressorParams {
+        &self.comp
+    }
+
+    pub(crate) fn report_reduction(&self, db: f32) {
+        self.reduction.fetch_max_positive(db);
+    }
+
+    /// Наибольшее сжатие компрессора (дБ) с прошлого вызова — для индикатора.
+    pub fn take_reduction(&self) -> f32 {
+        self.reduction.swap(0.0)
     }
 
     /// Усиление с учётом «Выключить звук».

@@ -1106,3 +1106,42 @@ button:disabled {
   justify-content: space-between;
   gap: 8px;
 }
+
+/* Компрессор: готовые наборы, свёрнутая точная настройка, шкала сжатия. */
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+details.more {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+details.more > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+details.more[open] > summary {
+  margin-bottom: 12px;
+}
+
+details.more > .field + .field {
+  margin-top: 12px;
+}
+
+.reduction-meter {
+  height: var(--slider-track-height);
+  background: var(--slider-track);
+  border-radius: var(--slider-thumb-radius);
+  overflow: hidden;
+}
+
+.reduction-fill {
+  height: 100%;
+  background: var(--node-processing);
+  transition: width 0.08s linear;
+}

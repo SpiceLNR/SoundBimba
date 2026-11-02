@@ -88,6 +88,8 @@ export interface AudioState {
   levels: Record<string, number>;
   /** Кнопки со звуком: играет ли, позиция и длина. */
   buttons: Record<string, ButtonPlayback>;
+  /** Компрессоры: насколько сжимают сейчас, дБ (нет записи — не сжимают). */
+  reductions?: Record<string, number>;
 }
 
 /** Проект и настройки без побочных действий (для кнопочной панели). */
@@ -193,7 +195,9 @@ export function onAudioState(handler: (s: AudioState) => void): () => void {
       if (previewEnabled) previewPlaying.n5 ??= { playing: false, pos: 0, len: 95 };
       const buttons: Record<string, ButtonPlayback> = {};
       for (const [id, b] of Object.entries(previewPlaying)) buttons[id] = { ...b };
-      handler({ enabled: previewEnabled, running: previewEnabled, status, levels, buttons });
+      const reductions: Record<string, number> = {};
+      for (const n of previewProject.nodes) if (n.type === 'compressor' && previewEnabled) reductions[n.id] = Math.random() * 9;
+      handler({ enabled: previewEnabled, running: previewEnabled, status, levels, buttons, reductions });
     }, 66);
     return () => clearInterval(h);
   }

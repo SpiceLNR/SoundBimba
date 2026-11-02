@@ -87,6 +87,8 @@ struct StateEvent<'a> {
     levels: HashMap<String, f32>,
     /// Кнопки со звуком: играет ли, позиция и длина (секунды) — для кругового индикатора и времени.
     buttons: HashMap<String, ButtonEvent>,
+    /// Компрессоры: наибольшее сжатие с прошлого события, дБ — для индикатора.
+    reductions: HashMap<String, f32>,
 }
 
 #[derive(Serialize, Clone)]
@@ -195,7 +197,7 @@ fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
                     None => (None, NodeStatus::DeviceMissing),
                 },
             },
-            NodeKind::SoundButton | NodeKind::Volume => (None, NodeStatus::Ok),
+            NodeKind::SoundButton | NodeKind::Volume | NodeKind::Compressor => (None, NodeStatus::Ok),
         };
         if let Some(port) = port {
             r.ports.insert(n.id.clone(), port);
@@ -541,7 +543,7 @@ impl Audio {
             .name("sb-audio-levels".into())
             .spawn(move || loop {
                 std::thread::sleep(LEVELS_EVERY);
-                let (levels, buttons) = {
+                let (levels, buttons, reductions) = {
                     let shared = sh.lock().unwrap();
                     let levels: HashMap<String, f32> = shared.iter().map(|(id, s)| (id.clone(), s.take_peak())).collect();
                     let secs = |frames: u64| frames as f64 / RATE as f64;
@@ -553,10 +555,11 @@ impl Audio {
                             })
                         })
                         .collect();
-                    (levels, buttons)
+                    let reductions: HashMap<String, f32> = shared.iter().map(|(id, s)| (id.clone(), s.take_reduction())).filter(|(_, r)| *r > 0.0).collect();
+                    (levels, buttons, reductions)
                 };
                 let snapshot = snap.lock().unwrap().clone();
-                if app.emit("audio-state", StateEvent { snapshot: &snapshot, levels, buttons }).is_err() {
+                if app.emit("audio-state", StateEvent { snapshot: &snapshot, levels, buttons, reductions }).is_err() {
                     break;
                 }
             })
