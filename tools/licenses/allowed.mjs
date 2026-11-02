@@ -11,6 +11,8 @@ export const ALLOWED = new Set([
   'Zlib',
   'ISC',
   'OFL-1.1',
+  // Добавлена автором 2026-11-02: ICU4X-библиотеки, которые тянет Tauri.
+  'Unicode-3.0',
 ]);
 
 // Исключения к лицензиям, которые только расширяют права (например, Apache-2.0 WITH LLVM-exception).

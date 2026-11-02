@@ -16,7 +16,8 @@
 2. **Секреты.** Никаких ключей, сертификатов, токенов, паролей в репозитории и в журналах. Подпись
    только через SignPath и GitHub Secrets. Если нашёл секрет в коде — останови работу и сообщи.
 3. **Лицензии.** Проект AGPL-3.0-or-later. Прежде чем добавить зависимость, проверь её лицензию:
-   разрешены MIT, Apache-2.0, BSD, MPL-2.0, zlib, ISC, OFL (шрифты). Запрещены proprietary,
+   разрешены MIT, Apache-2.0, BSD, MPL-2.0, zlib, ISC, OFL (шрифты), Unicode-3.0 (добавлена
+   автором 2026-11-02: нужна Tauri). Запрещены proprietary,
    noncommercial, GPL-2.0-only, любые «source-available». Каждую новую зависимость и ресурс
    (шрифты, иконки) записывай в `THIRD_PARTY_NOTICES.md`. В файлах кода короткий SPDX-заголовок:
    `SPDX-License-Identifier: AGPL-3.0-or-later`.
