@@ -8,6 +8,7 @@ import './app.css';
 import { api } from './api';
 import App from './App';
 import { installKeyGuard } from './keyguard';
+import PanelApp from './PanelApp';
 
 installKeyGuard();
 window.addEventListener('error', (e) => api.log('error', `${e.message} @ ${e.filename}:${e.lineno}`));
@@ -15,6 +16,7 @@ window.addEventListener('unhandledrejection', (e) => api.log('error', `unhandled
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>
-    <App />
+    {/* Одно приложение — два окна: основное и кнопочная панель (адрес #buttons). */}
+    {window.location.hash === '#buttons' ? <PanelApp /> : <App />}
   </StrictMode>,
 );

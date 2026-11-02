@@ -18,7 +18,7 @@ use graph::Project;
 use serde::Serialize;
 use audio::Audio;
 use storage::{Paths, Settings};
-use tauri::{Manager, RunEvent, State};
+use tauri::{Emitter, Manager, RunEvent, State};
 
 struct AppState {
     paths: Paths,
@@ -59,12 +59,33 @@ fn load_state(state: State<AppState>, audio: State<Audio>) -> LoadState {
     LoadState { project: loaded.project, settings, recovered_from: loaded.recovered_from, version: env!("CARGO_PKG_VERSION") }
 }
 
+/// Проект и настройки без побочных действий — для кнопочной панели (второе окно).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UiState {
+    project: Project,
+    settings: Settings,
+}
+
 #[tauri::command]
-fn save_project(state: State<AppState>, audio: State<Audio>, project: Project) -> Result<(), CmdError> {
+fn get_ui_state(state: State<AppState>) -> UiState {
+    UiState { project: storage::load_project(&state.paths).project, settings: storage::load_settings(&state.paths) }
+}
+
+#[tauri::command]
+fn save_project(app: tauri::AppHandle, state: State<AppState>, audio: State<Audio>, project: Project) -> Result<(), CmdError> {
     graph::validate(&project).map_err(|e| CmdError::new(e.code(), &e))?;
     audio.set_project(project.clone());
+    // Кнопочная панель узнаёт о новых кнопках.
+    let _ = app.emit("project-changed", &project);
     let _guard = state.write_lock.lock().unwrap();
     storage::write_atomic(&state.paths.project, &graph::to_json(&project)).map_err(|e| CmdError::new("io", e))
+}
+
+/// Нажатие кнопки-звука: играть, а если уже играет — стоп.
+#[tauri::command]
+fn press_button(audio: State<Audio>, node_id: String) {
+    audio.press(&node_id);
 }
 
 /// Включить или выключить звук (сама настройка сохраняется вместе с остальными).
@@ -139,7 +160,8 @@ fn list_audio_apps() -> Result<Vec<AppDto>, CmdError> {
 }
 
 #[tauri::command]
-fn save_settings(state: State<AppState>, settings: Settings) -> Result<(), CmdError> {
+fn save_settings(app: tauri::AppHandle, state: State<AppState>, settings: Settings) -> Result<(), CmdError> {
+    let _ = app.emit("settings-changed", &settings);
     let text = serde_json::to_string_pretty(&settings).map_err(|e| CmdError::new("io", e))?;
     let _guard = state.write_lock.lock().unwrap();
     storage::write_atomic(&state.paths.settings, &text).map_err(|e| CmdError::new("io", e))
@@ -203,8 +225,18 @@ fn main() {
             set_audio_enabled,
             list_audio_devices,
             list_audio_apps,
-            measure_latency
+            measure_latency,
+            press_button,
+            get_ui_state
         ])
+        .on_window_event(|window, event| {
+            // Закрыли основное окно — закрываем и кнопочную панель, иначе программа не выйдет.
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                if let Some(panel) = window.app_handle().get_webview_window("buttons") {
+                    let _ = panel.close();
+                }
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while building SoundBimba")
         .run(|app, event| {

@@ -11,6 +11,10 @@ export interface Settings {
   hotkeys?: Record<string, string>;
   /** Звук включён (запоминается). */
   audioEnabled?: boolean;
+  /** Рамка у окна кнопочной панели. */
+  panelFrame?: boolean;
+  /** Режим основного окна: карта («expert») или простой («simple»). */
+  mode?: 'expert' | 'simple';
 }
 
 export interface LoadState {
@@ -39,7 +43,18 @@ export interface Latency {
   inputEstimateMs: number;
 }
 
-export type NodeStatus = 'ok' | 'off' | 'app-not-chosen' | 'app-not-running' | 'device-missing' | 'no-cable' | 'error';
+export type NodeStatus =
+  | 'ok'
+  | 'off'
+  | 'app-not-chosen'
+  | 'app-not-running'
+  | 'device-missing'
+  | 'no-cable'
+  | 'error'
+  | 'file-not-chosen'
+  | 'file-missing'
+  | 'file-unsupported'
+  | 'file-too-long';
 
 /** Состояние звука, приходит из Rust ~15 раз в секунду. */
 export interface AudioState {
@@ -47,6 +62,14 @@ export interface AudioState {
   running: boolean;
   status: Record<string, NodeStatus>;
   levels: Record<string, number>;
+  /** Играющие кнопки: доля прозвучавшего (0…1). */
+  buttons: Record<string, number>;
+}
+
+/** Проект и настройки без побочных действий (для кнопочной панели). */
+export interface UiState {
+  project: Project;
+  settings: Settings;
 }
 
 /** Ошибка из Rust: code — ключ причины (reason.<code>), detail — подробность для журнала. */
@@ -86,6 +109,7 @@ const previewDevices: AudioDevice[] = [
 ];
 
 let previewEnabled = false;
+const previewPlaying: Record<string, number> = {};
 
 function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!browserPreview) return invoke<T>(cmd, args);
@@ -99,6 +123,12 @@ function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     ],
   };
   if (cmd === 'set_audio_enabled') previewEnabled = Boolean(args?.enabled);
+  if (cmd === 'press_button') {
+    const id = String(args?.nodeId);
+    if (id in previewPlaying) delete previewPlaying[id];
+    else previewPlaying[id] = 0;
+  }
+  if (cmd === 'get_ui_state') return Promise.resolve({ project: previewProject, settings: { language: null, theme: 'bimba' } } as T);
   return Promise.resolve(answers[cmd] as T);
 }
 
@@ -112,7 +142,11 @@ export function onAudioState(handler: (s: AudioState) => void): () => void {
       const status: Record<string, NodeStatus> = {};
       for (const n of previewProject.nodes) status[n.id] = previewEnabled ? 'ok' : 'off';
       if (previewEnabled) status.n1 = 'app-not-chosen';
-      handler({ enabled: previewEnabled, running: previewEnabled, status, levels });
+      for (const id of Object.keys(previewPlaying)) {
+        previewPlaying[id] += 0.01;
+        if (previewPlaying[id] >= 1) delete previewPlaying[id];
+      }
+      handler({ enabled: previewEnabled, running: previewEnabled, status, levels, buttons: { ...previewPlaying } });
     }, 66);
     return () => clearInterval(h);
   }
@@ -139,5 +173,7 @@ export const api = {
   listAudioDevices: () => call<AudioDevice[]>('list_audio_devices'),
   listAudioApps: () => call<AudioApp[]>('list_audio_apps'),
   measureLatency: () => call<Latency>('measure_latency'),
+  pressButton: (nodeId: string) => call<void>('press_button', { nodeId }),
+  getUiState: () => call<UiState>('get_ui_state'),
   log: (level: 'info' | 'error', message: string) => call<void>('log_ui', { level, message }).catch(() => {}),
 };

@@ -210,6 +210,16 @@ input[type='range']:focus-visible {
   width: 100%;
 }
 
+/* Меню-команды (не выбор значения) — по ширине самого длинного пункта, не уже кнопки. */
+.dropdown-list:not(.match-width) {
+  width: max-content;
+  max-width: min(360px, calc(100vw - 24px));
+}
+
+.dropdown-list:not(.match-width) .dropdown-item-label {
+  white-space: nowrap;
+}
+
 .dropdown-list.align-left {
   left: 0;
 }
@@ -678,4 +688,192 @@ button:disabled {
   .save-state.save-error {
     background: var(--danger);
   }
+}
+
+/* Узел-кнопка: круглая кнопка слева от названия. */
+.sound-node-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sound-node-text {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Круглая кнопка-звук с кольцом прогресса. */
+.button-disc {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.button-disc:hover {
+  background: var(--control-bg-hover);
+}
+
+.button-disc:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.button-disc .disc-track {
+  fill: none;
+  stroke: var(--border);
+}
+
+.button-disc .disc-progress {
+  fill: none;
+  stroke: var(--node-button);
+  stroke-linecap: round;
+}
+
+.button-disc .disc-icon {
+  fill: var(--text);
+}
+
+.button-disc.playing .disc-icon {
+  fill: var(--node-button);
+}
+
+.file-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Сетка кнопок (кнопочная панель, простой режим). */
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 14px;
+}
+
+.button-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 6px;
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+}
+
+.button-tile-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.button-tile-problem {
+  color: var(--danger);
+  font-size: 0.8em;
+  text-align: center;
+}
+
+/* Окно кнопочной панели. */
+.panel-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  background: var(--surface);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.panel-header-title {
+  flex: 1;
+  font-weight: var(--title-weight);
+  text-transform: var(--title-transform);
+  letter-spacing: var(--title-spacing);
+  color: var(--accent);
+}
+
+.panel-header-button {
+  padding: 3px 10px;
+}
+
+.panel-pad {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* Простой режим. */
+.main-simple {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.simple-view {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.simple-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.simple-volume {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius);
+}
+
+.simple-route {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-weight: var(--title-weight);
+}
+
+.simple-arrow {
+  color: var(--accent);
+}
+
+.simple-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.simple-controls input[type='range'] {
+  flex: 1;
+}
+
+.simple-percent {
+  width: 52px;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.simple-later {
+  opacity: 0.7;
 }

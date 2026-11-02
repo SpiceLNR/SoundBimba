@@ -13,7 +13,7 @@ use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use engine::{Graph, NodeShared, PortKey, PortResolver, RATE};
+use engine::{Clip, Graph, NodeShared, PortKey, PortResolver, RATE};
 use graph::{Node, NodeKind, Project};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
@@ -43,6 +43,14 @@ pub enum NodeStatus {
     NoCable,
     /// Устройство не открылось или отвалилось.
     Error,
+    /// Кнопка: файл не выбран.
+    FileNotChosen,
+    /// Кнопка: файла нет или нет доступа.
+    FileMissing,
+    /// Кнопка: формат не поддерживается или файл повреждён.
+    FileUnsupported,
+    /// Кнопка: звук длиннее 3 минут.
+    FileTooLong,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -77,17 +85,35 @@ struct StateEvent<'a> {
     #[serde(flatten)]
     snapshot: &'a Snapshot,
     levels: HashMap<String, f32>,
+    /// Играющие кнопки: доля прозвучавшего (0…1) — для кругового индикатора.
+    buttons: HashMap<String, f32>,
 }
 
-/// Как узлы проекта связаны с устройствами и процессами прямо сейчас.
+/// Как узлы проекта связаны с устройствами, процессами и файлами прямо сейчас.
 struct Resolved {
     ports: HashMap<String, PortKey>,
+    clips: HashMap<String, (String, Clip)>,
     status: HashMap<String, NodeStatus>,
 }
 
 impl PortResolver for Resolved {
     fn port_for(&self, node: &Node) -> Option<PortKey> {
         self.ports.get(&node.id).cloned()
+    }
+    fn clip_for(&self, node: &Node) -> Option<Clip> {
+        self.clips.get(&node.id).map(|(_, c)| c.clone())
+    }
+}
+
+/// Звуки кнопок, уже прочитанные с диска (по пути к файлу). Ошибку «нет файла» не запоминаем —
+/// файл может появиться; остальные ошибки запоминаем, чтобы не читать плохой файл каждые 2 с.
+type ClipCache = HashMap<String, Result<Clip, clips::ClipError>>;
+
+fn clip_status(e: &clips::ClipError) -> NodeStatus {
+    match e {
+        clips::ClipError::Missing(_) => NodeStatus::FileMissing,
+        clips::ClipError::Unsupported(_) => NodeStatus::FileUnsupported,
+        clips::ClipError::TooLong => NodeStatus::FileTooLong,
     }
 }
 
@@ -102,11 +128,43 @@ fn find_device<'a>(devs: &'a [DeviceInfo], wanted: Option<&str>, render: bool) -
     }
 }
 
-fn resolve(p: &Project) -> Resolved {
+fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
     let devs = devices::list().unwrap_or_default();
     let procs = processes::list();
-    let mut r = Resolved { ports: HashMap::new(), status: HashMap::new() };
+    let mut r = Resolved { ports: HashMap::new(), clips: HashMap::new(), status: HashMap::new() };
     for n in &p.nodes {
+        if n.kind == NodeKind::SoundButton {
+            let status = match param(n, "file") {
+                None => NodeStatus::FileNotChosen,
+                Some(path) => {
+                    let loaded = match cache.get(path) {
+                        Some(Ok(c)) => Ok(c.clone()),
+                        _ => {
+                            let res = clips::load(std::path::Path::new(path));
+                            // «Нет файла» не запоминаем (файл может появиться) и не пишем в журнал
+                            // каждые 2 с — смену состояния узла журнал и так записывает.
+                            if !matches!(res, Err(clips::ClipError::Missing(_))) {
+                                match &res {
+                                    Ok(_) => applog::info(&format!("sound loaded for button {}", n.id)),
+                                    Err(e) => applog::error(&format!("button {}: {e}", n.id)),
+                                }
+                                cache.insert(path.to_string(), res.clone());
+                            }
+                            res
+                        }
+                    };
+                    match loaded {
+                        Ok(clip) => {
+                            r.clips.insert(n.id.clone(), (path.to_string(), clip));
+                            NodeStatus::Ok
+                        }
+                        Err(e) => clip_status(&e),
+                    }
+                }
+            };
+            r.status.insert(n.id.clone(), status);
+            continue;
+        }
         let (port, status) = match n.kind {
             NodeKind::AppSource => match param(n, "exe") {
                 None => (None, NodeStatus::AppNotChosen),
@@ -150,16 +208,20 @@ struct Structure {
     nodes: Vec<(String, NodeKind)>,
     edges: Vec<(String, String)>,
     ports: Vec<(String, PortKey)>,
+    clips: Vec<(String, String)>,
 }
 
 impl Structure {
     fn of(p: &Project, r: &Resolved) -> Structure {
         let mut ports: Vec<_> = r.ports.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         ports.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut clips: Vec<_> = r.clips.iter().map(|(id, (path, _))| (id.clone(), path.clone())).collect();
+        clips.sort();
         Structure {
             nodes: p.nodes.iter().map(|n| (n.id.clone(), n.kind)).collect(),
             edges: p.edges.iter().map(|e| (e.from.clone(), e.to.clone())).collect(),
             ports,
+            clips,
         }
     }
 }
@@ -195,6 +257,7 @@ struct Controller {
     last_status: HashMap<String, NodeStatus>,
     last_glitches: HashMap<String, (u32, u32, u32)>,
     last_overloads: HashMap<String, u32>,
+    clip_cache: ClipCache,
     last_late: u32,
 }
 
@@ -217,7 +280,7 @@ impl Controller {
             s.ports.clear();
             return;
         }
-        let resolved = resolve(&project);
+        let resolved = resolve(&project, &mut self.clip_cache);
         let structure = Structure::of(&project, &resolved);
         let failed = self
             .running
@@ -392,6 +455,7 @@ pub struct Audio {
     tx: Mutex<Sender<Cmd>>,
     snapshot: Arc<Mutex<Snapshot>>,
     control: Mutex<Option<std::thread::JoinHandle<()>>>,
+    shared: Arc<Mutex<HashMap<String, Arc<NodeShared>>>>,
 }
 
 impl Audio {
@@ -411,6 +475,7 @@ impl Audio {
             last_status: HashMap::new(),
             last_glitches: HashMap::new(),
             last_overloads: HashMap::new(),
+            clip_cache: HashMap::new(),
             last_late: 0,
         };
         let control = std::thread::Builder::new()
@@ -437,21 +502,26 @@ impl Audio {
             .expect("cannot start audio control thread");
 
         // Уровни и состояния — в интерфейс.
-        let (snap, sh) = (snapshot.clone(), shared);
+        let (snap, sh) = (snapshot.clone(), shared.clone());
         std::thread::Builder::new()
             .name("sb-audio-levels".into())
             .spawn(move || loop {
                 std::thread::sleep(LEVELS_EVERY);
-                let levels: HashMap<String, f32> =
-                    sh.lock().unwrap().iter().map(|(id, s)| (id.clone(), s.take_peak())).collect();
+                let (levels, buttons) = {
+                    let shared = sh.lock().unwrap();
+                    let levels: HashMap<String, f32> = shared.iter().map(|(id, s)| (id.clone(), s.take_peak())).collect();
+                    let buttons: HashMap<String, f32> =
+                        shared.iter().filter_map(|(id, s)| s.playback().map(|p| (id.clone(), p))).collect();
+                    (levels, buttons)
+                };
                 let snapshot = snap.lock().unwrap().clone();
-                if app.emit("audio-state", StateEvent { snapshot: &snapshot, levels }).is_err() {
+                if app.emit("audio-state", StateEvent { snapshot: &snapshot, levels, buttons }).is_err() {
                     break;
                 }
             })
             .expect("cannot start audio levels thread");
 
-        Audio { tx: Mutex::new(tx), snapshot, control: Mutex::new(Some(control)) }
+        Audio { tx: Mutex::new(tx), snapshot, control: Mutex::new(Some(control)), shared }
     }
 
     /// Остановить звук и дождаться, пока устройства закроются (при выходе из программы).
@@ -468,6 +538,13 @@ impl Audio {
 
     pub fn set_enabled(&self, on: bool) {
         let _ = self.tx.lock().unwrap().send(Cmd::Enabled(on));
+    }
+
+    /// Нажатие кнопки-звука (играть / стоп). Если звук выключен — ничего не происходит.
+    pub fn press(&self, node_id: &str) {
+        if let Some(sh) = self.shared.lock().unwrap().get(node_id) {
+            sh.press();
+        }
     }
 
     pub fn set_latency(&self, ms: f64) {

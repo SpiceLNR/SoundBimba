@@ -17,6 +17,18 @@ impl PortResolver for Ports {
     }
 }
 
+/// Порты + звуки кнопок.
+struct WithClips(Ports, HashMap<String, Clip>);
+
+impl PortResolver for WithClips {
+    fn port_for(&self, node: &Node) -> Option<PortKey> {
+        self.0.port_for(node)
+    }
+    fn clip_for(&self, node: &Node) -> Option<Clip> {
+        self.1.get(&node.id).cloned()
+    }
+}
+
 fn node(id: &str, kind: NodeKind, params: serde_json::Value) -> Node {
     Node { id: id.into(), kind, pos: [0.0, 0.0], params: params.as_object().cloned().unwrap_or_default() }
 }
@@ -315,4 +327,88 @@ fn loud_mix_is_limited_and_counted() {
     let tail = &out[0][out[0].len() - BLOCK_SAMPLES..];
     assert!(tail.iter().all(|&s| s <= 1.0 && s > 0.9), "{:?}", &tail[..2]);
     assert!(r.taps[0].stats().overloads() > 0);
+}
+
+// ---------- кнопки ----------
+
+/// Кнопка → выход; звук кнопки — `frames` кадров с уровнем 0,5.
+fn button_rig(frames: usize) -> (Graph, RingReader, HashMap<String, Arc<NodeShared>>) {
+    let p = Project {
+        schema: 1,
+        nodes: vec![node("btn", NodeKind::SoundButton, json!({ "file": "x.wav" })), node("out", NodeKind::VirtualOut, json!({}))],
+        edges: vec![edge("btn", "out")],
+    };
+    let ports = Ports([("out".to_string(), PortKey::Render("cable".into()))].into_iter().collect());
+    let clip: Clip = vec![0.5f32; frames * CHANNELS].into();
+    let resolver = WithClips(ports, [("btn".to_string(), clip)].into_iter().collect());
+    let plan = plan(&p, &resolver).unwrap();
+    // Запас = ровно 4 блока минус 3 кадра: после 4 блоков читатель стартует, ничего не отбросив.
+    let (w, r) = ring(48_000, RATE, RATE, BLOCK * 4 - 3);
+    let mut shared = HashMap::new();
+    let g = Graph::compile(&p, &resolver, &plan, vec![], vec![w], &mut shared).unwrap();
+    (g, r, shared)
+}
+
+fn drain(r: &mut RingReader) -> Vec<f32> {
+    let mut all = Vec::new();
+    let mut buf = vec![0.0; BLOCK_SAMPLES];
+    loop {
+        let before = r.stats().snapshot().0;
+        r.read(&mut buf);
+        if r.stats().snapshot().0 != before {
+            break;
+        }
+        all.extend_from_slice(&buf);
+    }
+    all
+}
+
+#[test]
+fn button_is_silent_until_pressed_then_plays_to_the_end() {
+    let (mut g, _r, shared) = button_rig(BLOCK * 3 + 10);
+    let btn = shared["btn"].clone();
+    g.process();
+    assert_eq!(btn.playback(), None, "до нажатия молчит");
+    btn.press();
+    g.process();
+    let p1 = btn.playback().expect("играет");
+    assert!((p1 - BLOCK as f32 / (BLOCK * 3 + 10) as f32).abs() < 1e-4);
+    for _ in 0..3 {
+        g.process();
+    }
+    assert_eq!(btn.playback(), None, "доиграла и остановилась сама");
+}
+
+#[test]
+fn second_press_stops_with_a_short_fade() {
+    let (mut g, mut r, shared) = button_rig(RATE as usize);
+    let btn = shared["btn"].clone();
+    btn.press();
+    g.process();
+    g.process();
+    btn.press();
+    g.process();
+    g.process();
+    assert_eq!(btn.playback(), None, "повторное нажатие — стоп");
+    let out = drain(&mut r);
+    let left: Vec<f32> = out.iter().step_by(2).copied().collect();
+    // Играло ~2 блока на 0,5, затем плавно к нулю: без скачка больше 1/200 за отсчёт.
+    assert!(left.iter().any(|&s| (s - 0.5).abs() < 1e-6));
+    let max_step = left.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
+    assert!(max_step <= 0.5 / STOP_FADE as f32 + 1e-4, "скачок {max_step}");
+}
+
+#[test]
+fn press_after_end_starts_again_from_the_beginning() {
+    let (mut g, _r, shared) = button_rig(BLOCK * 2);
+    let btn = shared["btn"].clone();
+    btn.press();
+    for _ in 0..3 {
+        g.process();
+    }
+    assert_eq!(btn.playback(), None, "доиграла");
+    btn.press();
+    g.process();
+    // Снова с начала: после одного блока — ровно половина звука.
+    assert!((btn.playback().unwrap() - 0.5).abs() < 1e-6);
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { arrange, canConnect, fromFlow, newNode, nextNodeId, summary, toFlow, wouldCreateCycle, type Project } from './graph';
+import { arrange, canConnect, fromFlow, newNode, nextNodeId, summary, toFlow, volumeRoutes, wouldCreateCycle, type Project } from './graph';
 import { translate } from './i18n';
 
 // Тот же проект, что в crates/graph (default_project) и в примере из ARCHITECTURE.md.
@@ -126,6 +126,16 @@ describe('graph', () => {
     const laid = arrange(nodes, edges);
     const y = (id: string) => laid.find((n) => n.id === id)!.position.y;
     expect(y('a') < y('b')).toBe(y('B') < y('A'));
+  });
+
+  it('describes volume controls as “from → to” for simple mode', () => {
+    const t = (k: string) => translate('ru', k);
+    const p: Project = {
+      ...project,
+      nodes: [...project.nodes, { id: 'b1', type: 'sound-button', pos: [0, 0], params: { file: 'C:\\Sounds\\horn.mp3' } }],
+      edges: [...project.edges, { from: 'b1', to: 'n3' }],
+    };
+    expect(volumeRoutes(p, t)).toEqual([{ id: 'n3', from: 'discord.exe, horn', to: 'Виртуальный микрофон' }]);
   });
 
   it('writes short node subtitles', () => {

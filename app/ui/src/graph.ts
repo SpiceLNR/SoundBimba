@@ -238,3 +238,37 @@ export function summary(kind: NodeKind, params: Params, t: Translate): string {
       return '';
   }
 }
+
+/** Как узел называется в простом режиме: для программы — имя exe, для кнопки — её подпись. */
+export function shortName(n: ProjectNode, t: Translate): string {
+  if (n.type === 'app-source' && typeof n.params.exe === 'string' && n.params.exe) return n.params.exe;
+  if (n.type === 'sound-button') {
+    if (typeof n.params.label === 'string' && n.params.label.trim()) return n.params.label.trim();
+    if (typeof n.params.file === 'string' && n.params.file) {
+      return (n.params.file.split(/[\\/]/).pop() ?? n.params.file).replace(/\.[^.]+$/, '');
+    }
+  }
+  return t(`node.${n.type}.title`);
+}
+
+export interface VolumeRoute {
+  id: string;
+  /** Что подаёт звук в эту громкость, через запятую. */
+  from: string;
+  /** Куда звук уходит дальше, через запятую. */
+  to: string;
+}
+
+/** Регуляторы громкости для простого режима: «откуда → куда» по соседним узлам. */
+export function volumeRoutes(p: Project, t: Translate): VolumeRoute[] {
+  const byId = new Map(p.nodes.map((n) => [n.id, n]));
+  const names = (ids: string[]) =>
+    [...new Set(ids.map((id) => byId.get(id)).filter((n): n is ProjectNode => !!n).map((n) => shortName(n, t)))].join(', ');
+  return p.nodes
+    .filter((n) => n.type === 'volume')
+    .map((n) => ({
+      id: n.id,
+      from: names(p.edges.filter((e) => e.to === n.id).map((e) => e.from)),
+      to: names(p.edges.filter((e) => e.from === n.id).map((e) => e.to)),
+    }));
+}

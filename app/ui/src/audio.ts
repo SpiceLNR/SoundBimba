@@ -3,7 +3,7 @@
 import { createContext, useContext } from 'react';
 import type { AudioState, NodeStatus } from './api';
 
-export const EMPTY_AUDIO: AudioState = { enabled: false, running: false, status: {}, levels: {} };
+export const EMPTY_AUDIO: AudioState = { enabled: false, running: false, status: {}, levels: {}, buttons: {} };
 
 export const AudioContext = createContext<AudioState>(EMPTY_AUDIO);
 

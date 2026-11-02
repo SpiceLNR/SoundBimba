@@ -48,6 +48,20 @@ pub struct Settings {
     /// Звук включён (запоминается между запусками; при первом запуске — выключен).
     #[serde(default)]
     pub audio_enabled: bool,
+    /// Рамка у окна кнопочной панели.
+    #[serde(default = "default_true")]
+    pub panel_frame: bool,
+    /// Режим основного окна: «expert» (карта) или «simple».
+    #[serde(default = "default_mode")]
+    pub mode: String,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_mode() -> String {
+    "expert".into()
 }
 
 fn default_theme() -> String {
@@ -56,7 +70,14 @@ fn default_theme() -> String {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { language: None, theme: default_theme(), hotkeys: BTreeMap::new(), audio_enabled: false }
+        Settings {
+            language: None,
+            theme: default_theme(),
+            hotkeys: BTreeMap::new(),
+            audio_enabled: false,
+            panel_frame: true,
+            mode: default_mode(),
+        }
     }
 }
 

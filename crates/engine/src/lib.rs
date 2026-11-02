@@ -43,11 +43,33 @@ pub enum PortKey {
 pub trait PortResolver {
     /// Порт для узла-источника или выхода; None — узел молчит (программа не запущена, нет устройства).
     fn port_for(&self, node: &graph::Node) -> Option<PortKey>;
+
+    /// Готовый звук для кнопки (48 кГц, стерео); None — файл не выбран или не прочитался.
+    fn clip_for(&self, _node: &graph::Node) -> Option<Clip> {
+        None
+    }
+}
+
+/// Звук кнопки: 48 кГц, стерео, отсчёты по очереди. Готовится заранее, вне потока звука.
+pub type Clip = Arc<[f32]>;
+
+/// Затухание при остановке кнопки — без щелчка: 5 мс.
+const STOP_FADE: usize = RATE as usize / 200;
+
+/// Состояние проигрывания кнопки (живёт в потоке звука).
+#[derive(Default)]
+struct Playback {
+    pos: usize,
+    playing: bool,
+    /// Сколько кадров затухания осталось; Some — сейчас затухаем перед остановкой.
+    fade_left: Option<usize>,
 }
 
 enum Op {
     /// Источник: читает внешний вход. None — источник молчит.
     Source(Option<usize>),
+    /// Кнопка-звук: проигрывает готовый звук по нажатию.
+    Button(Option<Clip>, Playback),
     /// Громкость: сумма входов × усиление.
     Volume,
     /// Выход: сумма входов → внешний выход. None — выхода нет.
@@ -126,7 +148,7 @@ impl Graph {
                 NodeKind::AppSource | NodeKind::MicInput => {
                     Op::Source(port.and_then(|k| plan.inputs.iter().position(|p| *p == k)))
                 }
-                NodeKind::SoundButton => Op::Source(None), // кнопки — этап 3
+                NodeKind::SoundButton => Op::Button(resolver.clip_for(node), Playback::default()),
                 NodeKind::Volume => Op::Volume,
                 NodeKind::SpeakerOut | NodeKind::VirtualOut => {
                     Op::Output(port.and_then(|k| plan.outputs.iter().position(|p| *p == k)))
@@ -156,11 +178,12 @@ impl Graph {
             let (before, rest) = self.buffers.split_at_mut(i);
             let out = &mut rest[0];
             let step = &mut self.steps[i];
-            match step.op {
-                Op::Source(port) => match port {
+            match &mut step.op {
+                Op::Source(port) => match *port {
                     Some(p) => out.copy_from_slice(&self.in_bufs[p][..]),
                     None => out.fill(0.0),
                 },
+                Op::Button(clip, pb) => play_button(clip.as_deref(), pb, &step.shared, &mut out[..]),
                 Op::Volume | Op::Output(_) => {
                     out.fill(0.0);
                     for &src in &step.inputs {
@@ -175,7 +198,8 @@ impl Graph {
                 ramp_gain(&mut out[..], step.last_gain, target);
                 step.last_gain = target;
             }
-            if let Op::Output(Some(p)) = step.op {
+            if let Op::Output(Some(p)) = &step.op {
+                let p = *p;
                 for (m, s) in self.out_bufs[p].iter_mut().zip(out.iter()) {
                     *m += *s;
                 }
@@ -195,6 +219,53 @@ impl Graph {
     pub fn input_stats(&self) -> impl Iterator<Item = &PortStats> {
         self.inputs.iter().map(|r| r.stats())
     }
+}
+
+/// Один блок кнопки: нажатие запускает звук с начала, повторное — останавливает (с затуханием).
+fn play_button(clip: Option<&[f32]>, pb: &mut Playback, shared: &NodeShared, out: &mut [f32]) {
+    out.fill(0.0);
+    let pressed = shared.take_press();
+    let Some(clip) = clip else {
+        shared.set_playback(false, 0.0);
+        return;
+    };
+    if pressed {
+        if pb.playing && pb.fade_left.is_none() {
+            pb.fade_left = Some(STOP_FADE);
+        } else if !pb.playing {
+            *pb = Playback { pos: 0, playing: true, fade_left: None };
+        }
+    }
+    let frames = clip.len() / CHANNELS;
+    for f in 0..out.len() / CHANNELS {
+        if !pb.playing {
+            break;
+        }
+        let gain = match pb.fade_left {
+            Some(0) => {
+                pb.playing = false;
+                break;
+            }
+            Some(n) => {
+                pb.fade_left = Some(n - 1);
+                n as f32 / STOP_FADE as f32
+            }
+            None => 1.0,
+        };
+        if pb.pos >= frames {
+            pb.playing = false;
+            break;
+        }
+        for ch in 0..CHANNELS {
+            out[f * CHANNELS + ch] = clip[pb.pos * CHANNELS + ch] * gain;
+        }
+        pb.pos += 1;
+    }
+    if !pb.playing {
+        pb.fade_left = None;
+    }
+    let progress = if pb.playing { pb.pos as f32 / frames.max(1) as f32 } else { 0.0 };
+    shared.set_playback(pb.playing, progress);
 }
 
 /// Порог мягкого ограничителя: тише — звук не меняется вовсе.

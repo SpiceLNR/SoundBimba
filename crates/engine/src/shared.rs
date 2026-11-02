@@ -26,17 +26,28 @@ impl AtomicF32 {
     }
 }
 
-/// Общие данные узла: громкость (пишет интерфейс) и пиковый уровень (пишет поток звука).
+/// Общие данные узла: громкость (пишет интерфейс), пиковый уровень (пишет поток звука),
+/// для кнопки — запрос «нажали», играет ли и где сейчас (для кругового индикатора).
 #[derive(Debug)]
 pub struct NodeShared {
     gain: AtomicF32,
     mute: AtomicBool,
     peak: AtomicF32,
+    press: AtomicBool,
+    playing: AtomicBool,
+    progress: AtomicF32,
 }
 
 impl Default for NodeShared {
     fn default() -> Self {
-        NodeShared { gain: AtomicF32::new(1.0), mute: AtomicBool::new(false), peak: AtomicF32::new(0.0) }
+        NodeShared {
+            gain: AtomicF32::new(1.0),
+            mute: AtomicBool::new(false),
+            peak: AtomicF32::new(0.0),
+            press: AtomicBool::new(false),
+            playing: AtomicBool::new(false),
+            progress: AtomicF32::new(0.0),
+        }
     }
 }
 
@@ -67,6 +78,25 @@ impl NodeShared {
     /// Пик с прошлого вызова (интерфейс опрашивает несколько раз в секунду).
     pub fn take_peak(&self) -> f32 {
         self.peak.swap(0.0)
+    }
+
+    /// Кнопку нажали (играть, а если уже играет — стоп).
+    pub fn press(&self) {
+        self.press.store(true, Relaxed);
+    }
+
+    pub(crate) fn take_press(&self) -> bool {
+        self.press.swap(false, Relaxed)
+    }
+
+    pub(crate) fn set_playback(&self, playing: bool, progress: f32) {
+        self.playing.store(playing, Relaxed);
+        self.progress.store(progress);
+    }
+
+    /// Играет ли кнопка и какая доля звука уже прозвучала (0…1).
+    pub fn playback(&self) -> Option<f32> {
+        self.playing.load(Relaxed).then(|| self.progress.load())
     }
 }
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { listen } from '@tauri-apps/api/event';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useCallback, useEffect, useState } from 'react';
 import { api, isCmdError, onAudioState, type AudioState, type LoadState, type Settings } from './api';
@@ -32,6 +33,13 @@ export default function App() {
   useEffect(() => applyTheme(settings.theme), [settings.theme]);
 
   useEffect(() => onAudioState(setAudio), []);
+
+  // Настройки могла поменять кнопочная панель (рамка окна) — держим у себя свежие.
+  useEffect(() => {
+    if (!('__TAURI_INTERNALS__' in window)) return;
+    const off = listen<Settings>('settings-changed', (e) => setSettings(e.payload));
+    return () => void off.then((f) => f());
+  }, []);
 
   useEffect(() => {
     api

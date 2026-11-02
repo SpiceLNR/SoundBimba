@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Боковая панель: настройки выбранного узла или провода.
+import { open } from '@tauri-apps/plugin-dialog';
 import type { Edge } from '@xyflow/react';
 import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
@@ -7,6 +8,7 @@ import { api, type AudioApp, type AudioDevice } from '../api';
 import { isProblem, useAudio } from '../audio';
 import { KINDS, type NodeKind, type Params, type SoundNode } from '../graph';
 import { useT } from '../i18n';
+import ButtonDisc from './ButtonDisc';
 import Dropdown from './Dropdown';
 
 interface Props {
@@ -100,6 +102,54 @@ function AppPicker({ value, onChange }: { value: string; onChange: (exe: string)
   );
 }
 
+/** Кнопка-звук: файл, название, проверка. */
+function ButtonParams({ node, onParams }: { node: SoundNode; onParams: Props['onParams'] }) {
+  const t = useT();
+  const audio = useAudio();
+  const { params } = node.data;
+  const file = typeof params.file === 'string' ? params.file : '';
+  const pick = async () => {
+    const path = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: t('dialog.audioFilter'), extensions: ['wav', 'mp3', 'ogg', 'flac'] }],
+    });
+    if (typeof path === 'string') onParams(node.id, { file: path });
+  };
+  return (
+    <>
+      <div className="field">
+        <span>{t('param.file')}</span>
+        <div className="value file-value" title={file}>
+          {file ? (file.split(/[\\/]/).pop() ?? file) : t('param.fileEmpty')}
+        </div>
+        <button type="button" onClick={() => void pick()}>
+          {t('param.pickFile')}
+        </button>
+        <p className="later">{t('param.fileFormats')}</p>
+      </div>
+      <label className="field">
+        <span>{t('param.label')}</span>
+        <input
+          type="text"
+          value={typeof params.label === 'string' ? params.label : ''}
+          placeholder={t('param.labelPlaceholder')}
+          onChange={(e) => onParams(node.id, { label: e.target.value })}
+        />
+      </label>
+      <div className="field">
+        <span>{t('param.tryButton')}</span>
+        <ButtonDisc
+          size={48}
+          progress={audio.buttons[node.id]}
+          disabled={!audio.enabled || audio.status[node.id] !== 'ok'}
+          onPress={() => void api.pressButton(node.id)}
+        />
+      </div>
+    </>
+  );
+}
+
 function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onParams'] }) {
   const t = useT();
   const { kind, params } = node.data;
@@ -133,13 +183,7 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
       );
     }
     case 'sound-button':
-      return (
-        <div className="field">
-          <span>{t('param.file')}</span>
-          <div className="value">{typeof params.file === 'string' && params.file ? params.file : t('param.fileEmpty')}</div>
-          <p className="later">{t('param.fileLater')}</p>
-        </div>
-      );
+      return <ButtonParams node={node} onParams={onParams} />;
     case 'mic-input':
     case 'speaker-out':
     case 'virtual-out': {

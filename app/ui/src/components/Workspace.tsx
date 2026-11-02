@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Рабочая среда: панель инструментов, карта (React Flow) и боковая панель. Автосохранение проекта.
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import {
   addEdge,
@@ -38,6 +39,7 @@ import { DICTS, useT, type Lang } from '../i18n';
 import HotkeysDialog from './HotkeysDialog';
 import type { Notify } from './Notices';
 import SidePanel from './SidePanel';
+import SimpleView from './SimpleView';
 import SoundNodeView from './SoundNodeView';
 import Toolbar, { type SaveState } from './Toolbar';
 import Watermark from './Watermark';
@@ -286,6 +288,30 @@ export default function Workspace({ project, version, settings, lang, onSettings
     }
   }, [measuring, notify]);
 
+  // Кнопочная панель: отдельное окно поверх остальных; если уже открыто — показать его.
+  const openPanel = useCallback(async () => {
+    if (!('__TAURI_INTERNALS__' in window)) {
+      window.open('/#buttons', 'buttons', 'width=440,height=340');
+      return;
+    }
+    const existing = await WebviewWindow.getByLabel('buttons');
+    if (existing) {
+      await existing.setFocus();
+      return;
+    }
+    const w = new WebviewWindow('buttons', {
+      url: 'index.html#buttons',
+      title: t('buttons.title'),
+      width: 440,
+      height: 340,
+      minWidth: 220,
+      minHeight: 160,
+      alwaysOnTop: true,
+      decorations: settings.panelFrame !== false,
+    });
+    void w.once('tauri://error', (e) => api.log('error', `button panel: ${JSON.stringify(e.payload)}`));
+  }, [t, settings.panelFrame]);
+
   const ariaLabelConfig = useMemo(
     () => ({
       'node.a11yDescription.default': t('map.nodeDesc'),
@@ -321,7 +347,14 @@ export default function Workspace({ project, version, settings, lang, onSettings
         onLatency={() => void onLatency()}
         onHotkeys={() => setHotkeysOpen(true)}
         onSettings={onSettings}
+        onOpenPanel={() => void openPanel()}
+        simple={settings.mode === 'simple'}
       />
+      {settings.mode === 'simple' ? (
+        <main className="main-simple">
+          <SimpleView project={JSON.parse(projectJson) as Project} onParams={onParams} />
+        </main>
+      ) : (
       <main className="main">
         <div className="map" ref={mapRef}>
           <Watermark />
@@ -364,6 +397,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
           onDeleteEdge={deleteEdge}
         />
       </main>
+      )}
       {hotkeysOpen && <HotkeysDialog bindings={bindings} onChange={changeBindings} onClose={() => setHotkeysOpen(false)} />}
     </div>
   );

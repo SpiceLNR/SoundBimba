@@ -24,6 +24,9 @@ interface Props {
   onLatency: () => void;
   onHotkeys: () => void;
   onSettings: (s: Settings) => void;
+  onOpenPanel: () => void;
+  /** Простой режим: без кнопок работы с картой. */
+  simple: boolean;
 }
 
 export default function Toolbar(p: Props) {
@@ -47,6 +50,7 @@ export default function Toolbar(p: Props) {
         <span className="sound-dot" aria-hidden="true" />
         {t(p.settings.audioEnabled ? 'toolbar.soundOn' : 'toolbar.soundOff')}
       </button>
+      {!p.simple && (
       <Dropdown
         className="add-node"
         label={t('toolbar.add')}
@@ -62,9 +66,12 @@ export default function Toolbar(p: Props) {
           })),
         }))}
       />
-      <button type="button" onClick={p.onArrange}>
-        {t('toolbar.arrange')}
-      </button>
+      )}
+      {!p.simple && (
+        <button type="button" onClick={p.onArrange}>
+          {t('toolbar.arrange')}
+        </button>
+      )}
       <span className="toolbar-gap" />
       <span className={`save-state save-${p.saveState}`}>{t(`save.${p.saveState}`)}</span>
       <Dropdown
@@ -88,14 +95,26 @@ export default function Toolbar(p: Props) {
       <Dropdown
         className="settings-menu"
         label={t('toolbar.settings')}
-        matchWidth
         align="right"
         onSelect={(v) => {
           const [what, value] = v.split(':');
           if (what === 'lang') p.onSettings({ ...p.settings, language: isLang(value) ? value : null });
           if (what === 'theme') p.onSettings({ ...p.settings, theme: value });
+          if (what === 'mode') p.onSettings({ ...p.settings, mode: value === 'simple' ? 'simple' : 'expert' });
+          if (what === 'window') p.onOpenPanel();
         }}
         groups={[
+          {
+            title: t('toolbar.mode'),
+            items: [
+              { value: 'mode:expert', label: t('mode.expert'), selected: p.settings.mode !== 'simple' },
+              { value: 'mode:simple', label: t('mode.simple'), selected: p.settings.mode === 'simple' },
+            ],
+          },
+          {
+            title: t('toolbar.windows'),
+            items: [{ value: 'window:buttons', label: t('buttons.open') }],
+          },
           {
             title: t('toolbar.language'),
             items: [
