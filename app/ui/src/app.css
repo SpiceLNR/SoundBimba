@@ -1,0 +1,364 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Раскладка и вид. Только переменные темы (themes/<id>/theme.css) — никаких цветов здесь. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--font-size);
+  overflow: hidden;
+  user-select: none;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: var(--text);
+}
+
+button,
+select {
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-small);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+button:hover,
+select:hover {
+  border-color: var(--accent);
+}
+
+button.danger {
+  margin-top: auto;
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+input[type='text'] {
+  width: 100%;
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-small);
+  padding: 7px 10px;
+  user-select: text;
+}
+
+input[type='text']:focus,
+select:focus,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+input[type='range'],
+input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+input[type='range'] {
+  width: 100%;
+}
+
+.loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-muted);
+}
+
+.workspace {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.brand {
+  font-weight: var(--title-weight);
+  text-transform: var(--title-transform);
+  letter-spacing: var(--title-spacing);
+  font-size: 1.15em;
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+.toolbar-gap {
+  flex: 1;
+}
+
+.toolbar-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.save-state {
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.save-error {
+  color: var(--danger);
+}
+
+.main {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  min-height: 0;
+}
+
+.map {
+  position: relative;
+  min-width: 0;
+}
+
+.watermark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: var(--watermark-color);
+  opacity: var(--watermark-opacity);
+}
+
+.watermark svg {
+  width: min(50%, 520px);
+  height: auto;
+}
+
+/* React Flow: его переменные берут значения из темы. */
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-background-pattern-dots-color: var(--dots);
+  --xy-edge-stroke: var(--wire);
+  --xy-edge-stroke-selected: var(--wire-selected);
+  --xy-edge-stroke-width: 2.5;
+  --xy-connectionline-stroke: var(--accent);
+  --xy-connectionline-stroke-width: 2.5;
+  --xy-handle-background-color: var(--surface-2);
+  --xy-handle-border-color: var(--text-muted);
+  --xy-edge-label-background-color: var(--surface);
+  --xy-edge-label-color: var(--text);
+  --xy-minimap-background-color: var(--surface);
+  --xy-minimap-mask-background-color: var(--bg);
+  --xy-minimap-node-background-color: var(--text-muted);
+  --xy-controls-button-background-color: var(--surface);
+  --xy-controls-button-background-color-hover: var(--surface-2);
+  --xy-controls-button-color: var(--text);
+  --xy-controls-button-color-hover: var(--accent);
+  --xy-controls-button-border-color: var(--border);
+  --xy-controls-box-shadow: var(--shadow);
+  --xy-selection-background-color: transparent;
+  --xy-selection-border: 1px dashed var(--accent);
+}
+
+.react-flow__minimap {
+  border-radius: var(--radius-small);
+  overflow: hidden;
+}
+
+.react-flow__minimap-node.cat-source {
+  fill: var(--node-source);
+}
+.react-flow__minimap-node.cat-processing {
+  fill: var(--node-processing);
+}
+.react-flow__minimap-node.cat-output {
+  fill: var(--node-output);
+}
+.react-flow__minimap-node.cat-button {
+  fill: var(--node-button);
+}
+
+/* Подпись провода только при наведении или выделении — карта остаётся чистой. */
+.react-flow__edge .react-flow__edge-textwrapper {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.react-flow__edge:hover .react-flow__edge-textwrapper,
+.react-flow__edge.selected .react-flow__edge-textwrapper {
+  opacity: 1;
+}
+.react-flow__edge-text {
+  font-family: var(--font);
+}
+
+/* Узел карты. */
+.sound-node {
+  --cat: var(--node-source);
+  width: 200px;
+  min-height: 64px;
+  padding: 10px 14px 10px 18px;
+  background: var(--node-bg);
+  color: var(--node-text);
+  border: var(--border-width) solid var(--border);
+  border-left: 6px solid var(--cat);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.sound-node.selected {
+  outline: 2px solid var(--node-selected);
+  outline-offset: 2px;
+}
+
+.cat-source {
+  --cat: var(--node-source);
+}
+.cat-processing {
+  --cat: var(--node-processing);
+}
+.cat-output {
+  --cat: var(--node-output);
+}
+.cat-button {
+  --cat: var(--node-button);
+}
+
+.sound-node-title {
+  font-weight: var(--title-weight);
+  text-transform: var(--title-transform);
+  letter-spacing: var(--title-spacing);
+}
+
+.sound-node-sub {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sound-node .react-flow__handle {
+  width: var(--handle-size);
+  height: var(--handle-size);
+  border-width: 2px;
+  border-color: var(--cat);
+  background: var(--node-bg);
+}
+
+.sound-node .react-flow__handle:hover {
+  background: var(--cat);
+}
+
+/* Боковая панель. */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface);
+  border-left: var(--border-width) solid var(--border);
+  overflow-y: auto;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 1.3em;
+  font-weight: var(--title-weight);
+  text-transform: var(--title-transform);
+  letter-spacing: var(--title-spacing);
+  color: var(--cat, var(--text));
+}
+
+.panel-title:not([class*='cat-']) {
+  color: var(--text);
+}
+
+.panel-desc,
+.panel-hint,
+.later {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.later {
+  font-size: 0.9em;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field > span {
+  color: var(--text-muted);
+}
+
+.value {
+  padding: 7px 10px;
+  background: var(--surface-2);
+  border-radius: var(--radius-small);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* Сообщения внизу экрана. */
+.notices {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 480px;
+  z-index: 10;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  background: var(--notice-bg);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow);
+  line-height: 1.4;
+}
+
+.notice-error {
+  background: var(--notice-error-bg);
+}
+
+.notice-close {
+  margin-left: auto;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  font-size: 1.2em;
+  line-height: 1;
+}

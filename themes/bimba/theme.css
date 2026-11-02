@@ -1,0 +1,41 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Тема «Бимба»: тёмная, дружелюбная, розовый акцент с логотипа. */
+[data-theme='bimba'] {
+  --font: 'Nunito', system-ui, sans-serif;
+  --font-size: 14px;
+  --title-weight: 700;
+  --title-transform: none;
+  --title-spacing: 0;
+
+  --bg: #17141c;
+  --surface: #221d29;
+  --surface-2: #2c2635;
+  --text: #f3eef7;
+  --text-muted: #a99db6;
+  --border: #3a3245;
+  --border-width: 1px;
+  --accent: #ff1493;
+  --accent-text: #ffffff;
+  --danger: #ff5c6c;
+  --radius: 14px;
+  --radius-small: 8px;
+  --shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+
+  --node-bg: #241f2b;
+  --node-text: #f3eef7;
+  --node-source: #4fc3f7;
+  --node-processing: #b388ff;
+  --node-output: #69f0ae;
+  --node-button: #ffb74d;
+  --node-selected: #ff1493;
+  --handle-size: 16px;
+
+  --wire: #8c7fa0;
+  --wire-selected: #ff1493;
+  --dots: #3a3245;
+  --watermark-color: #ff1493;
+  --watermark-opacity: 0.05;
+
+  --notice-bg: #2c2635;
+  --notice-error-bg: #4a1f2b;
+}

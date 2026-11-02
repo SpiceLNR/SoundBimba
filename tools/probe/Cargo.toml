@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 windows-core = "0.62"
+winaudio = { path = "../../crates/winaudio" }
 
 [dependencies.windows]
 version = "0.62"

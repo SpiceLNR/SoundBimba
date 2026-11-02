@@ -1,0 +1,6 @@
+{
+  "id": "bimba",
+  "names": { "ru": "Бимба", "en": "Bimba", "uk": "Бімба" },
+  "fonts": ["Nunito"],
+  "default": true
+}

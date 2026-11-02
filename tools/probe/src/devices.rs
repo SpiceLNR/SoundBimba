@@ -13,41 +13,17 @@ use windows::Win32::Media::Audio::{
 use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ};
 
+pub use winaudio::cables::{cable_of, CableKind, CABLES};
+
 use crate::format::Fmt;
 use crate::report::Report;
 use crate::rep;
-
-/// Известный виртуальный кабель: ищем по части названия устройства или адаптера.
-pub struct CableKind {
-    pub label: &'static str,
-    patterns: &'static [&'static str],
-    pub note: Option<&'static str>,
-}
-
-/// Список расширяемый. Сравнение без учёта регистра.
-pub const CABLES: &[CableKind] = &[
-    CableKind { label: "VB-CABLE", patterns: &["vb-audio virtual cable"], note: None },
-    CableKind { label: "VB-CABLE A", patterns: &["vb-audio cable a"], note: None },
-    CableKind { label: "VB-CABLE B", patterns: &["vb-audio cable b"], note: None },
-    CableKind { label: "VB-CABLE C", patterns: &["vb-audio cable c"], note: None },
-    CableKind { label: "VB-CABLE D", patterns: &["vb-audio cable d"], note: None },
-    CableKind {
-        label: "Virtual Audio Driver (MTT)",
-        patterns: &["virtual audio driver", "virtual mic driver"],
-        note: Some("от него отказались: микрофон выдаёт тестовый тон, а не звук динамика"),
-    },
-];
 
 /// Найденный кабель: его «динамик» (куда пишем) и «микрофон» (откуда читают другие программы).
 pub struct Cable<'a> {
     pub kind: &'static CableKind,
     pub speaker: Option<&'a Device>,
     pub mic: Option<&'a Device>,
-}
-
-fn cable_of(name: &str, adapter: &str) -> Option<&'static CableKind> {
-    let text = format!("{name} {adapter}").to_lowercase();
-    CABLES.iter().find(|k| k.patterns.iter().any(|p| text.contains(p)))
 }
 
 pub fn find_cables(devs: &[Device]) -> Vec<Cable<'_>> {
@@ -257,19 +233,5 @@ pub fn report_latency(r: &mut Report, devs: &[Device]) {
             _ => "недоступно".into(),
         };
         rep!(r, "  {kind} «{}»: shared {shared}; shared-lowlatency (минимум IAudioClient3) {low}", d.name);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::cable_of;
-
-    #[test]
-    fn recognizes_cables() {
-        let label = |n, a| cable_of(n, a).map(|k| k.label);
-        assert_eq!(label("CABLE Input (VB-Audio Virtual Cable)", "VB-Audio Virtual Cable"), Some("VB-CABLE"));
-        assert_eq!(label("CABLE-A Output (VB-Audio Cable A)", "VB-Audio Cable A"), Some("VB-CABLE A"));
-        assert_eq!(label("Speakers (Virtual Desktop Audio)", "Virtual Desktop Audio"), None);
-        assert_eq!(label("Speakers (Realtek(R) Audio)", "Realtek(R) Audio"), None);
     }
 }

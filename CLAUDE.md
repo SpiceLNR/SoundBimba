@@ -52,9 +52,16 @@
 ## Команды (заполнить по мере появления)
 - Нужно: Rust (MSVC), Visual Studio 2022 с C++ и **Windows 11 SDK** (без SDK нет kernel32.lib).
 - Собирать из **PowerShell**, не из Git Bash: там `/usr/bin/link` подменяет компоновщик MSVC.
-- Сборка: `cargo build --release` (проба: `target\release\probe.exe`)
-- Тесты: `cargo test`; проверка стиля: `cargo clippy --all-targets`
-- Запуск пробы: `target\release\probe.exe` (`--help` — параметры; без окна: `--no-pause`)
+- Один раз после клонирования: `npm install` в папке `app`.
+- Сборка приложения: в `app` выполнить `npx tauri build` → `target\release\soundbimba.exe`
+  (установщик пока выключен: `bundle.active = false`, включим на этапе 5).
+- Запуск для разработки: в `app` — `npx tauri dev`. Посмотреть интерфейс без Tauri (в браузере,
+  с заглушкой вместо Rust): `npm run dev` в `app`, открыть http://localhost:5173.
+- Тесты: `cargo test --workspace` и `npm test` (в `app`); стиль: `cargo clippy --workspace --all-targets`,
+  типы: `npx tsc --noEmit` (в `app`).
+- Лицензии: `node tools/licenses/check-cargo.mjs` (из корня) и `npm run licenses` (в `app`).
+- Проба: `cargo build --release -p probe` → `target\release\probe.exe` (`--help`; без окна: `--no-pause`).
+- Данные приложения: `%APPDATA%\SoundBimba\` — `project.json`, `settings.json`, `logs\soundbimba.log`.
 
 ## Что отвечать автору, когда непонятно
 Задай один конкретный вопрос с вариантом по умолчанию. Не задавай пачку вопросов сразу.

@@ -1,0 +1,129 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! SoundBimba: окно Tauri и команды для интерфейса (загрузка и автосохранение проекта, настройки,
+//! экспорт и импорт, диагностика). Звука на этапе 1 ещё нет.
+
+// В выпускной сборке не показывать окно консоли.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod applog;
+mod diagnostics;
+mod storage;
+mod zip;
+
+use std::fs;
+use std::sync::Mutex;
+
+use graph::Project;
+use serde::Serialize;
+use storage::{Paths, Settings};
+use tauri::State;
+
+struct AppState {
+    paths: Paths,
+    /// Запись файлов по одной, чтобы автосохранения не наложились.
+    write_lock: Mutex<()>,
+}
+
+/// Ошибка для интерфейса: `code` — ключ локализации, `detail` — подробность для журнала.
+#[derive(Serialize)]
+struct CmdError {
+    code: String,
+    detail: String,
+}
+
+impl CmdError {
+    fn new(code: &str, detail: impl ToString) -> Self {
+        let e = CmdError { code: code.into(), detail: detail.to_string() };
+        applog::error(&format!("{}: {}", e.code, e.detail));
+        e
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LoadState {
+    project: Project,
+    settings: Settings,
+    recovered_from: Option<String>,
+    version: &'static str,
+}
+
+#[tauri::command]
+fn load_state(state: State<AppState>) -> LoadState {
+    let loaded = storage::load_project(&state.paths);
+    LoadState {
+        project: loaded.project,
+        settings: storage::load_settings(&state.paths),
+        recovered_from: loaded.recovered_from,
+        version: env!("CARGO_PKG_VERSION"),
+    }
+}
+
+#[tauri::command]
+fn save_project(state: State<AppState>, project: Project) -> Result<(), CmdError> {
+    graph::validate(&project).map_err(|e| CmdError::new(e.code(), &e))?;
+    let _guard = state.write_lock.lock().unwrap();
+    storage::write_atomic(&state.paths.project, &graph::to_json(&project)).map_err(|e| CmdError::new("io", e))
+}
+
+#[tauri::command]
+fn save_settings(state: State<AppState>, settings: Settings) -> Result<(), CmdError> {
+    let text = serde_json::to_string_pretty(&settings).map_err(|e| CmdError::new("io", e))?;
+    let _guard = state.write_lock.lock().unwrap();
+    storage::write_atomic(&state.paths.settings, &text).map_err(|e| CmdError::new("io", e))
+}
+
+#[tauri::command]
+fn export_project(path: String, project: Project) -> Result<(), CmdError> {
+    graph::validate(&project).map_err(|e| CmdError::new(e.code(), &e))?;
+    fs::write(&path, graph::to_json(&project)).map_err(|e| CmdError::new("io", e))?;
+    applog::info("project exported");
+    Ok(())
+}
+
+#[tauri::command]
+fn import_project(path: String) -> Result<Project, CmdError> {
+    let text = fs::read_to_string(&path).map_err(|e| CmdError::new("io", e))?;
+    let project = graph::from_json(&text).map_err(|e| CmdError::new(e.code(), &e))?;
+    applog::info("project imported");
+    Ok(project)
+}
+
+#[tauri::command]
+fn save_diagnostics(state: State<AppState>, path: String, ui_info: String) -> Result<(), CmdError> {
+    diagnostics::save(&state.paths, &path, &ui_info).map_err(|e| CmdError::new("io", e))?;
+    applog::info("diagnostics saved");
+    Ok(())
+}
+
+/// Ошибки и события интерфейса — в общий журнал.
+#[tauri::command]
+fn log_ui(level: String, message: String) {
+    applog::write(if level == "error" { "UI-ERROR" } else { "UI" }, &message);
+}
+
+fn main() {
+    let paths = Paths::new();
+    applog::init(paths.log.clone());
+    applog::info(&format!(
+        "SoundBimba {} starting; {}",
+        env!("CARGO_PKG_VERSION"),
+        winaudio::system::windows_info().summary()
+    ));
+    std::panic::set_hook(Box::new(|info| applog::error(&format!("panic: {info}"))));
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .manage(AppState { paths, write_lock: Mutex::new(()) })
+        .invoke_handler(tauri::generate_handler![
+            load_state,
+            save_project,
+            save_settings,
+            export_project,
+            import_project,
+            save_diagnostics,
+            log_ui
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running SoundBimba");
+}
