@@ -1,6 +1,13 @@
 # Заявка на бесплатную подпись в SignPath Foundation
 
 Подпись нужна, чтобы Windows не пугала при установке («Windows защитила ваш компьютер»).
+
+**Решение автора 2026-11-03: пока не подаём.** Фонд требует «проверяемой репутации» для программ,
+а у проекта на тот момент 0 звёзд и по одному скачиванию релизов — отказ был бы очень вероятен.
+Подать, когда появятся пользователи (звёзды, скачивания, упоминания). Перед подачей вернуть в
+раздел «Code signing policy» README (все три языка) обязательную фразу фонда:
+«Free code signing provided by SignPath.io, certificate by SignPath Foundation» — фонд проверяет,
+что она уже есть на странице проекта и загрузки.
 Подаёт заявку автор; Claude готовит репозиторий и потом подключает подпись к автосборке.
 Условия фонда: https://signpath.org/terms (прочитаны 2026-11-03).
 
@@ -9,8 +16,8 @@
 1. **Двухфакторная защита на GitHub** — обязательна для всех участников.
    GitHub → фото профиля → Settings → Password and authentication → «Enable two-factor
    authentication». Подойдёт приложение-аутентификатор на телефоне. Сохраните коды восстановления.
-2. **Раздел «Code signing policy» в README** — уже есть (с пометкой «заявка подана»); он должен
-   быть на GitHub до подачи (отправить изменения).
+2. **Раздел «Code signing policy» в README** — есть (роли, приватность); перед подачей вписать в
+   него фразу фонда (см. выше) и отправить на GitHub.
 3. *(по желанию)* В последнем релизе (v0.3.0) нажать «Edit» и дописать внизу строку
    `Code signing policy: https://github.com/SpiceLNR/SoundBimba/blob/main/README.en.md#code-signing-policy`
    — у следующих релизов она появится сама.
@@ -21,23 +28,29 @@
 
 | Поле | Что вписать |
 |---|---|
-| Project Name | `SoundBimba` |
-| Repository URL | `https://github.com/SpiceLNR/SoundBimba` |
-| Homepage URL | `https://github.com/SpiceLNR/SoundBimba` |
+| Project Name* | `SoundBimba` |
+| Repository URL* | `https://github.com/SpiceLNR/SoundBimba` |
+| Homepage URL* | `https://github.com/SpiceLNR/SoundBimba` |
 | Download URL | `https://github.com/SpiceLNR/SoundBimba/releases` |
+| Privacy Policy URL | `https://github.com/SpiceLNR/SoundBimba/blob/main/README.en.md#code-signing-policy` |
+| Wikipedia URL (optional) | пусто |
+| Tagline* | `Free offline node-based audio routing for Windows: app sound, microphone, sound buttons and voice effects to headphones or a virtual microphone.` |
+| Category* | ближайшее из списка (Multimedia / Audio, иначе Utilities) |
+| Description* | см. ниже (короткий абзац, без версий и библиотек) |
+| Reputation | честно: звёзды, скачивания, упоминания на момент подачи |
 | Описание проекта (если спросят) | см. ниже |
 | Лицензия (если спросят) | `AGPL-3.0-or-later` |
 | Что подписывать (если спросят) | `Windows installer (NSIS .exe) and the application .exe, built by GitHub Actions` |
 | Сборка (если спросят) | `GitHub Actions, workflow .github/workflows/build.yml` |
 
-Описание (скопировать):
+Description (скопировать; форма просит коротко и без версий):
 
-> SoundBimba is a free, offline, node-based audio routing app for Windows 11: capture the sound of
-> individual apps and the microphone, add sound buttons (soundpad), volume, compressor, voice
-> morpher and noise suppression (RNNoise), and send the result to headphones or to a virtual
-> microphone (a user-installed virtual cable such as VB-CABLE; no drivers are bundled). UI in
-> Russian, English and Ukrainian. License AGPL-3.0-or-later; all dependencies are open source
-> (MIT/Apache/BSD/MPL/OFL). No network access, no telemetry.
+> SoundBimba lets you build your sound like a diagram: capture the audio of individual apps and the
+> microphone, add sound buttons, volume, compression, voice effects and noise suppression, and send
+> the result to headphones or to a virtual microphone for Discord, OBS or games. It works fully
+> offline, has a simple mode for beginners, and is available in Russian, English and Ukrainian.
+
+Поля ниже «Description» в форме на 2026-11-03 не рассмотрены (не загружались) — смотреть на месте.
 
 Остальные поля (имя, e-mail и т.п.) — ваши данные. Галочки согласия с условиями — только если вы
 с ними согласны (это ваше решение).

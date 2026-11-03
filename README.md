@@ -57,13 +57,11 @@ SoundBimba — бесплатная программа для Windows, в кот
 
 ## Политика подписи (Code signing policy)
 
-Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-
-**Сейчас:** заявка в SignPath Foundation подана и ждёт решения, поэтому нынешние релизы ещё
-**не подписаны** — у каждого есть `SHA256SUMS.txt` для проверки. Когда заявку одобрят, установщики
-будут подписываться в автосборке GitHub ([.github/workflows/build.yml](.github/workflows/build.yml)),
-и каждую подпись будет вручную подтверждать ответственный. Ключей и сертификатов в репозитории нет
-и не будет.
+Сейчас релизы **не подписаны** — у каждого есть `SHA256SUMS.txt` для проверки. Позже, когда у
+проекта появятся пользователи, мы подадим заявку на бесплатную подпись для открытых проектов в
+[SignPath Foundation](https://signpath.org). Тогда установщики будут подписываться в автосборке GitHub
+([.github/workflows/build.yml](.github/workflows/build.yml)), и каждую подпись будет вручную
+подтверждать ответственный. Ключей и сертификатов в репозитории нет и не будет.
 
 - Авторы и проверяющие изменения (committers and reviewers): [SpiceLNR](https://github.com/SpiceLNR)
 - Подтверждает подпись релиза (approvers): [SpiceLNR](https://github.com/SpiceLNR)

@@ -57,13 +57,11 @@ paths are (a path may contain your Windows user name) — look through the zip b
 
 ## Code signing policy
 
-Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-
-**Current state:** the application to SignPath Foundation is submitted and pending, so the current
-releases are **not signed yet** — each has a `SHA256SUMS.txt` for checking. Once approved, installers
-will be signed in the GitHub build ([.github/workflows/build.yml](.github/workflows/build.yml)), and every
-signing request will be approved manually. There are no keys or certificates in the repository and
-there never will be.
+Releases are currently **not signed** — each has a `SHA256SUMS.txt` for checking. Later, once the
+project has users, we plan to apply for free open-source code signing from
+[SignPath Foundation](https://signpath.org). Installers will then be signed in the GitHub build
+([.github/workflows/build.yml](.github/workflows/build.yml)), and every signing request will be approved
+manually. There are no keys or certificates in the repository and there never will be.
 
 - Committers and reviewers: [SpiceLNR](https://github.com/SpiceLNR)
 - Approvers: [SpiceLNR](https://github.com/SpiceLNR)
