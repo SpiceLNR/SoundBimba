@@ -12,6 +12,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@fontsource/comic-neue": "5.3.0",
     "@fontsource/nunito": "5.3.0",
     "@fontsource/open-sans": "5.3.0",
     "@tauri-apps/api": "2.12.4",

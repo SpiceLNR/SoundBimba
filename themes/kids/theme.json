@@ -1,0 +1,13 @@
+{
+  "id": "kids",
+  "names": {
+    "ru": "Детская",
+    "en": "Kids",
+    "uk": "Дитяча"
+  },
+  "fonts": [
+    "Comic Sans MS",
+    "Comic Neue"
+  ],
+  "order": 3
+}

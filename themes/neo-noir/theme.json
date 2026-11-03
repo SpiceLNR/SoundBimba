@@ -1,0 +1,12 @@
+{
+  "id": "neo-noir",
+  "names": {
+    "ru": "Нео-нуар",
+    "en": "Neo-noir",
+    "uk": "Нео-нуар"
+  },
+  "fonts": [
+    "Nunito"
+  ],
+  "order": 4
+}

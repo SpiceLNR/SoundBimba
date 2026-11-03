@@ -1,0 +1,13 @@
+{
+  "id": "engineer",
+  "names": {
+    "ru": "Инженерская",
+    "en": "Engineer",
+    "uk": "Інженерна"
+  },
+  "fonts": [
+    "Open Sans"
+  ],
+  "wires": "traces",
+  "order": 5
+}

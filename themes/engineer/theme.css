@@ -1,0 +1,145 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Тема «Инженерская»: основа — «Метро» (плоско, панель одной полосой, Open Sans, лёгкие
+   заглавные), а карта — печатная плата: зелёная паяльная маска с сеткой и переходными
+   отверстиями, узлы — чёрные микросхемы с ножками и белой маркировкой, провода — медные дорожки
+   с прямыми углами (форма — в theme.json), точки подключения — позолоченные площадки. */
+[data-theme='engineer'] {
+  --font: 'Open Sans', sans-serif;
+  --font-size: 14px;
+  --title-weight: 300;
+  --title-transform: uppercase;
+  --title-spacing: 0.06em;
+
+  --bg: #0d3b2b;
+  --surface: #0a2e21;
+  --surface-2: #114a36;
+  --text: #f1f4ea;
+  --text-muted: #9fc4ad;
+  --border: #1d5c43;
+  --border-width: 0px;
+  --accent: #e2b54c;
+  --accent-text: #0a2e21;
+  --danger: #ff7a5c;
+  --radius: 0px;
+  --radius-small: 0px;
+  --shadow: none;
+
+  /* Кнопки и списки панели инструментов — без рамок и фона, сливаются в одну полосу. */
+  --control-bg: transparent;
+  --control-bg-hover: #114a36;
+  --control-border-hover: transparent;
+  --control-border: transparent;
+
+  /* Ширина списка «Добавить узел» под шрифт темы. */
+  --add-node-width: 252px;
+
+  --slider-track: #1d5c43;
+  --slider-track-height: 4px;
+  --slider-thumb-bg: #e2b54c;
+  --slider-thumb-width: 10px;
+  --slider-thumb-height: 22px;
+  --slider-thumb-radius: 0px;
+
+  /* Микросхема: чёрный корпус, белая маркировка; цвет типа — полоска маркировки. */
+  --node-bg: #151515;
+  --node-text: #ecece6;
+  --node-source: #6cc4ff;
+  --node-processing: #c9a2ff;
+  --node-output: #8be59a;
+  --node-button: #ffb24a;
+  --node-selected: #e2b54c;
+  --handle-size: 16px;
+
+  /* Медь дорожек. */
+  --wire: #c7874a;
+  --wire-selected: #ffbf73;
+  --dots: #1f6a4d;
+  --watermark-color: #f1f4ea;
+  --watermark-opacity: 0.025;
+
+  /* Полосы прокрутки: узкие прямоугольные, как ползунки. */
+  --scrollbar-size: 6px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #1d5c43;
+  --scrollbar-thumb-hover: #e2b54c;
+  --scrollbar-radius: 0px;
+
+  --backdrop: rgba(4, 20, 14, 0.7);
+  --notice-bg: #114a36;
+  --notice-error-bg: #4d2318;
+}
+
+/* Плата: тонкая сетка разводки поверх зелёной маски (точки — переходные отверстия). */
+[data-theme='engineer'] .map {
+  background-color: var(--bg);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 40px);
+}
+
+/* Дорожки: медь, толще обычного провода, с тенью от лака. */
+[data-theme='engineer'] .react-flow__edge-path {
+  stroke-width: 4;
+  stroke-linecap: square;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.55));
+}
+
+[data-theme='engineer'] .react-flow__edge.selected .react-flow__edge-path,
+[data-theme='engineer'] .react-flow__edge:hover .react-flow__edge-path {
+  filter: drop-shadow(0 0 3px rgba(255, 191, 115, 0.6));
+}
+
+/* Микросхема: корпус с бликом, ножки сверху и снизу, ключ первой ножки. */
+[data-theme='engineer'] .sound-node {
+  position: relative;
+  background:
+    radial-gradient(circle at 12px 12px, #2b2b2b 0 3px, transparent 3.5px),
+    linear-gradient(180deg, #1e1e1e, #111111);
+  border: 1px solid #2c2c2c;
+  border-left: 3px solid var(--cat);
+  box-shadow:
+    0 2px 0 #050505,
+    0 6px 12px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='engineer'] .sound-node::before,
+[data-theme='engineer'] .sound-node::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, #b9bec3 0 5px, transparent 5px 13px);
+  pointer-events: none;
+}
+
+[data-theme='engineer'] .sound-node::before {
+  top: -7px;
+}
+
+[data-theme='engineer'] .sound-node::after {
+  bottom: -7px;
+}
+
+[data-theme='engineer'] .sound-node.selected {
+  outline: 2px dashed var(--node-selected);
+  outline-offset: 5px;
+}
+
+[data-theme='engineer'] .sound-node-title {
+  color: var(--node-text);
+}
+
+/* Контактная площадка: позолота с отверстием. */
+[data-theme='engineer'] .sound-node .react-flow__handle {
+  border: 2px solid #8c6a24;
+  background: radial-gradient(circle, #0d3b2b 0 28%, #e2b54c 32% 100%);
+}
+
+[data-theme='engineer'] .sound-node .react-flow__handle:hover {
+  background: radial-gradient(circle, #0d3b2b 0 28%, #ffd780 32% 100%);
+}
+
+[data-theme='engineer'] .meter {
+  background: #262626;
+}

@@ -7,20 +7,27 @@ export interface ThemeMeta {
   names: Record<Lang, string>;
   fonts: string[];
   default?: boolean;
+  /** Место в меню «Тема» (1 — первая). */
+  order: number;
+  /** Форма проводов: плавные кривые (по умолчанию) или дорожки с прямыми углами, как на плате. */
+  wires?: 'curve' | 'traces';
 }
 
 // Стили всех тем подключаются сразу; выбранная включается атрибутом data-theme.
 import.meta.glob('../../../themes/*/theme.css', { eager: true });
 const metas = import.meta.glob<ThemeMeta>('../../../themes/*/theme.json', { eager: true, import: 'default' });
 
-export const THEMES: ThemeMeta[] = Object.values(metas).sort(
-  (a, b) => Number(Boolean(b.default)) - Number(Boolean(a.default)) || a.id.localeCompare(b.id),
-);
+export const THEMES: ThemeMeta[] = Object.values(metas).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 
 export const DEFAULT_THEME = THEMES.find((t) => t.default)?.id ?? 'bimba';
 
 export function themeId(id: string | undefined): string {
   return THEMES.some((t) => t.id === id) ? (id as string) : DEFAULT_THEME;
+}
+
+/** Форма проводов выбранной темы. */
+export function wireShape(id: string | undefined): 'curve' | 'traces' {
+  return THEMES.find((t) => t.id === themeId(id))?.wires ?? 'curve';
 }
 
 export function applyTheme(id: string): void {

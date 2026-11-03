@@ -1,0 +1,6 @@
+{
+  "id": "frutiger-aero",
+  "names": { "ru": "Фрутигер аэро", "en": "Frutiger Aero", "uk": "Фрутігер аеро" },
+  "fonts": ["Segoe UI", "Open Sans"],
+  "order": 6
+}

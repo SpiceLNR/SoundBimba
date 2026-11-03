@@ -21,6 +21,9 @@ Keep this list up to date: every dependency and bundled resource must appear her
 | Symphonia (`symphonia` and its codec crates: WAV/PCM, MP3, OGG/Vorbis, FLAC) | Decoding sound files for buttons | MPL-2.0 | https://github.com/pdeljanov/Symphonia |
 | Nunito font (via Fontsource) | Theme "Bimba" font, bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/nunito , https://fontsource.org |
 | Open Sans font (via Fontsource) | Theme "Metro" font (free alternative to Segoe UI), bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/opensans , https://fontsource.org |
+| Comic Neue font (via Fontsource) | Theme "Kids" fallback font, bundled offline | SIL OFL 1.1 | https://github.com/crozynski/comicneue , https://fontsource.org |
+| Segoe UI — **not bundled** | Theme "Frutiger Aero" uses it from Windows if installed (fallback: bundled Open Sans); never distributed by SoundBimba | Microsoft (part of Windows) | — |
+| Comic Sans MS — **not bundled** | Theme "Kids" uses it from Windows if installed; never distributed by SoundBimba | Microsoft (part of Windows) | — |
 | Vite, @vitejs/plugin-react, TypeScript, Vitest | Build and tests only, not in the app | MIT / Apache-2.0 | https://vitejs.dev , https://www.typescriptlang.org , https://vitest.dev |
 | ICU4X crates (`icu_*`, `zerovec`, `yoke`, `litemap`, `tinystr`, `writeable`, `zerotrie`, `zerofrom`, `potential_utf`) | Pulled in by Tauri (URL handling) | Unicode-3.0 (permissive, OSI-approved; allowed by the author on 2026-11-02) | https://github.com/unicode-org/icu4x |
 | windows-rs: `windows`, `windows-core` and their sub-crates (`windows-link`, `-result`, `-strings`, `-implement`, `-interface`, `-collections`, `-future`, `-numerics`, `-threading`) | Windows API bindings (tools/probe) | MIT or Apache-2.0 | https://github.com/microsoft/windows-rs |

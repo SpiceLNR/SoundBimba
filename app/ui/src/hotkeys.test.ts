@@ -47,6 +47,24 @@ describe('hotkeys', () => {
     expect(b).not.toHaveProperty('unknown');
   });
 
+  it('add-node digits follow the order of the "Add node" list', () => {
+    const digits = ACTIONS.filter((a) => addedKind(a)).map((a) => DEFAULT_BINDINGS[a]);
+    expect(digits).toEqual(['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9']);
+  });
+
+  it('old saved defaults move to the new digits, own choices stay', () => {
+    // Сохранено, как было раньше: наушники 5, виртуальный микрофон 6 — и своя клавиша у компрессора.
+    const b = mergeBindings({ 'add-speaker-out': 'Digit5', 'add-virtual-out': 'Digit6', 'add-compressor': 'KeyC', 'add-volume': 'Digit4' });
+    expect(b['add-speaker-out']).toBe('Digit8');
+    expect(b['add-virtual-out']).toBe('Digit9');
+    expect(b['add-compressor']).toBe('KeyC');
+    expect(b['add-volume']).toBe('Digit4');
+    // Своё сочетание, совпавшее с чужим по умолчанию, побеждает — без двойных назначений.
+    const c = mergeBindings({ arrange: 'Digit5' });
+    expect(c.arrange).toBe('Digit5');
+    expect(c['add-compressor']).toBe('');
+  });
+
   it('default combos are unique and every action has a name', () => {
     const used = ACTIONS.map((a) => DEFAULT_BINDINGS[a]).filter(Boolean);
     expect(new Set(used).size).toBe(used.length);

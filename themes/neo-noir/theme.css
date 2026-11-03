@@ -1,0 +1,161 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Тема «Нео-нуар»: основа — «Бимба» (тот же шрифт, скругления, раскладка), но ночной город:
+   почти чёрный фон, неоновые цвета. Провода — неоновые трубки (светлая сердцевина и цветное
+   свечение), узлы подсвечены неоном цвета своего типа, вывеска «SoundBimba» и «пятачок»
+   изредка мерцают. Если в Windows выключены эффекты анимации — без мерцания. */
+[data-theme='neo-noir'] {
+  --font: 'Nunito', system-ui, sans-serif;
+  --font-size: 14px;
+  --title-weight: 700;
+  --title-transform: none;
+  --title-spacing: 0;
+
+  --bg: #07060b;
+  --surface: #110e18;
+  --surface-2: #1a1524;
+  --text: #f4eefb;
+  --text-muted: #9c8fb0;
+  --border: #2b2238;
+  --border-width: 1px;
+  --accent: #ff2bd6;
+  --accent-text: #ffffff;
+  --danger: #ff4d6a;
+  --radius: 14px;
+  --radius-small: 8px;
+  --shadow: 0 6px 22px rgba(0, 0, 0, 0.65);
+
+  --control-bg: #1a1524;
+  --control-bg-hover: #241c32;
+  --control-border-hover: #ff2bd6;
+  --control-border: #2b2238;
+
+  /* Ширина списка «Добавить узел» под шрифт темы. */
+  --add-node-width: 228px;
+
+  --slider-track: #2b2238;
+  --slider-track-height: 6px;
+  --slider-thumb-bg: #ff2bd6;
+  --slider-thumb-width: 18px;
+  --slider-thumb-height: 18px;
+  --slider-thumb-radius: 50%;
+
+  --node-bg: #0f0c16;
+  --node-text: #f4eefb;
+  --node-source: #22e5ff;
+  --node-processing: #b14dff;
+  --node-output: #39ff88;
+  --node-button: #ffb020;
+  --node-selected: #ff2bd6;
+  --handle-size: 16px;
+
+  /* Провод — светлая сердцевина неоновой трубки; свечение задаётся ниже. */
+  --wire: #ffc8f3;
+  --wire-selected: #c9f8ff;
+  --dots: #1c1628;
+  --watermark-color: #ff2bd6;
+  --watermark-opacity: 0.06;
+
+  /* Полосы прокрутки: тонкие, при наведении — неон. */
+  --scrollbar-size: 10px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #2b2238;
+  --scrollbar-thumb-hover: #ff2bd6;
+  --scrollbar-radius: 8px;
+
+  --backdrop: rgba(4, 3, 8, 0.7);
+  --notice-bg: #1a1524;
+  --notice-error-bg: #4a1530;
+}
+
+/* Неоновые трубки проводов: светлая сердцевина и розовое свечение (выбранный — голубое). */
+[data-theme='neo-noir'] .react-flow__edge-path {
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(255, 43, 214, 0.95)) drop-shadow(0 0 7px rgba(255, 43, 214, 0.7));
+}
+
+[data-theme='neo-noir'] .react-flow__edge.selected .react-flow__edge-path,
+[data-theme='neo-noir'] .react-flow__edge:hover .react-flow__edge-path {
+  filter: drop-shadow(0 0 2px rgba(34, 229, 255, 0.95)) drop-shadow(0 0 9px rgba(34, 229, 255, 0.75));
+}
+
+[data-theme='neo-noir'] .react-flow__connection-path {
+  filter: drop-shadow(0 0 6px rgba(255, 43, 214, 0.8));
+}
+
+/* Узлы: неоновый контур цвета своего типа. */
+[data-theme='neo-noir'] .sound-node {
+  border-color: color-mix(in srgb, var(--cat) 45%, transparent);
+  box-shadow:
+    0 0 14px -3px var(--cat),
+    inset 0 0 12px -8px var(--cat),
+    var(--shadow);
+}
+
+[data-theme='neo-noir'] .sound-node.selected {
+  box-shadow:
+    0 0 22px 0 var(--cat),
+    inset 0 0 14px -6px var(--cat),
+    var(--shadow);
+}
+
+[data-theme='neo-noir'] .sound-node-title {
+  text-shadow: 0 0 8px color-mix(in srgb, var(--cat) 70%, transparent);
+}
+
+[data-theme='neo-noir'] .sound-node .react-flow__handle {
+  box-shadow: 0 0 8px var(--cat);
+}
+
+[data-theme='neo-noir'] .meter-fill {
+  box-shadow: 0 0 8px var(--cat);
+}
+
+/* Вывеска. */
+[data-theme='neo-noir'] .brand {
+  text-shadow:
+    0 0 4px rgba(255, 43, 214, 0.9),
+    0 0 12px rgba(255, 43, 214, 0.7),
+    0 0 26px rgba(255, 43, 214, 0.45);
+}
+
+[data-theme='neo-noir'] button.primary,
+[data-theme='neo-noir'] .sound-toggle.on {
+  box-shadow: 0 0 14px rgba(255, 43, 214, 0.55);
+}
+
+/* Мерцание старой неоновой вывески: почти всё время горит, изредка «моргает». */
+@keyframes neo-noir-flicker {
+  0%, 41%, 43%, 45%, 78%, 80%, 100% {
+    opacity: 1;
+  }
+  42%, 44% {
+    opacity: 0.35;
+  }
+  79% {
+    opacity: 0.6;
+  }
+}
+
+/* Провода чуть «гудят»: свечение едва заметно дышит. */
+@keyframes neo-noir-hum {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.86;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='neo-noir'] .brand {
+    animation: neo-noir-flicker 7s infinite;
+  }
+
+  [data-theme='neo-noir'] .watermark {
+    animation: neo-noir-flicker 11s infinite 2s;
+  }
+
+  [data-theme='neo-noir'] .react-flow__edge-path {
+    animation: neo-noir-hum 3.2s ease-in-out infinite;
+  }
+}

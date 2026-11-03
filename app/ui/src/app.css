@@ -132,6 +132,10 @@ input[type='range']:focus-visible {
   white-space: nowrap;
   background: var(--surface);
   border-bottom: var(--border-width) solid var(--border);
+  /* Панель (с её выпадающими списками) — всегда поверх карты, даже если тема делает панель
+     отдельным слоем (стекло через backdrop-filter): иначе списки открываются под картой. */
+  position: relative;
+  z-index: 25;
 }
 
 .brand {

@@ -1,5 +1,12 @@
 {
   "id": "metro",
-  "names": { "ru": "Метро", "en": "Metro", "uk": "Метро" },
-  "fonts": ["Open Sans"]
+  "names": {
+    "ru": "Метро",
+    "en": "Metro",
+    "uk": "Метро"
+  },
+  "fonts": [
+    "Open Sans"
+  ],
+  "order": 2
 }

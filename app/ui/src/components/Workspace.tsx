@@ -6,6 +6,7 @@ import {
   addEdge,
   Background,
   BackgroundVariant,
+  ConnectionLineType,
   Controls,
   MiniMap,
   ReactFlow,
@@ -36,6 +37,7 @@ import {
 } from '../graph';
 import { ACTIONS, actionFor, addedKind, eventToCombo, isTyping, mergeBindings, type Action, type Bindings } from '../hotkeys';
 import { DICTS, useT, type Lang } from '../i18n';
+import { wireShape } from '../theme';
 import { applyTemplate, type Template } from '../templates';
 import CableWizard from './CableWizard';
 import HotkeysDialog from './HotkeysDialog';
@@ -116,10 +118,13 @@ export default function Workspace({ project, version, settings, lang, onSettings
     },
     [nodes, t],
   );
+  // Форма проводов — из темы: у «Инженерской» дорожки с прямыми углами, как на плате.
+  const traces = wireShape(settings.theme) === 'traces';
+  const edgeType = traces ? 'smoothstep' : 'default';
   // Подпись провода «откуда → куда» видна при наведении (см. app.css).
   const shownEdges = useMemo(
-    () => edges.map((e) => ({ ...e, label: `${titleOf(e.source)} → ${titleOf(e.target)}` })),
-    [edges, titleOf],
+    () => edges.map((e) => ({ ...e, type: edgeType, label: `${titleOf(e.source)} → ${titleOf(e.target)}` })),
+    [edges, titleOf, edgeType],
   );
 
   const onConnect = useCallback(
@@ -432,6 +437,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
             onSelectionChange={onSelectionChange}
             fitView
             fitViewOptions={{ padding: 0.2 }}
+            connectionLineType={traces ? ConnectionLineType.SmoothStep : ConnectionLineType.Bezier}
             snapToGrid
             snapGrid={[20, 20]}
             colorMode="dark"

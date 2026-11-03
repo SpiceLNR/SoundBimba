@@ -34,16 +34,27 @@ export const DEFAULT_BINDINGS: Bindings = {
   export: 'Ctrl+KeyS',
   import: 'Ctrl+KeyO',
   diagnostics: '',
-  // Цифры 1–9 (без Ctrl): быстро добавить узел, когда курсор не в поле ввода.
+  // Цифры 1–9 (без Ctrl) — по порядку списка «Добавить узел»: быстро добавить узел, когда курсор
+  // не в поле ввода.
   'add-app-source': 'Digit1',
   'add-mic-input': 'Digit2',
   'add-sound-button': 'Digit3',
   'add-volume': 'Digit4',
+  'add-compressor': 'Digit5',
+  'add-voice-morpher': 'Digit6',
+  'add-denoise': 'Digit7',
+  'add-speaker-out': 'Digit8',
+  'add-virtual-out': 'Digit9',
+};
+
+/** Прежние сочетания по умолчанию (до 2026-11-03: цифры шли не по порядку списка). Сохранённое
+ *  прежнее значение по умолчанию считаем «не менял» и даём новое. */
+const PREVIOUS_DEFAULTS: Partial<Record<Action, string>> = {
+  'add-speaker-out': 'Digit5',
+  'add-virtual-out': 'Digit6',
   'add-compressor': 'Digit7',
   'add-voice-morpher': 'Digit8',
   'add-denoise': 'Digit9',
-  'add-speaker-out': 'Digit5',
-  'add-virtual-out': 'Digit6',
 };
 
 const MODIFIERS = new Set(['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight']);
@@ -96,7 +107,18 @@ export function formatCombo(combo: string): string {
 /** Сохранённые настройки поверх значений по умолчанию (новые действия получают своё сочетание). */
 export function mergeBindings(saved?: Record<string, string>): Bindings {
   const b = { ...DEFAULT_BINDINGS };
-  for (const a of ACTIONS) if (typeof saved?.[a] === 'string') b[a] = saved[a];
+  const own = new Set<Action>();
+  for (const a of ACTIONS) {
+    const v = saved?.[a];
+    if (typeof v !== 'string' || v === PREVIOUS_DEFAULTS[a]) continue;
+    b[a] = v;
+    own.add(a);
+  }
+  // Сочетание, которое человек сам назначил, важнее значения по умолчанию у другого действия.
+  for (const a of ACTIONS) {
+    if (own.has(a) || !b[a]) continue;
+    if (ACTIONS.some((o) => o !== a && own.has(o) && b[o] === b[a])) b[a] = '';
+  }
   return b;
 }
 

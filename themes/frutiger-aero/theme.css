@@ -1,0 +1,245 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Тема «Фрутигер аэро» — в духе 2005–2012 (Windows Vista и 7): глубокое синее небо, переходящее
+   в насыщенный зелёный луг, прозрачные пузыри, панели и узлы — голубое стекло с бликом (как
+   «Aero» в Windows 7), белый текст, провода — светящиеся салатовые лучи с белой сердцевиной.
+   (Первая версия была слишком светлой — автору не понравилось.)
+   Шрифт — Segoe UI из Windows (его нельзя класть в программу: лицензия Microsoft, мы его не
+   распространяем); если его нет — Open Sans (SIL OFL) из программы. */
+[data-theme='frutiger-aero'] {
+  --font: 'Segoe UI', 'Open Sans', sans-serif;
+  --font-size: 14px;
+  --title-weight: 600;
+  --title-transform: none;
+  --title-spacing: 0;
+
+  --bg: #0d5aa8;
+  --surface: rgba(16, 92, 170, 0.55);
+  --surface-2: rgba(70, 160, 230, 0.35);
+  --text: #ffffff;
+  --text-muted: #cfe8ff;
+  --border: rgba(255, 255, 255, 0.4);
+  --border-width: 1px;
+  --accent: #6fe0ff;
+  --accent-text: #04345e;
+  --danger: #ffa3a3;
+  --radius: 12px;
+  --radius-small: 7px;
+  --shadow: 0 6px 22px rgba(0, 25, 60, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+
+  --control-bg: rgba(255, 255, 255, 0.14);
+  --control-bg-hover: rgba(255, 255, 255, 0.26);
+  --control-border-hover: #a8ecff;
+  --control-border: rgba(255, 255, 255, 0.45);
+
+  /* Ширина списка «Добавить узел» под шрифт темы. */
+  --add-node-width: 228px;
+
+  --slider-track: rgba(255, 255, 255, 0.3);
+  --slider-track-height: 6px;
+  --slider-thumb-bg: #ffffff;
+  --slider-thumb-width: 18px;
+  --slider-thumb-height: 18px;
+  --slider-thumb-radius: 50%;
+
+  /* Узел — голубое стекло; цвет типа — полоска слева и шарики подключения. */
+  --node-bg: rgba(40, 140, 225, 0.42);
+  --node-text: #ffffff;
+  --node-source: #6fd6ff;
+  --node-processing: #d2a6ff;
+  --node-output: #a6f06a;
+  --node-button: #ffc95c;
+  --node-selected: #ffffff;
+  --handle-size: 16px;
+
+  /* Провод — белая сердцевина светового луча; салатовое свечение задаётся ниже. */
+  --wire: #f2ffd9;
+  --wire-selected: #ffffff;
+  --dots: rgba(255, 255, 255, 0.14);
+  --watermark-color: #ffffff;
+  --watermark-opacity: 0.07;
+
+  /* Полосы прокрутки: стеклянные. */
+  --scrollbar-size: 12px;
+  --scrollbar-track: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.35);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.6);
+  --scrollbar-radius: 7px;
+
+  --backdrop: rgba(3, 30, 70, 0.45);
+  --notice-bg: rgba(16, 92, 170, 0.85);
+  --notice-error-bg: rgba(170, 40, 50, 0.85);
+}
+
+/* Глубокое небо, зелёный луг и пузыри (прозрачные внутри, с ярким ободком). */
+[data-theme='frutiger-aero'] body,
+[data-theme='frutiger-aero'] .map {
+  background:
+    radial-gradient(circle 38px at 14% 72%, rgba(255, 255, 255, 0.06) 0 62%, rgba(255, 255, 255, 0.6) 70%, rgba(255, 255, 255, 0.18) 76%, transparent 79%),
+    radial-gradient(circle 22px at 30% 40%, rgba(255, 255, 255, 0.06) 0 62%, rgba(255, 255, 255, 0.6) 70%, rgba(255, 255, 255, 0.18) 76%, transparent 79%),
+    radial-gradient(circle 54px at 82% 60%, rgba(255, 255, 255, 0.05) 0 62%, rgba(255, 255, 255, 0.5) 70%, rgba(255, 255, 255, 0.15) 76%, transparent 79%),
+    radial-gradient(circle 16px at 66% 28%, rgba(255, 255, 255, 0.06) 0 62%, rgba(255, 255, 255, 0.65) 70%, rgba(255, 255, 255, 0.18) 76%, transparent 79%),
+    radial-gradient(circle 30px at 48% 84%, rgba(255, 255, 255, 0.06) 0 62%, rgba(255, 255, 255, 0.55) 70%, rgba(255, 255, 255, 0.18) 76%, transparent 79%),
+    radial-gradient(circle 12px at 8% 30%, rgba(255, 255, 255, 0.06) 0 62%, rgba(255, 255, 255, 0.65) 70%, rgba(255, 255, 255, 0.18) 76%, transparent 79%),
+    radial-gradient(circle 26px at 92% 22%, rgba(255, 255, 255, 0.06) 0 62%, rgba(255, 255, 255, 0.55) 70%, rgba(255, 255, 255, 0.18) 76%, transparent 79%),
+    radial-gradient(circle 18px at 56% 52%, rgba(255, 255, 255, 0.06) 0 62%, rgba(255, 255, 255, 0.55) 70%, rgba(255, 255, 255, 0.18) 76%, transparent 79%),
+    radial-gradient(ellipse 60% 30% at 20% 0%, rgba(255, 255, 255, 0.22), transparent 70%),
+    radial-gradient(ellipse 140% 42% at 50% 118%, #3fae2a 0%, #6fcf3a 38%, rgba(111, 207, 58, 0) 70%),
+    linear-gradient(180deg, #063d82 0%, #0d5aa8 35%, #1f86d6 70%, #3fa6e6 100%);
+  background-attachment: fixed;
+}
+
+/* Голубое стекло панелей и окон. */
+[data-theme='frutiger-aero'] .toolbar,
+[data-theme='frutiger-aero'] .side-panel,
+[data-theme='frutiger-aero'] .dialog,
+[data-theme='frutiger-aero'] .notice,
+[data-theme='frutiger-aero'] .dropdown-list {
+  backdrop-filter: blur(16px) saturate(1.4);
+}
+
+[data-theme='frutiger-aero'] .toolbar {
+  background: linear-gradient(180deg, rgba(120, 200, 255, 0.45) 0%, rgba(30, 120, 200, 0.4) 50%, rgba(10, 80, 160, 0.5) 51%, rgba(30, 120, 200, 0.45) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 2px 12px rgba(0, 25, 60, 0.35);
+}
+
+[data-theme='frutiger-aero'] .dropdown-list,
+[data-theme='frutiger-aero'] .dialog {
+  background: rgba(14, 80, 155, 0.78);
+}
+
+/* Глянцевые стеклянные кнопки: блик на верхней половине. */
+[data-theme='frutiger-aero'] button:not(.button-disc):not(.react-flow__controls-button) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.12) 49%, rgba(0, 30, 80, 0.12) 50%, rgba(255, 255, 255, 0.08) 100%);
+  box-shadow: 0 1px 3px rgba(0, 25, 60, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-shadow: 0 1px 1px rgba(0, 30, 70, 0.5);
+}
+
+/* Кнопки масштаба карты — одна стеклянная панель с общим бликом. */
+[data-theme='frutiger-aero'] .react-flow__controls {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(12px) saturate(1.3);
+  background: linear-gradient(180deg, rgba(120, 200, 255, 0.45) 0%, rgba(20, 100, 185, 0.55) 100%);
+  box-shadow: 0 4px 14px rgba(0, 25, 60, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+[data-theme='frutiger-aero'] .react-flow__controls-button {
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+[data-theme='frutiger-aero'] .react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+[data-theme='frutiger-aero'] .react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+[data-theme='frutiger-aero'] .react-flow__controls-button svg {
+  fill: #ffffff;
+  filter: drop-shadow(0 1px 1px rgba(0, 30, 70, 0.5));
+}
+
+/* Пункты списков — без отдельного глянца, блик только при наведении. */
+[data-theme='frutiger-aero'] .dropdown-list button:not(:hover) {
+  background-image: none;
+  box-shadow: none;
+}
+
+[data-theme='frutiger-aero'] button.primary {
+  background-image: linear-gradient(180deg, #b7f2ff 0%, #5fd3ff 49%, #20a8ec 50%, #55ccff 100%);
+  border-color: #a8ecff;
+  color: #04345e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+[data-theme='frutiger-aero'] .sound-toggle.on {
+  background-image: linear-gradient(180deg, #d2fba6 0%, #8fe05c 49%, #55c12e 50%, #86dc59 100%);
+  border-color: #c9f7a0;
+  color: #133d05;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+[data-theme='frutiger-aero'] .brand {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(111, 224, 255, 0.8), 0 1px 1px rgba(0, 30, 70, 0.6);
+}
+
+[data-theme='frutiger-aero'] input:not([type='range']):not([type='checkbox']),
+[data-theme='frutiger-aero'] textarea {
+  color: var(--text);
+  background: rgba(0, 40, 90, 0.35);
+}
+
+/* Узлы — голубое стекло с бликом сверху. */
+[data-theme='frutiger-aero'] .sound-node {
+  backdrop-filter: blur(10px) saturate(1.3);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0.02) 54%, rgba(120, 200, 255, 0.12) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-left: 6px solid var(--cat);
+  box-shadow:
+    0 6px 18px rgba(0, 25, 60, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -8px 16px -10px rgba(111, 224, 255, 0.6);
+  text-shadow: 0 1px 1px rgba(0, 30, 70, 0.55);
+}
+
+[data-theme='frutiger-aero'] .sound-node.selected {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 3px;
+  box-shadow:
+    0 0 18px rgba(111, 224, 255, 0.75),
+    0 8px 22px rgba(0, 25, 60, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+[data-theme='frutiger-aero'] .sound-node-sub {
+  color: var(--text-muted);
+}
+
+/* Точки подключения — глянцевые шарики цвета типа. */
+[data-theme='frutiger-aero'] .sound-node .react-flow__handle {
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  background: radial-gradient(circle at 35% 30%, #ffffff 0 15%, var(--cat) 60%, color-mix(in srgb, var(--cat) 65%, #00264d) 100%);
+  box-shadow: 0 0 6px var(--cat);
+}
+
+/* Провода — световые лучи: белая сердцевина и салатовое свечение (выбранный — белое). */
+[data-theme='frutiger-aero'] .react-flow__edge-path {
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(166, 240, 106, 0.95)) drop-shadow(0 0 8px rgba(120, 230, 70, 0.75));
+}
+
+[data-theme='frutiger-aero'] .react-flow__edge.selected .react-flow__edge-path,
+[data-theme='frutiger-aero'] .react-flow__edge:hover .react-flow__edge-path {
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 10px rgba(111, 224, 255, 0.85));
+}
+
+[data-theme='frutiger-aero'] .meter {
+  background: rgba(0, 40, 90, 0.4);
+  box-shadow: inset 0 1px 2px rgba(0, 20, 50, 0.4);
+}
+
+[data-theme='frutiger-aero'] .meter-fill {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 60%);
+}
+
+/* Пузыри медленно всплывают. */
+@keyframes aero-bubbles {
+  from {
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  }
+  to {
+    background-position: 0 -60px, 0 -110px, 0 -40px, 0 -140px, 0 -80px, 0 -50px, 0 -90px, 0 -120px, 0 0, 0 0, 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='frutiger-aero'] .map {
+    animation: aero-bubbles 14s ease-in-out infinite alternate;
+  }
+}

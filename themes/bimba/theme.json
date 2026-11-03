@@ -1,6 +1,13 @@
 {
   "id": "bimba",
-  "names": { "ru": "Бимба", "en": "Bimba", "uk": "Бімба" },
-  "fonts": ["Nunito"],
-  "default": true
+  "names": {
+    "ru": "Бимба",
+    "en": "Bimba",
+    "uk": "Бімба"
+  },
+  "fonts": [
+    "Nunito"
+  ],
+  "default": true,
+  "order": 1
 }
