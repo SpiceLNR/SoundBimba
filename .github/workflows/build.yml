@@ -99,6 +99,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Заметки к релизу — docs/release-notes/<метка>.md, если такой файл есть.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: docs/release-notes
+
       - uses: actions/download-artifact@v4
         with:
           name: soundbimba-windows-x64
@@ -109,8 +114,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          NOTES="docs/release-notes/$TAG.md"
+          if [ -f "$NOTES" ]; then
+            set -- --notes-file "$NOTES"
+          else
+            set -- --notes "Unsigned build. Check the SHA-256 in SHA256SUMS.txt. / Сборка без подписи: сверьте SHA-256 из SHA256SUMS.txt."
+          fi
           gh release create "$TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
             --title "SoundBimba $TAG" \
-            --notes "Unsigned build. Check the SHA-256 in SHA256SUMS.txt. / Сборка без подписи: сверьте SHA-256 из SHA256SUMS.txt."
+            "$@"

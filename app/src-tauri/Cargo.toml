@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 [package]
 name = "soundbimba"
-version = "0.1.0"
+version = "0.2.0"
 description = "SoundBimba: node-based audio routing for Windows"
 edition.workspace = true
 license.workspace = true

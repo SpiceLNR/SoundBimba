@@ -29,7 +29,7 @@ SoundBimba — бесплатная программа для Windows, в кот
 1. Скачайте `SoundBimba_…_x64-setup.exe` и `SHA256SUMS.txt` со страницы
    [Releases](https://github.com/SpiceLNR/SoundBimba/releases).
 2. Проверьте, что файл не подменён (по желанию): в PowerShell выполните
-   `Get-FileHash .\SoundBimba_0.1.0_x64-setup.exe` — число должно совпасть с `SHA256SUMS.txt`.
+   `Get-FileHash .\SoundBimba_0.2.0_x64-setup.exe` — число должно совпасть с `SHA256SUMS.txt`.
 3. Запустите установщик. Права администратора не нужны. Интернет не нужен: движок окна
    (Microsoft WebView2) уже внутри установщика.
 
