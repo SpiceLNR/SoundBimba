@@ -33,8 +33,8 @@ outputs on the right, wires in between. No internet, no ads, no telemetry.
 3. Run the installer. No administrator rights, no internet needed: the window engine
    (Microsoft WebView2) is inside the installer.
 
-**Why Windows says "Windows protected your PC".** Releases are not signed yet (see "Signing
-policy"). Click "More info" → "Run anyway". If in doubt, compare the SHA-256 (step 2) or build
+**Why Windows says "Windows protected your PC".** Releases are not signed yet (see "Code signing
+policy" below). Click "More info" → "Run anyway". If in doubt, compare the SHA-256 (step 2) or build
 the program yourself.
 
 **Uninstall:** "Settings → Apps → SoundBimba → Uninstall". Your setups and settings are in
@@ -55,13 +55,22 @@ If something doesn't work, use "Project → Save diagnostics" and attach the zip
 and settings, Windows and sound device information. Your sound files are not included, but their
 paths are (a path may contain your Windows user name) — look through the zip before sending it.
 
-## Signing policy
+## Code signing policy
 
-Releases are currently **unsigned**. We have applied (or will apply) for free open-source code
-signing from SignPath Foundation. Once approved, installers will be signed in the GitHub build and
-this section will say so. There are no keys or certificates in the repository and there never will
-be. Until then every release has a `SHA256SUMS.txt`, and the build is fully open: its steps are in
-[.github/workflows/build.yml](.github/workflows/build.yml).
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+**Current state:** the application to SignPath Foundation is submitted and pending, so the current
+releases are **not signed yet** — each has a `SHA256SUMS.txt` for checking. Once approved, installers
+will be signed in the GitHub build ([.github/workflows/build.yml](.github/workflows/build.yml)), and every
+signing request will be approved manually. There are no keys or certificates in the repository and
+there never will be.
+
+- Committers and reviewers: [SpiceLNR](https://github.com/SpiceLNR)
+- Approvers: [SpiceLNR](https://github.com/SpiceLNR)
+
+**Privacy policy.** This program will not transfer any information to other networked systems unless
+specifically requested by the user or the person installing or operating it. SoundBimba does not go
+online at all; "Save diagnostics" writes a file only where you choose.
 
 ## Building from source
 

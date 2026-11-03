@@ -120,12 +120,15 @@ jobs:
         run: |
           NOTES="docs/release-notes/$TAG.md"
           if [ -f "$NOTES" ]; then
-            set -- --notes-file "$NOTES"
+            cat "$NOTES" > notes.md
           else
-            set -- --notes "Unsigned build. Check the SHA-256 in SHA256SUMS.txt. / Сборка без подписи: сверьте SHA-256 из SHA256SUMS.txt."
+            echo "Unsigned build. Check the SHA-256 in SHA256SUMS.txt. / Сборка без подписи: сверьте SHA-256 из SHA256SUMS.txt." > notes.md
           fi
+          # Ссылка на политику подписи — на странице каждого релиза (условие SignPath Foundation).
+          printf '\n---\n\n[Code signing policy](https://github.com/%s/blob/main/README.en.md#code-signing-policy) · [Политика подписи](https://github.com/%s#политика-подписи-code-signing-policy)\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_REPOSITORY" >> notes.md
           gh release create "$TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
             --title "SoundBimba $TAG" \
-            "$@"
+            --notes-file notes.md
