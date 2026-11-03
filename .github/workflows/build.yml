@@ -72,9 +72,13 @@ jobs:
           npx tsc --noEmit
           npm test
 
+      # Папка target берётся из кэша прошлых сборок — старые установщики из неё убираем, иначе
+      # они попадают в релиз (так в v0.2.0 попал установщик 0.1.0).
       - name: Installer
         working-directory: app
-        run: npx tauri build
+        run: |
+          Remove-Item ../target/release/bundle -Recurse -Force -ErrorAction SilentlyContinue
+          npx tauri build
 
       - name: SHA-256
         run: |
