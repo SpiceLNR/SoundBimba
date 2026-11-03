@@ -63,11 +63,14 @@ pub fn report(paths: &Paths, ui_info: &str, audio: &str) -> String {
 pub fn save(paths: &Paths, target: &str, ui_info: &str, audio: &str) -> std::io::Result<()> {
     let mut files = vec![("report.txt".to_string(), report(paths, ui_info, audio).into_bytes())];
     let old_log = paths.log.with_extension("log.old");
+    // Что SoundBimba поменяла в Windows («Оригинал звука» программ).
+    let routing = paths.dir.join("routing.json");
     for (name, path) in [
         ("project.json", &paths.project),
         ("settings.json", &paths.settings),
         ("soundbimba.log", &paths.log),
         ("soundbimba.log.old", &old_log),
+        ("routing.json", &routing),
     ] {
         if let Ok(data) = fs::read(path) {
             files.push((name.to_string(), data));

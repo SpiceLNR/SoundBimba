@@ -8,6 +8,7 @@
 mod applog;
 mod audio;
 mod diagnostics;
+mod routes;
 mod storage;
 mod templates;
 mod zip;
@@ -308,7 +309,8 @@ fn main() {
             let state = app.state::<AppState>();
             let (templates, errors) = import_opened(&state.paths, templates::opened_files(std::env::args()));
             *state.opened.lock().unwrap() = OpenedDto { templates, errors };
-            app.manage(Audio::start(app.handle().clone()));
+            let journal = app.state::<AppState>().paths.dir.join("routing.json");
+            app.manage(Audio::start(app.handle().clone(), journal));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

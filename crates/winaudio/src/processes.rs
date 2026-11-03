@@ -58,6 +58,36 @@ pub struct AudioApp {
     pub active: bool,
 }
 
+/// Все процессы с аудиосессией на устройствах вывода: (имя exe, PID). У одной программы их
+/// может быть несколько (браузер играет звук из отдельного процесса). Без системных звуков и нас.
+pub fn audio_sessions() -> Result<Vec<(String, u32)>> {
+    ensure_com()?;
+    let procs = list();
+    let me = std::process::id();
+    let mut out: Vec<(String, u32)> = Vec::new();
+    unsafe {
+        let en: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+        let devs = en.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)?;
+        for i in 0..devs.GetCount()? {
+            let Ok(mgr) = devs.Item(i)?.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) else { continue };
+            let sessions = mgr.GetSessionEnumerator()?;
+            for s in 0..sessions.GetCount()? {
+                let ctl = sessions.GetSession(s)?;
+                let Ok(ctl2) = ctl.cast::<IAudioSessionControl2>() else { continue };
+                let pid = ctl2.GetProcessId().unwrap_or(0);
+                if pid == 0 || pid == me || ctl2.IsSystemSoundsSession() == S_OK {
+                    continue;
+                }
+                let Some(exe) = procs.iter().find(|p| p.pid == pid).map(|p| p.exe.clone()) else { continue };
+                if !out.iter().any(|(_, p)| *p == pid) {
+                    out.push((exe, pid));
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Программы с аудиосессией на любом устройстве вывода (без системных звуков и без нас самих).
 pub fn audio_apps() -> Result<Vec<AudioApp>> {
     ensure_com()?;

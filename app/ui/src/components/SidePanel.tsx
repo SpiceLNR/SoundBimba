@@ -11,6 +11,7 @@ import { useT } from '../i18n';
 import CompressorParams from './CompressorParams';
 import DenoiseParams from './DenoiseParams';
 import MorpherParams from './MorpherParams';
+import OriginalPicker from './OriginalPicker';
 import ButtonDisc from './ButtonDisc';
 import Dropdown from './Dropdown';
 
@@ -161,7 +162,12 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
   const set = (patch: Params) => onParams(node.id, patch);
   switch (kind) {
     case 'app-source':
-      return <AppPicker value={typeof params.exe === 'string' ? params.exe : ''} onChange={(exe) => set({ exe })} />;
+      return (
+        <>
+          <AppPicker value={typeof params.exe === 'string' ? params.exe : ''} onChange={(exe) => set({ exe })} />
+          <OriginalPicker node={node} onParams={onParams} />
+        </>
+      );
     case 'volume': {
       const percent = Math.round(Number(params.gain ?? 1) * 100);
       return (

@@ -92,6 +92,8 @@ export interface AudioState {
   reductions?: Record<string, number>;
   /** Шумоподавление: вероятность голоса 0…1 (нет записи — тишина). */
   voices?: Record<string, number>;
+  /** «Оригинал звука»: выставлено в Windows, ждёт звука программы или ошибка. */
+  routes?: Record<string, 'applied' | 'waiting' | 'error'>;
 }
 
 /** Проект и настройки без побочных действий (для кнопочной панели). */

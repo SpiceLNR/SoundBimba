@@ -5,10 +5,13 @@
 //! - Изменились провода, узлы или устройства → движок и потоки перезапускаются (короткая пауза).
 //! - Изменилась только громкость → новое значение уходит в движок без перезапуска.
 //! - Раз в 2 секунды: не запустилась ли выбранная программа, не отключили ли устройство.
+//! - «Оригинал звука» программ (этап 7, `routes`): выставляется, пока звук включён, и
+//!   возвращается, когда выбор снят, звук выключен или SoundBimba закрывается.
 //!
 //! Уровни и состояния узлов ~15 раз в секунду уходят в интерфейс событием `audio-state`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::path::PathBuf;
 use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -22,6 +25,7 @@ use winaudio::streams::{self, Source, Stream};
 use winaudio::{processes, runner};
 
 use crate::applog;
+use crate::routes::{self, Journal, RouteState, WindowsRoutes};
 
 /// Наименьший запас в кольцевых буферах, мс (часть общей задержки). Для устройств с крупными
 /// порциями (10 мс) поток сам берёт больше — см. `winaudio::streams` (иначе треск).
@@ -77,6 +81,8 @@ pub struct Snapshot {
     pub engine_late: u32,
     /// Последний замер «SoundBimba → виртуальный микрофон», мс.
     pub latency_ms: Option<f64>,
+    /// «Оригинал звука» узлов «Звук приложения», где выбрано перенаправление.
+    pub routes: HashMap<String, RouteState>,
 }
 
 #[derive(Serialize, Clone)]
@@ -275,6 +281,9 @@ struct Controller {
     last_gaps: HashMap<String, u32>,
     clip_cache: ClipCache,
     last_late: u32,
+    /// Что SoundBimba поменяла в Windows («Оригинал звука») и куда сохранять журнал.
+    journal: Journal,
+    journal_path: PathBuf,
 }
 
 impl Controller {
@@ -285,7 +294,43 @@ impl Controller {
         self.structure = None;
     }
 
+    /// Желаемое перенаправление: exe → устройство (только пока звук включён).
+    fn wanted_routes(&self) -> (BTreeMap<String, String>, Vec<(String, String)>) {
+        let mut want = BTreeMap::new();
+        let mut nodes = Vec::new();
+        let Some(p) = self.project.as_ref().filter(|_| self.enabled) else { return (want, nodes) };
+        for n in p.nodes.iter().filter(|n| n.kind == NodeKind::AppSource) {
+            let mode = param(n, "original").unwrap_or("normal");
+            if mode == "normal" {
+                continue;
+            }
+            let (Some(exe), Some(device)) = (param(n, "exe"), param(n, "originalDevice")) else { continue };
+            let exe = exe.to_lowercase();
+            // Две программы-узла с одним exe: побеждает первый.
+            want.entry(exe.clone()).or_insert_with(|| device.to_string());
+            nodes.push((n.id.clone(), exe));
+        }
+        (want, nodes)
+    }
+
+    fn sync_routes(&mut self) {
+        let (want, nodes) = self.wanted_routes();
+        if want.is_empty() && self.journal.entries.is_empty() {
+            self.snapshot.lock().unwrap().routes.clear();
+            return;
+        }
+        let (states, changed) = routes::sync(&want, &mut self.journal, &WindowsRoutes);
+        if changed {
+            if let Err(e) = self.journal.save(&self.journal_path) {
+                applog::error(&format!("routing: cannot save journal: {e}"));
+            }
+        }
+        self.snapshot.lock().unwrap().routes =
+            nodes.into_iter().filter_map(|(id, exe)| states.get(&exe).map(|s| (id, *s))).collect();
+    }
+
     fn refresh(&mut self) {
+        self.sync_routes();
         let Some(project) = self.project.clone() else { return };
         if !self.enabled {
             self.stop();
@@ -500,7 +545,7 @@ pub struct Audio {
 }
 
 impl Audio {
-    pub fn start(app: AppHandle) -> Audio {
+    pub fn start(app: AppHandle, journal_path: PathBuf) -> Audio {
         let (tx, rx) = channel::<Cmd>();
         let snapshot = Arc::new(Mutex::new(Snapshot::default()));
         let shared: Arc<Mutex<HashMap<String, Arc<NodeShared>>>> = Arc::default();
@@ -519,6 +564,8 @@ impl Audio {
             last_gaps: HashMap::new(),
             clip_cache: HashMap::new(),
             last_late: 0,
+            journal: Journal::load(&journal_path),
+            journal_path,
         };
         let control = std::thread::Builder::new()
             .name("sb-audio-control".into())
@@ -540,6 +587,10 @@ impl Audio {
                     c.refresh();
                 }
                 c.stop();
+                // Закрываемся — всё, что меняли в Windows, возвращаем (что не удалось — вернём при
+                // следующем запуске, журнал сохранён).
+                c.enabled = false;
+                c.sync_routes();
             })
             .expect("cannot start audio control thread");
 
