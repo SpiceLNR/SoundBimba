@@ -212,6 +212,22 @@ input[type='range']:focus-visible {
   flex: 1;
 }
 
+/* Узкое окно (вплоть до наименьшего, 900 px): если панель всё равно не влезает, широкие
+   выпадающие списки чуть сжимаются — а не вся панель уезжает за край. */
+@media (max-width: 1200px) {
+  /* Сжимаются только широкие: «Добавить узел» и «Настройки» (у неё запас под самый длинный
+     пункт списка). Короткие («Проект») остаются целыми. */
+  .toolbar > .add-node,
+  .toolbar > .dropdown:has(.dropdown-label.fit) {
+    flex: 0 1 auto;
+    min-width: 96px;
+  }
+
+  .toolbar .dropdown-label.fit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .dropdown-list {
   position: absolute;
   top: calc(100% + 4px);
@@ -304,7 +320,8 @@ input[type='range']:focus-visible {
 
 /* Узкое окно: название программы есть в заголовке окна, на панели его можно спрятать. */
 @media (max-width: 1000px) {
-  .brand {
+  /* :root — сильнее правил тем, которые задают вывеске свой вид (например, «Детская»). */
+  :root .toolbar > .brand {
     display: none;
   }
 }

@@ -178,6 +178,28 @@ export default function Workspace({ project, version, settings, lang, onSettings
     requestAnimationFrame(() => void rf.fitView({ padding: 0.2, duration: 300 }));
   }, [rf]);
 
+  // Окно поменяло размер — центр видимой части карты остаётся на месте, как у географической
+  // карты: схема не уезжает за край, масштаб не меняется.
+  const simpleMode = settings.mode === 'simple';
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el || simpleMode) return;
+    let last = { w: el.clientWidth, h: el.clientHeight };
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (!w || !h) return; // карта скрыта
+      const dw = w - last.w;
+      const dh = h - last.h;
+      last = { w, h };
+      if (!dw && !dh) return;
+      const v = rf.getViewport();
+      void rf.setViewport({ x: v.x + dw / 2, y: v.y + dh / 2, zoom: v.zoom });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rf, simpleMode]);
+
   const addNode = useCallback(
     (kind: NodeKind) => {
       if (KINDS[kind].insideChip && !inChip) return; // ножки — только внутри микросхемы
