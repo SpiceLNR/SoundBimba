@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
 /* Тема «Нео-нуар»: основа — «Бимба» (тот же шрифт, скругления, раскладка), но ночной город:
    почти чёрный фон, неоновые цвета. Провода — неоновые трубки (светлая сердцевина и цветное
-   свечение), узлы подсвечены неоном цвета своего типа, вывеска «SoundBimba» и «пятачок»
-   изредка мерцают. Если в Windows выключены эффекты анимации — без мерцания. */
+   свечение), узлы подсвечены неоном цвета своего типа. Провода изредка моргают, как старая
+   неоновая трубка, и из узелка на конце провода в этот миг сыплются искры, — всегда, даже если в Windows выключены эффекты анимации (решение автора).
+   «Пятачок» на фоне не светится и не мерцает — тусклый, как стена в темноте. Вывеска
+   «SoundBimba» мерцает, если в Windows включены эффекты анимации. */
 [data-theme='neo-noir'] {
   --font: 'Nunito', system-ui, sans-serif;
   --font-size: 14px;
@@ -53,8 +55,9 @@
   --wire: #ffc8f3;
   --wire-selected: #c9f8ff;
   --dots: #1c1628;
-  --watermark-color: #ff2bd6;
-  --watermark-opacity: 0.06;
+  /* «Пятачок» — без неона: тусклый серо-сиреневый, как надпись на тёмной стене. */
+  --watermark-color: #9c8fb0;
+  --watermark-opacity: 0.05;
 
   /* Полосы прокрутки: тонкие, при наведении — неон. */
   --scrollbar-size: 10px;
@@ -137,26 +140,68 @@
   }
 }
 
-/* Провода чуть «гудят»: свечение едва заметно дышит. */
-@keyframes neo-noir-hum {
-  0%, 100% {
+/* Провода иногда моргают, как неоновая трубка с плохим контактом: почти всё время горят,
+   изредка гаснут на миг. У разных проводов — разный ритм, чтобы моргали не все разом. */
+@keyframes neo-noir-wire-blink {
+  0%, 88%, 90.5%, 92%, 100% {
     opacity: 1;
   }
-  50% {
-    opacity: 0.86;
+  89% {
+    opacity: 0.25;
   }
+  91% {
+    opacity: 0.55;
+  }
+}
+
+/* Искры из узелка, когда провод моргает: вспыхивают у конца провода и разлетаются. Ритм тот
+   же, что у моргания (те же длительность и сдвиг). Рисует их NeonEdge.tsx. */
+@keyframes neo-noir-spark {
+  0%, 88.6% {
+    opacity: 0;
+    transform: translate(0, 0) scale(1);
+  }
+  89% {
+    opacity: 1;
+    transform: translate(calc(var(--dx) * 0.15), calc(var(--dy) * 0.15)) scale(1.3);
+  }
+  91% {
+    opacity: 0.9;
+    transform: translate(calc(var(--dx) * 0.8), calc(var(--dy) * 0.8 + 3px)) scale(0.9);
+  }
+  92.5%, 100% {
+    opacity: 0;
+    transform: translate(var(--dx), calc(var(--dy) + 7px)) scale(0.4);
+  }
+}
+
+[data-theme='neo-noir'] .wire-spark {
+  fill: #fff6c9;
+  opacity: 0;
+  filter: drop-shadow(0 0 2px rgba(255, 176, 32, 0.95)) drop-shadow(0 0 4px rgba(255, 43, 214, 0.7));
+  pointer-events: none;
+}
+
+[data-theme='neo-noir'] .react-flow__edge .react-flow__edge-path {
+  animation: neo-noir-wire-blink 11s infinite;
+}
+
+[data-theme='neo-noir'] .wire-spark {
+  animation: neo-noir-spark 11s infinite;
+}
+
+[data-theme='neo-noir'] .react-flow__edges > svg:nth-child(3n + 2) :is(.react-flow__edge-path, .wire-spark) {
+  animation-duration: 14s;
+  animation-delay: -5s;
+}
+
+[data-theme='neo-noir'] .react-flow__edges > svg:nth-child(3n) :is(.react-flow__edge-path, .wire-spark) {
+  animation-duration: 17s;
+  animation-delay: -9s;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   [data-theme='neo-noir'] .brand {
     animation: neo-noir-flicker 7s infinite;
-  }
-
-  [data-theme='neo-noir'] .watermark {
-    animation: neo-noir-flicker 11s infinite 2s;
-  }
-
-  [data-theme='neo-noir'] .react-flow__edge-path {
-    animation: neo-noir-hum 3.2s ease-in-out infinite;
   }
 }

@@ -50,6 +50,7 @@ import { wireShape } from '../theme';
 import { applyTemplate, type Template } from '../templates';
 import { IdPrefix } from './chipContext';
 import TraceEdge from './TraceEdge';
+import NeonEdge from './NeonEdge';
 import CableWizard from './CableWizard';
 import HotkeysDialog from './HotkeysDialog';
 import type { Notify } from './Notices';
@@ -63,7 +64,7 @@ import Watermark from './Watermark';
 import WelcomeDialog from './WelcomeDialog';
 
 const nodeTypes = { sound: SoundNodeView };
-const edgeTypes = { trace: TraceEdge };
+const edgeTypes = { trace: TraceEdge, neon: NeonEdge };
 const SAVE_DELAY_MS = 600;
 
 interface Props {
@@ -143,9 +144,11 @@ export default function Workspace({ project, version, settings, lang, onSettings
     },
     [nodes, t],
   );
-  // Форма проводов — из темы: у «Инженерской» дорожки с прямыми углами, как на плате.
-  const traces = wireShape(settings.theme) === 'traces';
-  const edgeType = traces ? 'trace' : 'default';
+  // Форма проводов — из темы: у «Инженерской» дорожки с прямыми углами, как на плате,
+  // у «Нео-нуара» — неон с искрами.
+  const shape = wireShape(settings.theme);
+  const traces = shape === 'traces';
+  const edgeType = traces ? 'trace' : shape === 'neon' ? 'neon' : 'default';
   // Подпись провода «откуда → куда» видна при наведении (см. app.css).
   const shownEdges = useMemo(
     () => edges.map((e) => ({ ...e, type: edgeType, label: `${titleOf(e.source)} → ${titleOf(e.target)}` })),

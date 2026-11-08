@@ -9,8 +9,9 @@ export interface ThemeMeta {
   default?: boolean;
   /** Место в меню «Тема» (1 — первая). */
   order: number;
-  /** Форма проводов: плавные кривые (по умолчанию) или дорожки с прямыми углами, как на плате. */
-  wires?: 'curve' | 'traces';
+  /** Форма проводов: плавные кривые (по умолчанию), дорожки с прямыми углами, как на плате,
+   *  или неоновые кривые с искрами у конца, когда провод моргает. */
+  wires?: 'curve' | 'traces' | 'neon';
   /** Персонаж темы: картинка themes/<id>/mascot.svg и ключи фраз для облачка (по очереди). */
   mascot?: { lines: string[] };
 }
@@ -28,7 +29,7 @@ export function themeId(id: string | undefined): string {
 }
 
 /** Форма проводов выбранной темы. */
-export function wireShape(id: string | undefined): 'curve' | 'traces' {
+export function wireShape(id: string | undefined): 'curve' | 'traces' | 'neon' {
   return THEMES.find((t) => t.id === themeId(id))?.wires ?? 'curve';
 }
 
