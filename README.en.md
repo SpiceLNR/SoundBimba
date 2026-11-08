@@ -29,7 +29,7 @@ outputs on the right, wires in between. No internet, no ads, no telemetry.
 1. Download `SoundBimba_…_x64-setup.exe` and `SHA256SUMS.txt` from
    [Releases](https://github.com/SpiceLNR/SoundBimba/releases).
 2. Optionally check the file was not tampered with: in PowerShell run
-   `Get-FileHash .\SoundBimba_0.3.0_x64-setup.exe` — the value must match `SHA256SUMS.txt`.
+   `Get-FileHash .\SoundBimba_0.4.0_x64-setup.exe` — the value must match `SHA256SUMS.txt`.
 3. Run the installer. No administrator rights, no internet needed: the window engine
    (Microsoft WebView2) is inside the installer.
 
