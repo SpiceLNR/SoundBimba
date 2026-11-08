@@ -209,7 +209,10 @@ fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
             | NodeKind::Volume
             | NodeKind::Compressor
             | NodeKind::VoiceMorpher
-            | NodeKind::Denoise => (None, NodeStatus::Ok),
+            | NodeKind::Denoise
+            | NodeKind::Chip
+            | NodeKind::ChipIn
+            | NodeKind::ChipOut => (None, NodeStatus::Ok),
         };
         if let Some(port) = port {
             r.ports.insert(n.id.clone(), port);
@@ -575,7 +578,8 @@ impl Audio {
                 }
                 loop {
                     match rx.recv_timeout(TICK) {
-                        Ok(Cmd::Project(p)) => c.project = Some(*p),
+                        // Движку и всему звуковому — схема с распакованными микросхемами.
+                        Ok(Cmd::Project(p)) => c.project = Some(graph::flatten(&p)),
                         Ok(Cmd::Enabled(on)) => {
                             c.enabled = on;
                             applog::info(if on { "sound on" } else { "sound off" });

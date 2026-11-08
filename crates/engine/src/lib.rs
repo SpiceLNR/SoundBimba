@@ -160,9 +160,14 @@ pub fn plan(project: &Project, resolver: &dyn PortResolver) -> Result<PortPlan, 
         let list = match n.kind {
             NodeKind::AppSource | NodeKind::MicInput => &mut inputs,
             NodeKind::SpeakerOut | NodeKind::VirtualOut => &mut outputs,
-            NodeKind::SoundButton | NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher | NodeKind::Denoise => {
-                continue
-            }
+            NodeKind::SoundButton
+            | NodeKind::Volume
+            | NodeKind::Compressor
+            | NodeKind::VoiceMorpher
+            | NodeKind::Denoise
+            | NodeKind::Chip
+            | NodeKind::ChipIn
+            | NodeKind::ChipOut => continue,
         };
         // Два узла на одном устройстве делят один порт.
         if let Some(key) = resolver.port_for(n) {
@@ -201,7 +206,9 @@ impl Graph {
                     Op::Source(port.and_then(|k| plan.inputs.iter().position(|p| *p == k)))
                 }
                 NodeKind::SoundButton => Op::Button(buttons.remove(&node.id), Playback::default()),
-                NodeKind::Volume => Op::Volume,
+                // Ножки микросхем звук пропускают как есть. Сами микросхемы движок не видит:
+                // схему ему отдают распакованной (graph::flatten).
+                NodeKind::Volume | NodeKind::ChipIn | NodeKind::ChipOut | NodeKind::Chip => Op::Volume,
                 NodeKind::Compressor => Op::Compressor(compressor::State::new(sh.compressor())),
                 NodeKind::VoiceMorpher => Op::Morpher(Box::default()),
                 NodeKind::Denoise => Op::Denoise(Box::default()),

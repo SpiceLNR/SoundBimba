@@ -13,6 +13,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type OnSelectionChangeParams,
@@ -23,6 +24,14 @@ import {
   arrange,
   canConnect,
   edgeId,
+  chipInner,
+  composeRoot,
+  innerFromFlow,
+  lookOf,
+  withInner,
+  flattenProject,
+  patchNested,
+  type ChipLevel,
   fromFlow,
   KINDS,
   newNode,
@@ -39,6 +48,7 @@ import { ACTIONS, actionFor, addedKind, eventToCombo, isTyping, mergeBindings, t
 import { DICTS, useT, type Lang } from '../i18n';
 import { wireShape } from '../theme';
 import { applyTemplate, type Template } from '../templates';
+import { IdPrefix } from './chipContext';
 import CableWizard from './CableWizard';
 import HotkeysDialog from './HotkeysDialog';
 import type { Notify } from './Notices';
@@ -71,6 +81,9 @@ export default function Workspace({ project, version, settings, lang, onSettings
   const [nodes, setNodes, onNodesChange] = useNodesState<SoundNode>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const [selected, setSelected] = useState<{ node?: string; edge?: string }>({});
+  // Открытые микросхемы: карта под каждой (на экране — схема внутри последней).
+  const [stack, setStack] = useState<ChipLevel[]>([]);
+  const inChip = stack.length > 0;
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -101,7 +114,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
   );
 
   // Автосохранение: только когда проект действительно изменился (выделение и размеры не в счёт).
-  const projectJson = useMemo(() => JSON.stringify(fromFlow(nodes, edges)), [nodes, edges]);
+  const projectJson = useMemo(() => JSON.stringify(composeRoot(stack, nodes, edges)), [stack, nodes, edges]);
   const lastSaved = useRef(JSON.stringify(project));
   useEffect(() => {
     if (projectJson === lastSaved.current) return;
@@ -139,15 +152,15 @@ export default function Workspace({ project, version, settings, lang, onSettings
 
   const onConnect = useCallback(
     (c: Connection) => {
-      const check = canConnect(nodes, edges, c.source, c.target);
+      const check = canConnect(nodes, edges, c.source, c.target, c.sourceHandle, c.targetHandle);
       if (check === 'cycle') notify('notice.cycle');
-      if (check === 'ok') setEdges((es) => addEdge({ ...c, id: edgeId(c.source, c.target) }, es));
+      if (check === 'ok') setEdges((es) => addEdge({ ...c, id: edgeId(c.source, c.target, c.sourceHandle, c.targetHandle) }, es));
     },
     [nodes, edges, setEdges, notify],
   );
 
   const isValidConnection = useCallback(
-    (c: Connection | Edge) => canConnect(nodes, edges, c.source, c.target) !== 'invalid',
+    (c: Connection | Edge) => canConnect(nodes, edges, c.source, c.target, c.sourceHandle, c.targetHandle) !== 'invalid',
     [nodes, edges],
   );
 
@@ -161,6 +174,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
 
   const addNode = useCallback(
     (kind: NodeKind) => {
+      if (KINDS[kind].insideChip && !inChip) return; // ножки — только внутри микросхемы
       const box = mapRef.current?.getBoundingClientRect();
       const center = box
         ? rf.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 })
@@ -169,14 +183,73 @@ export default function Workspace({ project, version, settings, lang, onSettings
       const node = newNode(kind, nextNodeId(nodes), center.x - NODE_WIDTH / 2 + shift, center.y - NODE_HEIGHT / 2 + shift);
       setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), { ...node, selected: true }]);
     },
-    [nodes, rf, setNodes],
+    [nodes, rf, setNodes, inChip],
   );
 
+  // Открыть микросхему: карта уходит «под» неё, на экране — схема внутри.
+  const enterChip = useCallback(
+    (chipId: string) => {
+      const chip = nodes.find((n) => n.id === chipId);
+      if (!chip || chip.data.kind !== 'chip') return;
+      const inner = toFlow({ schema: 1, ...chipInner(chip.data.params) });
+      setStack((st) => [...st, { chipId, nodes: nodes.map((n) => ({ ...n, selected: false })), edges }]);
+      setNodes(inner.nodes);
+      setEdges(inner.edges);
+      setSelected({});
+      fitSoon();
+    },
+    [nodes, edges, setNodes, setEdges, fitSoon],
+  );
+
+  // Вернуться на уровень `depth` (0 — карта): схема на экране складывается обратно в микросхемы.
+  const exitTo = useCallback(
+    (depth: number) => {
+      if (depth >= stack.length) return;
+      let ns = nodes;
+      let es = edges;
+      for (let i = stack.length - 1; i >= depth; i--) {
+        const level = stack[i];
+        ns = withInner(level.nodes, level.chipId, innerFromFlow(ns, es));
+        es = level.edges;
+      }
+      setStack(stack.slice(0, depth));
+      setNodes(ns);
+      setEdges(es);
+      setSelected({});
+      fitSoon();
+    },
+    [stack, nodes, edges, setNodes, setEdges, fitSoon],
+  );
+
+  // У узлов разных уровней одинаковые номера (n1, n2…), а карта помнит точки подключения по
+  // номеру — после входа в микросхему и выхода из неё просим перемерить узлы, иначе провода к
+  // «чужим» точкам не рисуются (в проекте они при этом есть).
+  const updateNodeInternals = useUpdateNodeInternals();
+  const levelKey = stack.map((l) => l.chipId).join('/');
+  const nodesNow = useRef(nodes);
+  nodesNow.current = nodes;
+  useEffect(() => {
+    const h = requestAnimationFrame(() => updateNodeInternals(nodesNow.current.map((n) => n.id)));
+    return () => cancelAnimationFrame(h);
+  }, [levelKey, updateNodeInternals]);
+
+  // В простом режиме — весь проект: открытые микросхемы закрываем.
+  useEffect(() => {
+    if (settings.mode === 'simple' && stack.length) exitTo(0);
+  }, [settings.mode, stack.length, exitTo]);
+
+  // id узла на открытом уровне — или полный («микросхема/…/узел») из простого режима.
   const onParams = useCallback(
-    (id: string, patch: Params) =>
+    (id: string, patch: Params) => {
+      const [head, ...rest] = id.split('/');
       setNodes((ns) =>
-        ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, params: { ...n.data.params, ...patch } } } : n)),
-      ),
+        ns.map((n) =>
+          n.id !== head
+            ? n
+            : { ...n, data: { ...n.data, params: rest.length ? patchNested(n.data.params, rest, patch) : { ...n.data.params, ...patch } } },
+        ),
+      );
+    },
     [setNodes],
   );
 
@@ -236,6 +309,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
   const closeWelcome = useCallback(() => onSettings({ ...settings, welcomeDone: true }), [onSettings, settings]);
 
   const clearAll = useCallback(() => {
+    setStack([]);
     setNodes([]);
     setEdges([]);
     setSelected({});
@@ -261,6 +335,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
     if (typeof path !== 'string') return;
     try {
       const flow = toFlow(await api.importProject(path));
+      setStack([]);
       setNodes(flow.nodes);
       setEdges(flow.edges);
       setSelected({});
@@ -418,16 +493,44 @@ export default function Workspace({ project, version, settings, lang, onSettings
         onSettings={onSettings}
         onOpenPanel={() => void openPanel()}
         simple={settings.mode === 'simple'}
+        inChip={inChip}
       />
       {settings.mode === 'simple' ? (
         <main className="main-simple">
-          <SimpleView project={JSON.parse(projectJson) as Project} onParams={onParams} />
+          <SimpleView project={flattenProject(JSON.parse(projectJson) as Project)} onParams={onParams} />
         </main>
       ) : (
       <main className="main">
         <div className="map" ref={mapRef}>
           <Watermark />
           <Mascot theme={settings.theme} />
+          {inChip && (
+            <nav className="chip-path" aria-label={t('chip.path')}>
+              <button type="button" className="chip-back" onClick={() => exitTo(stack.length - 1)}>
+                ← {t('chip.back')}
+              </button>
+              <button type="button" className="link-button" onClick={() => exitTo(0)}>
+                {t('chip.map')}
+              </button>
+              {stack.map((level, i) => {
+                const chip = level.nodes.find((n) => n.id === level.chipId);
+                const name = typeof chip?.data.params.name === 'string' && chip.data.params.name.trim() ? chip.data.params.name.trim() : t('node.chip.title');
+                const last = i === stack.length - 1;
+                return (
+                  <span key={i} className="chip-path-step">
+                    <span aria-hidden="true">›</span>
+                    {last ? (
+                      <strong aria-current="page">{name}</strong>
+                    ) : (
+                      <button type="button" className="link-button" onClick={() => exitTo(i + 1)}>
+                        {name}
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
+            </nav>
+          )}
           {wireTip && (
             <div className="wire-tip" style={{ left: wireTip.x, top: wireTip.y }} role="tooltip">
               {wireTip.text}
@@ -442,6 +545,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
               </button>
             </div>
           )}
+          <IdPrefix.Provider value={stack.map((l) => `${l.chipId}/`).join('')}>
           <ReactFlow
             nodes={nodes}
             edges={shownEdges}
@@ -451,6 +555,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
             onConnect={onConnect}
             isValidConnection={isValidConnection}
             onSelectionChange={onSelectionChange}
+            onNodeDoubleClick={(_, n) => enterChip(n.id)}
             onEdgeMouseEnter={showWireTip}
             onEdgeMouseMove={showWireTip}
             onEdgeMouseLeave={hideWireTip}
@@ -472,10 +577,12 @@ export default function Workspace({ project, version, settings, lang, onSettings
             proOptions={{ hideAttribution: true }}
           >
             <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
-            <MiniMap pannable zoomable nodeClassName={(n) => `cat-${KINDS[(n as SoundNode).data.kind].category}`} />
+            <MiniMap pannable zoomable nodeClassName={(n) => `cat-${lookOf((n as SoundNode).data.kind)}`} />
             <Controls showInteractive={false} />
           </ReactFlow>
+          </IdPrefix.Provider>
         </div>
+        <IdPrefix.Provider value={stack.map((l) => `${l.chipId}/`).join('')}>
         <SidePanel
           node={selectedNode}
           edge={selectedEdge}
@@ -483,7 +590,9 @@ export default function Workspace({ project, version, settings, lang, onSettings
           onParams={onParams}
           onDeleteNode={deleteNode}
           onDeleteEdge={deleteEdge}
+          onOpenChip={enterChip}
         />
+        </IdPrefix.Provider>
       </main>
       )}
       {templatesOpen && (

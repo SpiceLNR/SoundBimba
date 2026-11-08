@@ -7,7 +7,7 @@ use std::sync::atomic::Ordering::Release;
 use std::time::{Duration, Instant};
 
 use engine::{Graph, PortKey, PortResolver, CHANNELS, RATE};
-use graph::{Edge, Node, NodeKind, PortKind, Project};
+use graph::{Edge, Node, NodeKind, Project};
 use std::collections::HashMap;
 
 #[test]
@@ -69,7 +69,7 @@ fn real_track_resets_after_the_end() {
     let project = Project {
         schema: 1,
         nodes: vec![node("b", NodeKind::SoundButton), node("o", NodeKind::VirtualOut)],
-        edges: vec![Edge { from: "b".into(), to: "o".into(), kind: PortKind::Audio }],
+        edges: vec![Edge::audio("b", "o")],
     };
     let plan = engine::plan(&project, &OnlyOut).unwrap();
     let (w, _r) = engine::ring(RATE as usize * 4, RATE, RATE, 1);

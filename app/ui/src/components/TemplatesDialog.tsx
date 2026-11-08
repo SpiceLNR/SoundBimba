@@ -5,7 +5,7 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type UserTemplate } from '../api';
-import { KINDS, type NodeKind, type Project } from '../graph';
+import { lookOf, type NodeKind, type Project } from '../graph';
 import { useT } from '../i18n';
 import { fromProject, TEMPLATES, type Template } from '../templates';
 import IconButton from './IconButton';
@@ -33,7 +33,7 @@ function Parts({ kinds }: { kinds: NodeKind[] }) {
   return (
     <span className="template-parts">
       {kinds.map((k, i) => (
-        <span key={i} className={`template-part cat-${KINDS[k].category}`}>
+        <span key={i} className={`template-part cat-${lookOf(k)}`}>
           {t(`node.${k}.title`)}
         </span>
       ))}

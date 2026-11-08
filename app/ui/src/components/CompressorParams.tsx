@@ -6,6 +6,7 @@ import { useAudio } from '../audio';
 import { COMPRESSOR_PRESETS, presetOf, signed } from '../compressor';
 import type { Params, SoundNode } from '../graph';
 import { useT } from '../i18n';
+import { useFullId } from './chipContext';
 
 interface SliderProps {
   label: string;
@@ -53,7 +54,8 @@ export default function CompressorParams({ node, onParams }: { node: SoundNode; 
   const makeup = num('makeup', 12);
   const set = (patch: Params) => onParams(node.id, patch);
   const active = presetOf(p);
-  const reduction = audio.enabled ? (audio.reductions?.[node.id] ?? 0) : 0;
+  const full = useFullId(node.id);
+  const reduction = audio.enabled ? (audio.reductions?.[full] ?? 0) : 0;
   const db = t('unit.db');
   const ms = t('unit.ms');
 

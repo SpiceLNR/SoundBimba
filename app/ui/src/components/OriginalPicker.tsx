@@ -8,6 +8,7 @@ import { useAudio } from '../audio';
 import type { Params, SoundNode } from '../graph';
 import { useT } from '../i18n';
 import Dropdown from './Dropdown';
+import { useFullId } from './chipContext';
 
 export type OriginalMode = 'normal' | 'device' | 'only';
 const MODES: OriginalMode[] = ['normal', 'device', 'only'];
@@ -35,7 +36,8 @@ export default function OriginalPicker({ node, onParams }: { node: SoundNode; on
   // Виртуальный кабель в списке не нужен: оригинал попал бы прямо в виртуальный микрофон.
   const outputs = (devices ?? []).filter((d) => d.render && !d.cable);
   const chosen = outputs.find((d) => d.id === device);
-  const state = audio.enabled ? audio.routes?.[node.id] : undefined;
+  const full = useFullId(node.id);
+  const state = audio.enabled ? audio.routes?.[full] : undefined;
 
   return (
     <div className="field original-picker">

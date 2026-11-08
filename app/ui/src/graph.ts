@@ -5,15 +5,32 @@ import { signed } from './compressor';
 import { voiceOf } from './morpher';
 import type { Translate } from './i18n';
 
-export type NodeKind = 'app-source' | 'mic-input' | 'sound-button' | 'volume' | 'compressor' | 'voice-morpher' | 'denoise' | 'speaker-out' | 'virtual-out';
+export type NodeKind =
+  | 'app-source'
+  | 'mic-input'
+  | 'sound-button'
+  | 'volume'
+  | 'compressor'
+  | 'voice-morpher'
+  | 'denoise'
+  | 'speaker-out'
+  | 'virtual-out'
+  | 'chip'
+  | 'chip-in'
+  | 'chip-out';
 export type Category = 'source' | 'processing' | 'output' | 'button';
 export type Params = Record<string, unknown>;
 
 interface KindInfo {
+  /** Столбец в раскладке и группа в списке «Добавить узел». */
   category: Category;
   input: boolean;
   output: boolean;
   defaults: Params;
+  /** Свой цвет и своя группа в списке — у микросхемы и её ножек. */
+  look?: 'chip';
+  /** Только внутри микросхемы (ножки). */
+  insideChip?: boolean;
 }
 
 export const KINDS: Record<NodeKind, KindInfo> = {
@@ -35,7 +52,32 @@ export const KINDS: Record<NodeKind, KindInfo> = {
   denoise: { category: 'processing', input: true, output: true, defaults: { amount: 1 } },
   'speaker-out': { category: 'output', input: true, output: false, defaults: { device: 'default' } },
   'virtual-out': { category: 'output', input: true, output: false, defaults: { device: 'virtual-1' } },
+  // Микросхема: внутри целая схема (params.inner), снаружи — ножки: её узлы «Вход/Выход
+  // микросхемы». Новая — сразу с одним входом и одним выходом. В раскладке — как обработка.
+  chip: {
+    category: 'processing',
+    input: true,
+    output: true,
+    look: 'chip',
+    defaults: {
+      name: '',
+      inner: {
+        nodes: [
+          { id: 'n1', type: 'chip-in', pos: [0, 0], params: { name: '' } },
+          { id: 'n2', type: 'chip-out', pos: [520, 0], params: { name: '' } },
+        ],
+        edges: [],
+      },
+    },
+  },
+  'chip-in': { category: 'source', input: false, output: true, look: 'chip', insideChip: true, defaults: { name: '' } },
+  'chip-out': { category: 'output', input: true, output: false, look: 'chip', insideChip: true, defaults: { name: '' } },
 };
+
+/** Цвет узла: по типу, у микросхем — свой. */
+export function lookOf(kind: NodeKind): Category | 'chip' {
+  return KINDS[kind].look ?? KINDS[kind].category;
+}
 
 export const KIND_ORDER = Object.keys(KINDS) as NodeKind[];
 export const CATEGORY_ORDER: Category[] = ['button', 'source', 'processing', 'output'];
@@ -51,6 +93,16 @@ export interface ProjectEdge {
   from: string;
   to: string;
   kind?: 'audio' | 'control';
+  /** Ножка микросхемы `from` (id её узла «Выход микросхемы»). */
+  fromPort?: string;
+  /** Ножка микросхемы `to` (id её узла «Вход микросхемы»). */
+  toPort?: string;
+}
+
+/** Схема внутри микросхемы. */
+export interface Inner {
+  nodes: ProjectNode[];
+  edges: ProjectEdge[];
 }
 
 export interface Project {
@@ -59,7 +111,11 @@ export interface Project {
   edges: ProjectEdge[];
 }
 
+/** Файл без микросхем — версия 1 (его открывает и 0.4), с микросхемами — 2. */
 export const SCHEMA = 1;
+export const SCHEMA_CHIPS = 2;
+/** Как в Rust: глубже — испорченный файл. */
+export const MAX_CHIP_DEPTH = 8;
 
 export interface SoundData extends Record<string, unknown> {
   kind: NodeKind;
@@ -71,8 +127,31 @@ export type SoundNode = Node<SoundData, 'sound'>;
 export const NODE_WIDTH = 200;
 export const NODE_HEIGHT = 64;
 
-export function edgeId(from: string, to: string): string {
-  return `${from}->${to}`;
+export function edgeId(from: string, to: string, fromPort?: string | null, toPort?: string | null): string {
+  const end = (id: string, port?: string | null) => (port ? `${id}:${port}` : id);
+  return `${end(from, fromPort)}->${end(to, toPort)}`;
+}
+
+/** Схема внутри микросхемы (пустая, если её нет или она испорчена). */
+export function chipInner(params: Params): Inner {
+  const inner = params.inner as Partial<Inner> | undefined;
+  return { nodes: Array.isArray(inner?.nodes) ? inner.nodes : [], edges: Array.isArray(inner?.edges) ? inner.edges : [] };
+}
+
+export interface Pin {
+  id: string;
+  name: string;
+}
+
+/** Ножки микросхемы сверху вниз (как стоят её узлы «Вход/Выход» внутри). */
+export function chipPins(params: Params): { ins: Pin[]; outs: Pin[] } {
+  const nodes = chipInner(params).nodes;
+  const pins = (kind: NodeKind) =>
+    nodes
+      .filter((n) => n.type === kind)
+      .sort((a, b) => a.pos[1] - b.pos[1] || a.pos[0] - b.pos[0])
+      .map((n) => ({ id: n.id, name: typeof n.params.name === 'string' ? n.params.name.trim() : '' }));
+  return { ins: pins('chip-in'), outs: pins('chip-out') };
 }
 
 export function toFlow(p: Project): { nodes: SoundNode[]; edges: Edge[] } {
@@ -84,9 +163,11 @@ export function toFlow(p: Project): { nodes: SoundNode[]; edges: Edge[] } {
       data: { kind: n.type, params: { ...n.params } },
     })),
     edges: p.edges.map((e) => ({
-      id: edgeId(e.from, e.to),
+      id: edgeId(e.from, e.to, e.fromPort, e.toPort),
       source: e.from,
       target: e.to,
+      ...(e.fromPort ? { sourceHandle: e.fromPort } : {}),
+      ...(e.toPort ? { targetHandle: e.toPort } : {}),
       data: e.kind && e.kind !== 'audio' ? { kind: e.kind } : undefined,
     })),
   };
@@ -95,19 +176,102 @@ export function toFlow(p: Project): { nodes: SoundNode[]; edges: Edge[] } {
 const round = (v: number) => Math.round(v * 10) / 10;
 
 export function fromFlow(nodes: SoundNode[], edges: Edge[]): Project {
+  const inner = innerFromFlow(nodes, edges);
+  return { schema: inner.nodes.some((n) => n.type === 'chip') ? SCHEMA_CHIPS : SCHEMA, ...inner };
+}
+
+/** Узлы и провода карты (или схемы внутри микросхемы) в виде файла. Провода к ножкам, которых
+ *  у микросхемы больше нет, отбрасываются. */
+export function innerFromFlow(nodes: SoundNode[], edges: Edge[]): Inner {
+  const pins = new Map(nodes.filter((n) => n.data.kind === 'chip').map((n) => [n.id, chipPins(n.data.params)]));
+  const pinOk = (id: string, port: string | null | undefined, side: 'ins' | 'outs') => {
+    const chip = pins.get(id);
+    return chip ? !!port && chip[side].some((p) => p.id === port) : !port;
+  };
   return {
-    schema: SCHEMA,
     nodes: nodes.map((n) => ({
       id: n.id,
       type: n.data.kind,
       pos: [round(n.position.x), round(n.position.y)],
       params: n.data.params,
     })),
-    edges: edges.map((e) => {
-      const kind = (e.data as { kind?: 'control' } | undefined)?.kind;
-      return kind ? { from: e.source, to: e.target, kind } : { from: e.source, to: e.target };
-    }),
+    edges: edges
+      .filter((e) => pinOk(e.source, e.sourceHandle, 'outs') && pinOk(e.target, e.targetHandle, 'ins'))
+      .map((e) => {
+        const kind = (e.data as { kind?: 'control' } | undefined)?.kind;
+        return {
+          from: e.source,
+          to: e.target,
+          ...(kind ? { kind } : {}),
+          ...(e.sourceHandle ? { fromPort: e.sourceHandle } : {}),
+          ...(e.targetHandle ? { toPort: e.targetHandle } : {}),
+        };
+      }),
   };
+}
+
+/** Микросхемы распакованы — как в Rust (`graph::flatten`): узлы внутри получают id
+ *  «микросхема/узел», провода к микросхеме идут к её ножкам. Для простого режима и кнопочной
+ *  панели: кнопки, громкости и голоса из микросхем — как обычные, по тем же id, что у звука.
+ *  Ножки остаются узлами «Вход/Выход микросхемы» (их пропускают в подписях «откуда → куда»). */
+export function flattenProject(p: Project): Project {
+  const nodes: ProjectNode[] = [];
+  const edges: ProjectEdge[] = [];
+  const expand = (level: Inner, prefix: string, depth: number) => {
+    const chips = new Set<string>();
+    for (const n of level.nodes) {
+      if (n.type !== 'chip') {
+        nodes.push({ ...n, id: prefix + n.id });
+        continue;
+      }
+      chips.add(n.id);
+      if (depth < MAX_CHIP_DEPTH) expand(chipInner(n.params), `${prefix}${n.id}/`, depth + 1);
+    }
+    const end = (id: string, port?: string) => (port && chips.has(id) ? `${prefix}${id}/${port}` : prefix + id);
+    for (const e of level.edges) edges.push({ from: end(e.from, e.fromPort), to: end(e.to, e.toPort), ...(e.kind ? { kind: e.kind } : {}) });
+  };
+  expand(p, '', 0);
+  return { schema: p.schema, nodes, edges };
+}
+
+/** Меняет параметры узла по полному id («микросхема/…/узел») — внутри микросхем. */
+export function patchNested(params: Params, path: string[], patch: Params): Params {
+  const inner = chipInner(params);
+  const [head, ...rest] = path;
+  return {
+    ...params,
+    inner: {
+      ...inner,
+      nodes: inner.nodes.map((n) =>
+        n.id !== head ? n : { ...n, params: rest.length ? patchNested(n.params, rest, patch) : { ...n.params, ...patch } },
+      ),
+    },
+  };
+}
+
+/** Уровень, который сейчас открыт поверх: микросхема `chipId` на карте `nodes/edges`. */
+export interface ChipLevel {
+  chipId: string;
+  nodes: SoundNode[];
+  edges: Edge[];
+}
+
+/** Кладёт схему внутрь микросхемы `chipId` (новые узлы и провода карты уровня выше). */
+export function withInner(nodes: SoundNode[], chipId: string, inner: Inner): SoundNode[] {
+  return nodes.map((n) => (n.id === chipId ? { ...n, data: { ...n.data, params: { ...n.data.params, inner } } } : n));
+}
+
+/** Весь проект, когда открыта микросхема (или несколько вложенных): то, что на экране,
+ *  складывается обратно внутрь микросхем снизу вверх. */
+export function composeRoot(stack: ChipLevel[], nodes: SoundNode[], edges: Edge[]): Project {
+  let inner = innerFromFlow(nodes, edges);
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const level = stack[i];
+    const ns = withInner(level.nodes, level.chipId, inner);
+    if (i === 0) return fromFlow(ns, level.edges);
+    inner = innerFromFlow(ns, level.edges);
+  }
+  return fromFlow(nodes, edges);
 }
 
 /** Есть ли уже путь to → … → from (тогда провод from → to замкнёт круг). */
@@ -127,11 +291,22 @@ export function wouldCreateCycle(edges: Pick<Edge, 'source' | 'target'>[], from:
 
 export type ConnectCheck = 'ok' | 'cycle' | 'invalid';
 
-export function canConnect(nodes: SoundNode[], edges: Edge[], from: string, to: string): ConnectCheck {
+export function canConnect(
+  nodes: SoundNode[],
+  edges: Edge[],
+  from: string,
+  to: string,
+  fromPort?: string | null,
+  toPort?: string | null,
+): ConnectCheck {
   const a = nodes.find((n) => n.id === from);
   const b = nodes.find((n) => n.id === to);
   if (!a || !b || !KINDS[a.data.kind].output || !KINDS[b.data.kind].input) return 'invalid';
-  if (edges.some((e) => e.source === from && e.target === to)) return 'invalid';
+  // К микросхеме — только через её ножку.
+  if ((a.data.kind === 'chip') !== !!fromPort || (b.data.kind === 'chip') !== !!toPort) return 'invalid';
+  if (edges.some((e) => e.source === from && e.target === to && (e.sourceHandle ?? null) === (fromPort ?? null) && (e.targetHandle ?? null) === (toPort ?? null)))
+    return 'invalid';
+  // Микросхема здесь — один узел: звук по кругу через неё запрещён (с запасом).
   return wouldCreateCycle(edges, from, to) ? 'cycle' : 'ok';
 }
 
@@ -512,6 +687,13 @@ export function summary(kind: NodeKind, params: Params, t: Translate): string {
       return params.device === 'default' || params.device === undefined ? t('param.deviceDefault') : String(params.device);
     case 'virtual-out':
       return '';
+    case 'chip': {
+      const { ins, outs } = chipPins(params);
+      return t('chip.summary', { ins: ins.length, outs: outs.length });
+    }
+    case 'chip-in':
+    case 'chip-out':
+      return typeof params.name === 'string' ? params.name.trim() : '';
   }
 }
 
@@ -523,6 +705,9 @@ export function shortName(n: ProjectNode, t: Translate): string {
     if (typeof n.params.file === 'string' && n.params.file) {
       return (n.params.file.split(/[\\/]/).pop() ?? n.params.file).replace(/\.[^.]+$/, '');
     }
+  }
+  if ((n.type === 'chip' || n.type === 'chip-in' || n.type === 'chip-out') && typeof n.params.name === 'string' && n.params.name.trim()) {
+    return n.params.name.trim();
   }
   return t(`node.${n.type}.title`);
 }
@@ -561,11 +746,21 @@ export function moveTo(ids: string[], id: string, target: string): Record<string
 /** Регуляторы для простого режима (громкость, морфер): «откуда → куда» по соседним узлам. */
 export function volumeRoutes(p: Project, t: Translate, kind: NodeKind = 'volume'): VolumeRoute[] {
   const byId = new Map(p.nodes.map((n) => [n.id, n]));
-  const names = (ids: string[]) => [...new Set(ids.map((id) => byId.get(id)).filter((n): n is ProjectNode => !!n).map((n) => shortName(n, t)))];
+  // Сквозь ножки микросхем — к тому, что подключено к ним снаружи (или внутри).
+  const through = (ids: string[], dir: 'from' | 'to', seen: Set<string>): ProjectNode[] =>
+    ids.flatMap((id) => {
+      const n = byId.get(id);
+      if (!n || seen.has(id)) return [];
+      seen.add(id);
+      if (n.type !== 'chip-in' && n.type !== 'chip-out') return [n];
+      const next = dir === 'from' ? p.edges.filter((e) => e.to === id).map((e) => e.from) : p.edges.filter((e) => e.from === id).map((e) => e.to);
+      return through(next, dir, seen);
+    });
+  const names = (ids: string[], dir: 'from' | 'to') => [...new Set(through(ids, dir, new Set()).map((n) => shortName(n, t)))];
   return simpleSorted(p.nodes.filter((n) => n.type === kind))
     .map((n) => {
-      const fromNames = names(p.edges.filter((e) => e.to === n.id).map((e) => e.from));
-      const toNames = names(p.edges.filter((e) => e.from === n.id).map((e) => e.to));
+      const fromNames = names(p.edges.filter((e) => e.to === n.id).map((e) => e.from), 'from');
+      const toNames = names(p.edges.filter((e) => e.from === n.id).map((e) => e.to), 'to');
       return { id: n.id, from: fromNames.join(', '), to: toNames.join(', '), fromNames, toNames };
     });
 }

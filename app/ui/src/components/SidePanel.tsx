@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
 import { api, type AudioApp, type AudioDevice } from '../api';
 import { isProblem, useAudio } from '../audio';
-import { KINDS, type NodeKind, type Params, type SoundNode } from '../graph';
+import { lookOf, type NodeKind, type Params, type SoundNode } from '../graph';
 import { useT } from '../i18n';
 import CompressorParams from './CompressorParams';
 import DenoiseParams from './DenoiseParams';
@@ -14,6 +14,7 @@ import MorpherParams from './MorpherParams';
 import OriginalPicker from './OriginalPicker';
 import ButtonDisc from './ButtonDisc';
 import Dropdown from './Dropdown';
+import { useFullId } from './chipContext';
 
 interface Props {
   node?: SoundNode;
@@ -22,6 +23,8 @@ interface Props {
   onParams: (id: string, patch: Params) => void;
   onDeleteNode: (id: string) => void;
   onDeleteEdge: (id: string) => void;
+  /** Открыть микросхему (её схему внутри). */
+  onOpenChip: (id: string) => void;
 }
 
 /** Выбор устройства: микрофон, наушники или виртуальный кабель. */
@@ -108,6 +111,7 @@ function AppPicker({ value, onChange }: { value: string; onChange: (exe: string)
 
 /** Кнопка-звук: файл, название, проверка. */
 function ButtonParams({ node, onParams }: { node: SoundNode; onParams: Props['onParams'] }) {
+  const full = useFullId(node.id);
   const t = useT();
   const audio = useAudio();
   const { params } = node.data;
@@ -146,10 +150,10 @@ function ButtonParams({ node, onParams }: { node: SoundNode; onParams: Props['on
         <span>{t('param.tryButton')}</span>
         <ButtonDisc
           size={120}
-          state={audio.enabled ? audio.buttons[node.id] : undefined}
-          disabled={!audio.enabled || audio.status[node.id] !== 'ok'}
-          onPress={() => void api.pressButton(node.id)}
-          onSeek={(f) => void api.seekButton(node.id, f)}
+          state={audio.enabled ? audio.buttons[full] : undefined}
+          disabled={!audio.enabled || audio.status[full] !== 'ok'}
+          onPress={() => void api.pressButton(full)}
+          onSeek={(f) => void api.seekButton(full, f)}
         />
       </div>
     </>
@@ -201,6 +205,21 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
       return <MorpherParams node={node} onParams={onParams} />;
     case 'denoise':
       return <DenoiseParams node={node} onParams={onParams} />;
+    case 'chip':
+    case 'chip-in':
+    case 'chip-out':
+      return (
+        <label className="field">
+          <span>{t(kind === 'chip' ? 'param.chipName' : 'param.pinName')}</span>
+          <input
+            type="text"
+            maxLength={60}
+            value={typeof params.name === 'string' ? params.name : ''}
+            placeholder={t(kind === 'chip' ? 'node.chip.title' : kind === 'chip-in' ? 'param.pinInPlaceholder' : 'param.pinOutPlaceholder')}
+            onChange={(e) => set({ name: e.target.value })}
+          />
+        </label>
+      );
     case 'mic-input':
     case 'speaker-out':
     case 'virtual-out': {
@@ -211,17 +230,23 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
   }
 }
 
-export default function SidePanel({ node, edge, edgeLabel, onParams, onDeleteNode, onDeleteEdge }: Props) {
+export default function SidePanel({ node, edge, edgeLabel, onParams, onDeleteNode, onDeleteEdge, onOpenChip }: Props) {
   const t = useT();
   const audio = useAudio();
+  const full = useFullId(node?.id ?? '');
   if (node) {
-    const status = audio.status[node.id];
+    const status = audio.status[full];
     return (
       <aside className="side-panel">
-        <h2 className={`panel-title cat-${KINDS[node.data.kind].category}`}>{t(`node.${node.data.kind}.title`)}</h2>
+        <h2 className={`panel-title cat-${lookOf(node.data.kind)}`}>{t(`node.${node.data.kind}.title`)}</h2>
         <p className="panel-desc">{t(`node.${node.data.kind}.desc`)}</p>
         {audio.enabled && isProblem(status) && <p className="problem-text">{t(`status.${status}`)}</p>}
         <NodeParams key={node.id} node={node} onParams={onParams} />
+        {node.data.kind === 'chip' && (
+          <button type="button" className="primary" onClick={() => onOpenChip(node.id)}>
+            {t('chip.open')}
+          </button>
+        )}
         <button type="button" className="danger" onClick={() => onDeleteNode(node.id)}>
           {t('panel.deleteNode')}
         </button>

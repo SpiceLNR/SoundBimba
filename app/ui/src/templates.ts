@@ -15,8 +15,9 @@ interface TemplateNode {
 export interface Template {
   id: string;
   nodes: TemplateNode[];
-  /** Провода: [откуда, куда] по именам узлов шаблона. */
-  edges: [string, string][];
+  /** Провода: [откуда, куда] по именам узлов шаблона; у проводов к микросхемам — ещё ножки
+   *  [откуда, куда, ножка откуда, ножка куда]. */
+  edges: ([string, string] | [string, string, string | undefined, string | undefined])[];
 }
 
 export const TEMPLATES: Template[] = [
@@ -111,7 +112,7 @@ export function fromProject(id: string, p: Project): Template {
   return {
     id,
     nodes: p.nodes.map((n) => ({ key: n.id, kind: n.type, params: n.params, pos: n.pos })),
-    edges: p.edges.map((e) => [e.from, e.to]),
+    edges: p.edges.map((e) => (e.fromPort || e.toPort ? [e.from, e.to, e.fromPort, e.toPort] : [e.from, e.to])),
   };
 }
 
@@ -133,10 +134,17 @@ export function applyTemplate(nodes: SoundNode[], edges: Edge[], tpl: Template):
     fresh.push(node);
     all = [...all, node];
   }
-  const freshEdges: Edge[] = tpl.edges.map(([a, b]) => {
+  const freshEdges: Edge[] = tpl.edges.map(([a, b, fromPort, toPort]) => {
     const source = ids.get(a)!;
     const target = ids.get(b)!;
-    return { id: edgeId(source, target), source, target };
+    // Ножки — id узлов внутри микросхемы: они копируются вместе с ней и не меняются.
+    return {
+      id: edgeId(source, target, fromPort, toPort),
+      source,
+      target,
+      ...(fromPort ? { sourceHandle: fromPort } : {}),
+      ...(toPort ? { targetHandle: toPort } : {}),
+    };
   });
   // Своя раскладка шаблона (сдвинутая в начало координат) — или автораскладка у встроенных.
   const own = tpl.nodes.length > 0 && tpl.nodes.every((n) => n.pos);

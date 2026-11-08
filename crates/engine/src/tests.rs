@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::f32::consts::TAU;
 
-use graph::{Edge, Node, NodeKind, PortKind, Project};
+use graph::{Edge, Node, NodeKind, Project};
 use serde_json::json;
 
 use super::*;
@@ -22,7 +22,7 @@ fn node(id: &str, kind: NodeKind, params: serde_json::Value) -> Node {
 }
 
 fn edge(from: &str, to: &str) -> Edge {
-    Edge { from: from.into(), to: to.into(), kind: PortKind::Audio }
+    Edge::audio(from, to)
 }
 
 fn sine(frames: usize, freq: f32, amp: f32, rate: u32) -> Vec<f32> {

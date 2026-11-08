@@ -4,6 +4,7 @@ import type React from 'react';
 import { useAudio } from '../audio';
 import type { Params, SoundNode } from '../graph';
 import { useT } from '../i18n';
+import { useFullId } from './chipContext';
 
 /** Выше этой вероятности считаем, что сейчас звучит голос. */
 const VOICE_LEVEL = 0.5;
@@ -13,7 +14,8 @@ export default function DenoiseParams({ node, onParams }: { node: SoundNode; onP
   const audio = useAudio();
   const amount = typeof node.data.params.amount === 'number' ? node.data.params.amount : 1;
   const percent = Math.round(amount * 100);
-  const voice = audio.enabled ? (audio.voices?.[node.id] ?? 0) : 0;
+  const full = useFullId(node.id);
+  const voice = audio.enabled ? (audio.voices?.[full] ?? 0) : 0;
   const speaking = voice >= VOICE_LEVEL;
   return (
     <>

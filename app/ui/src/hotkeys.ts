@@ -45,6 +45,10 @@ export const DEFAULT_BINDINGS: Bindings = {
   'add-denoise': 'Digit7',
   'add-speaker-out': 'Digit8',
   'add-virtual-out': 'Digit9',
+  // Микросхема — на нуле; ножки (только внутри микросхемы) — без клавиш, их можно назначить.
+  'add-chip': 'Digit0',
+  'add-chip-in': '',
+  'add-chip-out': '',
 };
 
 /** Прежние сочетания по умолчанию (до 2026-11-03 цифры шли не по порядку списка; до 2026-11-08

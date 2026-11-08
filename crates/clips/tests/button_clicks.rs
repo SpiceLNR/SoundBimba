@@ -10,7 +10,7 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use engine::{Graph, PortKey, PortResolver, BLOCK, BLOCK_SAMPLES, CHANNELS, RATE};
-use graph::{Edge, Node, NodeKind, PortKind, Project};
+use graph::{Edge, Node, NodeKind, Project};
 
 struct OnlyOut;
 
@@ -85,11 +85,7 @@ fn button_sound_has_no_clicks() {
             node("b", NodeKind::SoundButton),
             node("o", NodeKind::VirtualOut),
         ],
-        edges: vec![Edge {
-            from: "b".into(),
-            to: "o".into(),
-            kind: PortKind::Audio,
-        }],
+        edges: vec![Edge::audio("b", "o")],
     };
     let plan = engine::plan(&project, &OnlyOut).unwrap();
     let (w, mut r) = engine::ring(RATE as usize * 10, RATE, RATE, BLOCK * 2);

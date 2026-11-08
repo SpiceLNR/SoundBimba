@@ -8,8 +8,13 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// Текущая версия схемы файла проекта.
-pub const SCHEMA: u32 = 1;
+/// Самая новая версия схемы файла проекта, которую понимает программа. 2 — есть микросхемы
+/// (0.5.0); файл без микросхем по-прежнему пишется версией 1, и его открывает и 0.4.
+pub const SCHEMA: u32 = 2;
+/// Версия файла без микросхем.
+pub const SCHEMA_BASE: u32 = 1;
+/// Глубже — явно испорченный файл (микросхема в микросхеме в …).
+pub const MAX_CHIP_DEPTH: usize = 8;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Project {
@@ -49,6 +54,13 @@ pub enum NodeKind {
     SpeakerOut,
     /// Выход «Виртуальный микрофон» (динамик виртуального кабеля).
     VirtualOut,
+    /// Микросхема: внутри целая схема (`params.inner` — узлы и провода), снаружи — ножки:
+    /// входы — её узлы «Вход микросхемы», выходы — узлы «Выход микросхемы».
+    Chip,
+    /// Вход микросхемы (ножка слева); внутри схемы — как источник.
+    ChipIn,
+    /// Выход микросхемы (ножка справа); внутри схемы — как выход.
+    ChipOut,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,7 +73,7 @@ pub enum Category {
 }
 
 impl NodeKind {
-    pub const ALL: [NodeKind; 9] = [
+    pub const ALL: [NodeKind; 12] = [
         NodeKind::AppSource,
         NodeKind::MicInput,
         NodeKind::SoundButton,
@@ -71,6 +83,9 @@ impl NodeKind {
         NodeKind::Denoise,
         NodeKind::SpeakerOut,
         NodeKind::VirtualOut,
+        NodeKind::Chip,
+        NodeKind::ChipIn,
+        NodeKind::ChipOut,
     ];
 
     pub fn has_input(self) -> bool {
@@ -82,19 +97,21 @@ impl NodeKind {
                 | NodeKind::Denoise
                 | NodeKind::SpeakerOut
                 | NodeKind::VirtualOut
+                | NodeKind::Chip
+                | NodeKind::ChipOut
         )
     }
 
     pub fn has_output(self) -> bool {
-        !matches!(self, NodeKind::SpeakerOut | NodeKind::VirtualOut)
+        !matches!(self, NodeKind::SpeakerOut | NodeKind::VirtualOut | NodeKind::ChipOut)
     }
 
     pub fn category(self) -> Category {
         match self {
-            NodeKind::AppSource | NodeKind::MicInput => Category::Source,
+            NodeKind::AppSource | NodeKind::MicInput | NodeKind::ChipIn => Category::Source,
             NodeKind::SoundButton => Category::Button,
-            NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher | NodeKind::Denoise => Category::Processing,
-            NodeKind::SpeakerOut | NodeKind::VirtualOut => Category::Output,
+            NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher | NodeKind::Denoise | NodeKind::Chip => Category::Processing,
+            NodeKind::SpeakerOut | NodeKind::VirtualOut | NodeKind::ChipOut => Category::Output,
         }
     }
 }
@@ -120,6 +137,36 @@ pub struct Edge {
     pub to: String,
     #[serde(default, skip_serializing_if = "PortKind::is_audio")]
     pub kind: PortKind,
+    /// Ножка микросхемы `from`: id её узла «Выход микросхемы». У обычных узлов — нет.
+    #[serde(rename = "fromPort", default, skip_serializing_if = "Option::is_none")]
+    pub from_port: Option<String>,
+    /// Ножка микросхемы `to`: id её узла «Вход микросхемы».
+    #[serde(rename = "toPort", default, skip_serializing_if = "Option::is_none")]
+    pub to_port: Option<String>,
+}
+
+impl Edge {
+    /// Обычный звуковой провод без ножек.
+    pub fn audio(from: impl Into<String>, to: impl Into<String>) -> Edge {
+        Edge { from: from.into(), to: to.into(), kind: PortKind::Audio, from_port: None, to_port: None }
+    }
+}
+
+/// Схема внутри микросхемы (`params.inner`).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct Inner {
+    #[serde(default)]
+    pub nodes: Vec<Node>,
+    #[serde(default)]
+    pub edges: Vec<Edge>,
+}
+
+/// Схема внутри микросхемы; None — испорчена.
+pub fn chip_inner(n: &Node) -> Option<Inner> {
+    match n.params.get("inner") {
+        None => Some(Inner::default()),
+        Some(v) => serde_json::from_value(v.clone()).ok(),
+    }
 }
 
 /// Ошибка проверки графа. `code()` — ключ для локализованного сообщения в интерфейсе.
@@ -135,6 +182,9 @@ pub enum GraphError {
     DuplicateEdge(String, String),
     Cycle,
     BadParam { node: String, param: &'static str },
+    /// Провод к микросхеме без ножки, к несуществующей ножке или ножка у обычного узла.
+    BadPort(String),
+    TooDeep,
 }
 
 impl GraphError {
@@ -150,6 +200,8 @@ impl GraphError {
             GraphError::DuplicateEdge(..) => "duplicate-edge",
             GraphError::Cycle => "cycle",
             GraphError::BadParam { .. } => "bad-param",
+            GraphError::BadPort(_) => "bad-port",
+            GraphError::TooDeep => "too-deep",
         }
     }
 }
@@ -167,6 +219,8 @@ impl fmt::Display for GraphError {
             GraphError::DuplicateEdge(a, b) => write!(f, "duplicate edge {a} -> {b}"),
             GraphError::Cycle => write!(f, "graph has a cycle"),
             GraphError::BadParam { node, param } => write!(f, "node {node}: bad parameter {param}"),
+            GraphError::BadPort(id) => write!(f, "edge to node {id} has a wrong chip pin"),
+            GraphError::TooDeep => write!(f, "chips are nested deeper than {MAX_CHIP_DEPTH}"),
         }
     }
 }
@@ -199,13 +253,24 @@ impl LoadError {
     }
 }
 
-/// Проверяет весь граф: идентификаторы, провода, параметры, отсутствие циклов.
+/// Проверяет весь граф: идентификаторы, провода, параметры, микросхемы (и всё внутри них),
+/// отсутствие циклов (по распакованной схеме — звук через ножки тоже не должен замкнуться).
 pub fn validate(p: &Project) -> Result<(), GraphError> {
     if p.schema > SCHEMA {
         return Err(GraphError::NewerSchema(p.schema));
     }
+    validate_level(&p.nodes, &p.edges, 0)?;
+    topo_order(&flatten(p)).map(|_| ())
+}
+
+fn validate_level(nodes: &[Node], edges: &[Edge], depth: usize) -> Result<(), GraphError> {
+    if depth > MAX_CHIP_DEPTH {
+        return Err(GraphError::TooDeep);
+    }
     let mut kinds = HashMap::new();
-    for n in &p.nodes {
+    // Ножки микросхем: id микросхемы → (входы, выходы).
+    let mut pins: HashMap<&str, (HashSet<String>, HashSet<String>)> = HashMap::new();
+    for n in nodes {
         if n.id.is_empty() {
             return Err(GraphError::EmptyId);
         }
@@ -213,9 +278,15 @@ pub fn validate(p: &Project) -> Result<(), GraphError> {
             return Err(GraphError::DuplicateNode(n.id.clone()));
         }
         check_params(n)?;
+        if n.kind == NodeKind::Chip {
+            let inner = chip_inner(n).ok_or_else(|| GraphError::BadParam { node: n.id.clone(), param: "inner" })?;
+            validate_level(&inner.nodes, &inner.edges, depth + 1)?;
+            let ids = |k| inner.nodes.iter().filter(|x| x.kind == k).map(|x| x.id.clone()).collect();
+            pins.insert(n.id.as_str(), (ids(NodeKind::ChipIn), ids(NodeKind::ChipOut)));
+        }
     }
     let mut seen = HashSet::new();
-    for e in &p.edges {
+    for e in edges {
         let from = *kinds.get(e.from.as_str()).ok_or_else(|| GraphError::UnknownNode(e.from.clone()))?;
         let to = *kinds.get(e.to.as_str()).ok_or_else(|| GraphError::UnknownNode(e.to.clone()))?;
         if e.from == e.to {
@@ -227,11 +298,64 @@ pub fn validate(p: &Project) -> Result<(), GraphError> {
         if !to.has_input() {
             return Err(GraphError::NoInput(e.to.clone()));
         }
-        if !seen.insert((e.from.as_str(), e.to.as_str())) {
+        // Ножка — только у микросхемы и только существующая.
+        let pin_ok = |id: &str, kind: NodeKind, port: &Option<String>, outs: bool| match (kind, port) {
+            (NodeKind::Chip, Some(p)) => pins.get(id).is_some_and(|(i, o)| if outs { o.contains(p) } else { i.contains(p) }),
+            (NodeKind::Chip, None) => false,
+            (_, port) => port.is_none(),
+        };
+        if !pin_ok(&e.from, from, &e.from_port, true) {
+            return Err(GraphError::BadPort(e.from.clone()));
+        }
+        if !pin_ok(&e.to, to, &e.to_port, false) {
+            return Err(GraphError::BadPort(e.to.clone()));
+        }
+        if !seen.insert((e.from.as_str(), e.from_port.as_deref(), e.to.as_str(), e.to_port.as_deref())) {
             return Err(GraphError::DuplicateEdge(e.from.clone(), e.to.clone()));
         }
     }
-    topo_order(p).map(|_| ())
+    Ok(())
+}
+
+/// Распаковывает микросхемы в обычную схему — её и получает звуковой движок. Узлы внутри
+/// микросхемы получают id «микросхема/узел» (вложенные — «a/b/узел»); ножки становятся
+/// громкостью 1 (звук проходит как есть), провода к микросхеме идут к её ножкам.
+/// Схема без микросхем возвращается как есть.
+pub fn flatten(p: &Project) -> Project {
+    let mut out = Project { schema: p.schema, nodes: Vec::new(), edges: Vec::new() };
+    expand(&p.nodes, &p.edges, "", 0, &mut out);
+    out
+}
+
+fn expand(nodes: &[Node], edges: &[Edge], prefix: &str, depth: usize, out: &mut Project) {
+    let mut chips = HashSet::new();
+    for n in nodes {
+        let id = format!("{prefix}{}", n.id);
+        match n.kind {
+            NodeKind::Chip => {
+                chips.insert(n.id.as_str());
+                if depth < MAX_CHIP_DEPTH {
+                    if let Some(inner) = chip_inner(n) {
+                        expand(&inner.nodes, &inner.edges, &format!("{id}/"), depth + 1, out);
+                    }
+                }
+            }
+            NodeKind::ChipIn | NodeKind::ChipOut => out.nodes.push(Node {
+                id,
+                kind: NodeKind::Volume,
+                pos: n.pos,
+                params: serde_json::json!({ "gain": 1.0, "mute": false }).as_object().cloned().unwrap_or_default(),
+            }),
+            _ => out.nodes.push(Node { id, ..n.clone() }),
+        }
+    }
+    let end = |node: &str, port: &Option<String>| match port {
+        Some(pin) if chips.contains(node) => format!("{prefix}{node}/{pin}"),
+        _ => format!("{prefix}{node}"),
+    };
+    for e in edges {
+        out.edges.push(Edge { from: end(&e.from, &e.from_port), to: end(&e.to, &e.to_port), kind: e.kind, from_port: None, to_port: None });
+    }
 }
 
 /// Допустимые значения параметров компрессора: порог (дБ), сила (во сколько раз), атака и
@@ -353,9 +477,9 @@ pub fn default_project() -> Project {
         pos: [x, y],
         params: params.as_object().cloned().unwrap_or_default(),
     };
-    let edge = |from: &str, to: &str| Edge { from: from.into(), to: to.into(), kind: PortKind::Audio };
+    let edge = |from: &str, to: &str| Edge::audio(from, to);
     Project {
-        schema: SCHEMA,
+        schema: SCHEMA_BASE,
         nodes: vec![
             node("n1", NodeKind::AppSource, 0.0, 0.0, serde_json::json!({ "exe": "" })),
             node("n2", NodeKind::MicInput, 0.0, 160.0, serde_json::json!({ "device": "default" })),
@@ -386,7 +510,7 @@ mod tests {
     }"#;
 
     fn edge(from: &str, to: &str) -> Edge {
-        Edge { from: from.into(), to: to.into(), kind: PortKind::Audio }
+        Edge::audio(from, to)
     }
 
     #[test]
@@ -511,5 +635,106 @@ mod tests {
         let text = to_json(&p);
         assert!(text.contains("\"kind\": \"control\""));
         assert_eq!(from_json(&text).unwrap().edges[0].kind, PortKind::Control);
+    }
+
+    /// Микросхема «Голос»: вход → громкость → выход; снаружи микрофон → микросхема → кабель.
+    const CHIP_EXAMPLE: &str = r#"{
+      "schema": 2,
+      "nodes": [
+        {"id": "m", "type": "mic-input", "pos": [0, 0], "params": {"device": "default"}},
+        {"id": "c", "type": "chip", "pos": [300, 0], "params": {"name": "Голос", "inner": {
+          "nodes": [
+            {"id": "i", "type": "chip-in",  "pos": [0, 0],   "params": {"name": "Голос"}},
+            {"id": "v", "type": "volume",   "pos": [200, 0], "params": {"gain": 0.5, "mute": false}},
+            {"id": "o", "type": "chip-out", "pos": [400, 0], "params": {"name": "Выход"}}
+          ],
+          "edges": [{"from": "i", "to": "v"}, {"from": "v", "to": "o"}]
+        }}},
+        {"id": "k", "type": "virtual-out", "pos": [600, 0], "params": {"device": "virtual-1"}}
+      ],
+      "edges": [
+        {"from": "m", "to": "c", "toPort": "i"},
+        {"from": "c", "fromPort": "o", "to": "k"}
+      ]
+    }"#;
+
+    #[test]
+    fn old_files_stay_byte_for_byte_the_same() {
+        // Файл 0.4 читается и пишется ровно как раньше: без новых полей, версия 1.
+        let p = from_json(ARCH_EXAMPLE).unwrap();
+        let text = to_json(&p);
+        assert!(text.contains("\"schema\": 1"));
+        assert!(!text.contains("Port"));
+        assert_eq!(from_json(&text).unwrap(), p);
+        assert_eq!(flatten(&p), p, "без микросхем распаковка ничего не меняет");
+        assert_eq!(default_project().schema, SCHEMA_BASE);
+    }
+
+    #[test]
+    fn chip_validates_and_flattens_for_the_engine() {
+        let p = from_json(CHIP_EXAMPLE).unwrap();
+        assert_eq!(from_json(&to_json(&p)).unwrap(), p, "микросхема переживает сохранение");
+        let flat = flatten(&p);
+        let ids: Vec<_> = flat.nodes.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(ids, ["m", "c/i", "c/v", "c/o", "k"]);
+        // Ножки — громкость 1 (звук проходит как есть), громкость внутри — своя.
+        assert_eq!(flat.nodes[1].kind, NodeKind::Volume);
+        assert_eq!(flat.nodes[1].params["gain"], 1.0);
+        assert_eq!(flat.nodes[2].params["gain"], 0.5);
+        let edges: Vec<_> = flat.edges.iter().map(|e| (e.from.as_str(), e.to.as_str())).collect();
+        assert_eq!(edges, [("c/i", "c/v"), ("c/v", "c/o"), ("m", "c/i"), ("c/o", "k")]);
+        assert!(flat.edges.iter().all(|e| e.from_port.is_none() && e.to_port.is_none()));
+        validate(&flat).unwrap();
+    }
+
+    #[test]
+    fn chip_in_chip_flattens_with_nested_ids() {
+        let mut p = from_json(CHIP_EXAMPLE).unwrap();
+        // Внешнюю микросхему кладём внутрь новой, с такими же ножками.
+        let inner_chip = p.nodes[1].clone();
+        let outer = serde_json::json!({
+            "nodes": [
+                {"id": "i", "type": "chip-in", "pos": [0, 0], "params": {}},
+                inner_chip,
+                {"id": "o", "type": "chip-out", "pos": [0, 0], "params": {}}
+            ],
+            "edges": [{"from": "i", "to": "c", "toPort": "i"}, {"from": "c", "fromPort": "o", "to": "o"}]
+        });
+        p.nodes[1].params.insert("inner".into(), outer);
+        validate(&p).unwrap();
+        let ids: Vec<_> = flatten(&p).nodes.into_iter().map(|n| n.id).collect();
+        assert_eq!(ids, ["m", "c/i", "c/c/i", "c/c/v", "c/c/o", "c/o", "k"]);
+    }
+
+    #[test]
+    fn rejects_wrong_chip_pins_and_loops_through_chips() {
+        let ok = from_json(CHIP_EXAMPLE).unwrap();
+        // Провод к микросхеме без ножки, к чужой ножке, ножка у обычного узла.
+        let mut p = ok.clone();
+        p.edges[0].to_port = None;
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-port");
+        p.edges[0].to_port = Some("o".into());
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-port");
+        let mut p = ok.clone();
+        p.edges[1].to_port = Some("x".into());
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-port");
+        // Испорченная схема внутри.
+        let mut p = ok.clone();
+        p.nodes[1].params.insert("inner".into(), serde_json::json!("мусор"));
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
+        // Ошибка внутри микросхемы тоже ловится.
+        let mut p = ok.clone();
+        let mut inner = chip_inner(&p.nodes[1]).unwrap();
+        inner.nodes[1].params.insert("gain".into(), serde_json::json!(9));
+        p.nodes[1].params.insert("inner".into(), serde_json::to_value(inner).unwrap());
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
+        // Звук по кругу через ножки: выход микросхемы → громкость → снова в её вход.
+        let mut p = ok.clone();
+        p.nodes.push(Node { id: "g".into(), kind: NodeKind::Volume, pos: [0.0, 0.0], params: Map::new() });
+        p.edges.push(Edge { from_port: Some("o".into()), ..Edge::audio("c", "g") });
+        p.edges.push(Edge { to_port: Some("i".into()), ..Edge::audio("g", "c") });
+        assert_eq!(validate(&p).unwrap_err().code(), "cycle");
+        // Файл 0.5 с микросхемой — новее, чем понимала 0.4 (она отложит его, а не испортит).
+        assert_eq!(ok.schema, 2);
     }
 }

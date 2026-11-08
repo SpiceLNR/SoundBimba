@@ -381,6 +381,10 @@ input[type='range']:focus-visible {
 .react-flow__minimap-node.cat-processing {
   fill: var(--node-processing);
 }
+
+.react-flow__minimap-node.cat-chip {
+  fill: var(--node-chip);
+}
 .react-flow__minimap-node.cat-output {
   fill: var(--node-output);
 }
@@ -426,6 +430,90 @@ input[type='range']:focus-visible {
   box-shadow: var(--shadow);
 }
 
+/* Путь «Карта › Микросхема» над картой, когда микросхема открыта. */
+.chip-path {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 7;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 20px);
+  padding: 6px 10px;
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow);
+}
+
+.chip-path .link-button {
+  align-self: auto;
+}
+
+.chip-path-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip-path-step strong {
+  color: var(--node-chip);
+}
+
+/* Микросхема: цветная рамка с обеих сторон (ножки и слева, и справа), выемка сверху, как у
+   чипа; ножки — строками, у каждой своя точка подключения у края. */
+.sound-node.chip-node {
+  position: relative;
+  width: 230px;
+  border-right: 6px solid var(--cat);
+  cursor: pointer;
+}
+
+.chip-node::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  width: 22px;
+  height: 11px;
+  transform: translateX(-50%);
+  border: var(--border-width) solid var(--cat);
+  border-top: none;
+  border-radius: 0 0 11px 11px;
+}
+
+.chip-pins {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.chip-pin-row {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 22px;
+  align-items: center;
+  margin: 0 -14px 0 -18px;
+  padding: 0 14px 0 18px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.chip-pin {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-pin.out {
+  text-align: right;
+}
+
 /* Узел-кнопка шире: слева большая круглая кнопка. */
 .sound-node.cat-button {
   width: 250px;
@@ -441,6 +529,10 @@ input[type='range']:focus-visible {
 }
 .cat-processing {
   --cat: var(--node-processing);
+}
+
+.cat-chip {
+  --cat: var(--node-chip);
 }
 .cat-output {
   --cat: var(--node-output);

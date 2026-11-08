@@ -2,7 +2,7 @@
 // Верхняя панель — одна строка: слева работа с картой, справа «Проект», «Клавиши» и «Настройки»
 // (язык и тема).
 import type { Settings } from '../api';
-import { CATEGORY_ORDER, KIND_ORDER, KINDS, type NodeKind } from '../graph';
+import { CATEGORY_ORDER, KIND_ORDER, KINDS, lookOf, type NodeKind } from '../graph';
 import { formatCombo, type Bindings } from '../hotkeys';
 import { LANGUAGES, isLang, useT, type Lang } from '../i18n';
 import { THEMES } from '../theme';
@@ -30,6 +30,8 @@ interface Props {
   onOpenPanel: () => void;
   /** Простой режим: без кнопок работы с картой. */
   simple: boolean;
+  /** Открыта микросхема: в списке появляются её ножки. */
+  inChip: boolean;
 }
 
 export default function Toolbar(p: Props) {
@@ -62,13 +64,14 @@ export default function Toolbar(p: Props) {
         label={t('toolbar.add')}
         matchWidth
         onSelect={(k) => p.onAdd(k as NodeKind)}
-        groups={CATEGORY_ORDER.map((cat) => ({
-          title: t(`category.${cat}`),
-          items: KIND_ORDER.filter((k) => KINDS[k].category === cat).map((k) => ({
+        groups={[...CATEGORY_ORDER, 'chip' as const].map((group) => ({
+          title: t(`category.${group}`),
+          // Микросхемы — своей группой в конце; ножки — только когда микросхема открыта.
+          items: KIND_ORDER.filter((k) => lookOf(k) === group && (!KINDS[k].insideChip || p.inChip)).map((k) => ({
             value: k,
             label: t(`node.${k}.title`),
             // Клавиша слева, в цвете узла этого типа.
-            left: <span className={`key-badge cat-${cat}`}>{p.bindings[`add-${k}`] ? formatCombo(p.bindings[`add-${k}`]) : ''}</span>,
+            left: <span className={`key-badge cat-${group}`}>{p.bindings[`add-${k}`] ? formatCombo(p.bindings[`add-${k}`]) : ''}</span>,
           })),
         }))}
       />

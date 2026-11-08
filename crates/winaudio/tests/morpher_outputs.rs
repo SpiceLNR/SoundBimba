@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use engine::{ButtonSource, Graph, PortKey, PortResolver, BLOCK, BLOCK_SAMPLES, RATE};
-use graph::{Edge, Node, NodeKind, PortKind, Project};
+use graph::{Edge, Node, NodeKind, Project};
 use winaudio::devices;
 use winaudio::streams::{open_capture, open_render, Source};
 
@@ -27,7 +27,7 @@ fn node(id: &str, kind: NodeKind, params: serde_json::Value) -> Node {
 }
 
 fn edge(a: &str, b: &str) -> Edge {
-    Edge { from: a.into(), to: b.into(), kind: PortKind::Audio }
+    Edge::audio(a, b)
 }
 
 /// Щелчки в левом канале: вторая разность больше, чем бывает у синуса такой частоты и уровня.

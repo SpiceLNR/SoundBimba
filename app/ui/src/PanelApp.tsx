@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, onAudioState, type AudioState, type Settings } from './api';
 import { AudioContext, EMPTY_AUDIO } from './audio';
 import ButtonGrid from './components/ButtonGrid';
-import type { Project } from './graph';
+import { flattenProject, type Project } from './graph';
 import { I18nContext, isLang, systemLanguage, translate, type Translate } from './i18n';
 import { applyTheme } from './theme';
 
@@ -70,7 +70,7 @@ export default function PanelApp() {
             </button>
           </header>
           {!audio.enabled && <p className="panel-hint panel-note">{t('buttons.soundOff')}</p>}
-          <div className="panel-pad">{project && <ButtonGrid nodes={project.nodes} />}</div>
+          <div className="panel-pad">{project && <ButtonGrid nodes={flattenProject(project).nodes} />}</div>
         </div>
       </AudioContext.Provider>
     </I18nContext.Provider>

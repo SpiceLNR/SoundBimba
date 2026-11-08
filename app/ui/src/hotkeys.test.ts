@@ -49,7 +49,8 @@ describe('hotkeys', () => {
 
   it('add-node digits follow the order of the "Add node" list', () => {
     const digits = ACTIONS.filter((a) => addedKind(a)).map((a) => DEFAULT_BINDINGS[a]);
-    expect(digits).toEqual(['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9']);
+    // 1–9 — по списку, 0 — микросхема; ножки (только внутри микросхемы) — без клавиш.
+    expect(digits).toEqual(['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', '', '']);
   });
 
   it('the sound button is first: digit 1, old saved 1–3 move along', () => {
