@@ -9,3 +9,6 @@ import '@fontsource/open-sans/600.css';
 // похожий Comic Neue (SIL OFL) из программы.
 import '@fontsource/comic-neue/400.css';
 import '@fontsource/comic-neue/700.css';
+// «Магическая»: Philosopher (SIL OFL) — сказочный, с кириллицей.
+import '@fontsource/philosopher/400.css';
+import '@fontsource/philosopher/700.css';

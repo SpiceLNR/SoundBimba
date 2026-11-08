@@ -22,6 +22,7 @@ Keep this list up to date: every dependency and bundled resource must appear her
 | Nunito font (via Fontsource) | Theme "Bimba" font, bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/nunito , https://fontsource.org |
 | Open Sans font (via Fontsource) | Theme "Metro" font (free alternative to Segoe UI), bundled offline | SIL OFL 1.1 | https://github.com/googlefonts/opensans , https://fontsource.org |
 | Comic Neue font (via Fontsource) | Theme "Kids" fallback font, bundled offline | SIL OFL 1.1 | https://github.com/crozynski/comicneue , https://fontsource.org |
+| Philosopher font (via Fontsource) | Theme "Magic" font, bundled offline | SIL OFL 1.1 | https://github.com/google/fonts/tree/main/ofl/philosopher , https://fontsource.org |
 | Segoe UI — **not bundled** | Theme "Frutiger Aero" uses it from Windows if installed (fallback: bundled Open Sans); never distributed by SoundBimba | Microsoft (part of Windows) | — |
 | Comic Sans MS — **not bundled** | Theme "Kids" uses it from Windows if installed; never distributed by SoundBimba | Microsoft (part of Windows) | — |
 | Vite, @vitejs/plugin-react, TypeScript, Vitest | Build and tests only, not in the app | MIT / Apache-2.0 | https://vitejs.dev , https://www.typescriptlang.org , https://vitest.dev |

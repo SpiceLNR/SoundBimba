@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+  <!-- Тема «Магическая»: пятачок SoundBimba как магическая руна — двойной круг с рунической
+       надписью и две руны-ноздри. Надпись медленно плывёт по кругу (полный оборот — 3 минуты),
+       внутреннее кольцо точек — навстречу. Руны — простые угловатые знаки, нарисованы здесь же. -->
+  <style>
+    .spin { animation: spin 180s linear infinite; }
+    .spin-back { animation: spin 240s linear infinite reverse; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <g fill="none" stroke="#f3dca0" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="200" cy="150" rx="172" ry="127" stroke-width="2.4"/>
+    <ellipse cx="200" cy="150" rx="146" ry="103" stroke-width="1.4"/>
+    <ellipse cx="200" cy="150" rx="140" ry="97" stroke-width="0.8" stroke-opacity=".6"/>
+    <!-- Надпись: руны на круге; круг сжат по высоте до овала пятачка, поэтому при вращении
+         руны идут ровно по овалу. -->
+    <g transform="translate(200 150) scale(1 0.7233)">
+      <g class="spin">
+        <path transform="translate(159.0,0.0) rotate(90.0) scale(0.8 1.08)" d="M-3,7 L-3,-7 M-3,-2 L3,-6 M-3,2 L3,-2" stroke-width="2.2"/>
+        <path transform="translate(150.4,51.6) rotate(108.9) scale(0.8 1.08)" d="M-3,7 L-3,-7 L3,-3 L-3,0 L3,7" stroke-width="2.2"/>
+        <path transform="translate(125.5,97.7) rotate(127.9) scale(0.8 1.08)" d="M0,7 L0,-7 M0,-1 L-4,-6 M0,-1 L4,-6" stroke-width="2.2"/>
+        <path transform="translate(87.0,133.1) rotate(146.8) scale(0.8 1.08)" d="M0,7 L0,-7 M-4,-3 L0,-7 L4,-3" stroke-width="2.2"/>
+        <path transform="translate(39.0,154.1) rotate(165.8) scale(0.8 1.08)" d="M-4,7 L-4,-7 L4,-1 M4,7 L4,-7 L-4,-1" stroke-width="2.2"/>
+        <path transform="translate(-13.1,158.5) rotate(184.7) scale(0.8 1.08)" d="M-4,7 L3,-1 L0,-6 L-3,-1 L4,7" stroke-width="2.2"/>
+        <path transform="translate(-63.9,145.6) rotate(203.7) scale(0.8 1.08)" d="M3,-6 L-3,0 L3,6" stroke-width="2.2"/>
+        <path transform="translate(-107.7,117.0) rotate(222.6) scale(0.8 1.08)" d="M-3,-6 L2,-2 L-2,2 L3,6" stroke-width="2.2"/>
+        <path transform="translate(-139.8,75.7) rotate(241.6) scale(0.8 1.08)" d="M0,7 L0,-7" stroke-width="2.2"/>
+        <path transform="translate(-156.8,26.2) rotate(260.5) scale(0.8 1.08)" d="M-4,7 L-4,-7 L0,-2 L4,-7 L4,7" stroke-width="2.2"/>
+        <path transform="translate(-156.8,-26.2) rotate(279.5) scale(0.8 1.08)" d="M-3,7 L-3,-7 M-3,-2 L3,-6 M-3,2 L3,-2" stroke-width="2.2"/>
+        <path transform="translate(-139.8,-75.7) rotate(298.4) scale(0.8 1.08)" d="M-3,7 L-3,-7 L3,-3 L-3,0 L3,7" stroke-width="2.2"/>
+        <path transform="translate(-107.7,-117.0) rotate(317.4) scale(0.8 1.08)" d="M0,7 L0,-7 M0,-1 L-4,-6 M0,-1 L4,-6" stroke-width="2.2"/>
+        <path transform="translate(-63.9,-145.6) rotate(336.3) scale(0.8 1.08)" d="M-4,7 L-4,-7 L4,-1 M4,7 L4,-7 L-4,-1" stroke-width="2.2"/>
+        <path transform="translate(-13.1,-158.5) rotate(355.3) scale(0.8 1.08)" d="M-4,7 L3,-1 L0,-6 L-3,-1 L4,7" stroke-width="2.2"/>
+        <path transform="translate(39.0,-154.1) rotate(374.2) scale(0.8 1.08)" d="M0,7 L0,-7 M-4,-3 L0,-7 L4,-3" stroke-width="2.2"/>
+        <path transform="translate(87.0,-133.1) rotate(393.2) scale(0.8 1.08)" d="M3,-6 L-3,0 L3,6" stroke-width="2.2"/>
+        <path transform="translate(125.5,-97.7) rotate(412.1) scale(0.8 1.08)" d="M-3,-6 L2,-2 L-2,2 L3,6" stroke-width="2.2"/>
+        <path transform="translate(150.4,-51.6) rotate(431.1) scale(0.8 1.08)" d="M-4,7 L-4,-7 L0,-2 L4,-7 L4,7" stroke-width="2.2"/>
+      </g>
+    </g>
+    <path d="M145,100 L172,136 L172,164 L145,200 L118,164 L118,136 Z" stroke-width="2.6"/>
+    <path d="M145,116 L145,184 M133,142 L145,154 L157,142 M133,164 L145,176 L157,164" stroke-width="2"/>
+    <path d="M255,100 L282,136 L282,164 L255,200 L228,164 L228,136 Z" stroke-width="2.6"/>
+    <path d="M255,116 L255,184 M243,142 L255,154 L267,142 M243,164 L255,176 L267,164" stroke-width="2"/>
+    <path d="M200,138 L206,150 L200,162 L194,150 Z" stroke-width="1.8"/>
+  </g>
+  <g fill="#f3dca0" transform="translate(200 150) scale(1 0.7233)">
+    <g class="spin-back">
+      <circle cx="128.0" cy="0.0" r="2.6"/>
+      <circle cx="110.9" cy="64.0" r="1.5"/>
+      <circle cx="64.0" cy="110.9" r="1.5"/>
+      <circle cx="0.0" cy="128.0" r="2.6"/>
+      <circle cx="-64.0" cy="110.9" r="1.5"/>
+      <circle cx="-110.9" cy="64.0" r="1.5"/>
+      <circle cx="-128.0" cy="0.0" r="2.6"/>
+      <circle cx="-110.9" cy="-64.0" r="1.5"/>
+      <circle cx="-64.0" cy="-110.9" r="1.5"/>
+      <circle cx="-0.0" cy="-128.0" r="2.6"/>
+      <circle cx="64.0" cy="-110.9" r="1.5"/>
+      <circle cx="110.9" cy="-64.0" r="1.5"/>
+    </g>
+  </g>
+</svg>

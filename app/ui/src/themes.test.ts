@@ -6,7 +6,14 @@ import { describe, expect, it } from 'vitest';
 import { THEMES } from './theme';
 
 const dir = join(__dirname, '../../../themes');
-const vars = (id: string) => new Set([...readFileSync(join(dir, id, 'theme.css'), 'utf8').matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)].map((m) => m[1]));
+/** Переменные из главного блока темы `[data-theme='id'] { … }` (свои вспомогательные переменные
+ *  внутри отдельных элементов, например у узлов, — не в счёт). */
+const vars = (id: string) => {
+  const css = readFileSync(join(dir, id, 'theme.css'), 'utf8');
+  const start = css.indexOf(`[data-theme='${id}'] {`);
+  const block = css.slice(start, css.indexOf('\n}', start));
+  return new Set([...block.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)].map((m) => m[1]));
+};
 
 describe('themes', () => {
   it('every theme folder is listed, with names in all languages and fonts', () => {
@@ -20,7 +27,7 @@ describe('themes', () => {
   });
 
   it('themes go in the order the author chose', () => {
-    expect(THEMES.map((t) => t.id)).toEqual(['bimba', 'metro', 'kids', 'kids-dark', 'neo-noir', 'engineer', 'frutiger-aero']);
+    expect(THEMES.map((t) => t.id)).toEqual(['bimba', 'metro', 'kids', 'kids-dark', 'neo-noir', 'engineer', 'frutiger-aero', 'magic']);
   });
 
   it('every theme defines the same variables as «Bimba»', () => {

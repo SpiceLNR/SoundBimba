@@ -1,0 +1,13 @@
+{
+  "id": "magic",
+  "names": {
+    "ru": "Магическая",
+    "en": "Magic",
+    "uk": "Магічна"
+  },
+  "fonts": [
+    "Philosopher"
+  ],
+  "wires": "magic",
+  "order": 8
+}

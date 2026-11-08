@@ -1,0 +1,320 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Тема «Магическая» — «звёздная мантия волшебника»: ночное синее небо с мерцающими звёздами,
+   золото и аметист. Узлы — тёмные плашки с тонкой золотой рамкой и звёздочкой в углу, провода —
+   светящиеся нити, по которым изредка пробегает искорка (MagicEdge.tsx, "wires": "magic").
+   «Пятачок» на фоне — магическая руна (rune.svg). Шрифт Philosopher (SIL OFL, с кириллицей).
+   Звёзды и искорки движутся всегда, даже если в Windows выключены эффекты анимации (как
+   у других тем, по решению автора). */
+[data-theme='magic'] {
+  --font: 'Philosopher', 'Nunito', system-ui, sans-serif;
+  --font-size: 14.5px;
+  --title-weight: 700;
+  --title-transform: none;
+  --title-spacing: 0.02em;
+
+  --bg: #0a0e27;
+  --surface: #121738;
+  --surface-2: #1a2048;
+  --text: #f4ecd8;
+  --text-muted: #a8a3c8;
+  --border: #2c336a;
+  --border-width: 1px;
+  --accent: #e8c26a;
+  --accent-text: #1b1534;
+  --danger: #ff6f8e;
+  --radius: 12px;
+  --radius-small: 7px;
+  --shadow: 0 6px 20px rgba(2, 3, 14, 0.6);
+
+  --control-bg: #1a2048;
+  --control-bg-hover: #232a5a;
+  --control-border-hover: #e8c26a;
+  --control-border: #2c336a;
+
+  /* Ширина списка «Добавить узел» под шрифт темы. */
+  --add-node-width: 232px;
+
+  --slider-track: #2c336a;
+  --slider-track-height: 6px;
+  --slider-thumb-bg: #e8c26a;
+  --slider-thumb-width: 18px;
+  --slider-thumb-height: 18px;
+  --slider-thumb-radius: 50%;
+
+  --node-bg: #121738;
+  --node-text: #f4ecd8;
+  /* Лазурь, аметист, роза, изумруд, золото. */
+  --node-source: #5fb8ff;
+  --node-processing: #b993ff;
+  --node-chip: #ff9aa8;
+  --node-output: #7fe8b8;
+  --node-button: #ffd36e;
+  --node-selected: #e8c26a;
+  --handle-size: 16px;
+
+  /* Провод — светлая сиреневая нить; свечение задаётся ниже. */
+  --wire: #d9c2ff;
+  --wire-selected: #ffe08a;
+  --dots: transparent;
+  /* Пятачок-руна нарисована своими цветами; здесь — только насколько она видна. */
+  --watermark-color: #f3dca0;
+  --watermark-opacity: 0.14;
+
+  /* Полосы прокрутки: тонкие, при наведении — золото. */
+  --scrollbar-size: 10px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #2c336a;
+  --scrollbar-thumb-hover: #e8c26a;
+  --scrollbar-radius: 8px;
+
+  --backdrop: rgba(4, 6, 20, 0.7);
+  --notice-bg: #1a2048;
+  --notice-error-bg: #4a1834;
+}
+
+/* Ночное небо: к горизонту светлее, с лёгкой аметистовой дымкой; тусклые неподвижные звёзды. */
+[data-theme='magic'] .map {
+  background:
+    radial-gradient(circle 1px at 7% 12%, rgba(255, 248, 225, 0.7) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 19% 34%, rgba(255, 248, 225, 0.55) 0 70%, transparent 100%),
+    radial-gradient(circle 1.2px at 27% 8%, rgba(255, 248, 225, 0.6) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 38% 22%, rgba(255, 248, 225, 0.5) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 46% 6%, rgba(255, 248, 225, 0.6) 0 70%, transparent 100%),
+    radial-gradient(circle 1.2px at 58% 17%, rgba(255, 248, 225, 0.55) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 66% 41%, rgba(255, 248, 225, 0.45) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 77% 27%, rgba(255, 248, 225, 0.6) 0 70%, transparent 100%),
+    radial-gradient(circle 1.2px at 89% 9%, rgba(255, 248, 225, 0.6) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 95% 47%, rgba(255, 248, 225, 0.5) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 4% 58%, rgba(255, 248, 225, 0.5) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 14% 79%, rgba(255, 248, 225, 0.45) 0 70%, transparent 100%),
+    radial-gradient(circle 1.2px at 31% 66%, rgba(255, 248, 225, 0.5) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 42% 91%, rgba(255, 248, 225, 0.45) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 53% 74%, rgba(255, 248, 225, 0.5) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 71% 86%, rgba(255, 248, 225, 0.5) 0 70%, transparent 100%),
+    radial-gradient(circle 1.2px at 83% 69%, rgba(255, 248, 225, 0.55) 0 70%, transparent 100%),
+    radial-gradient(circle 1px at 92% 92%, rgba(255, 248, 225, 0.45) 0 70%, transparent 100%),
+    radial-gradient(ellipse 70% 45% at 75% 10%, rgba(120, 80, 200, 0.18), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 15% 85%, rgba(60, 110, 200, 0.16), transparent 70%),
+    linear-gradient(180deg, #070a1e 0%, #0b1030 55%, #141a45 100%);
+  background-attachment: fixed;
+}
+
+[data-theme='magic'] body {
+  background: linear-gradient(180deg, #070a1e 0%, #0b1030 55%, #141a45 100%);
+}
+
+/* «Пятачок» — магическая руна вместо заливки: едва видна на небе, руны по кругу медленно плывут
+   (их вращение — внутри rune.svg). */
+[data-theme='magic'] .watermark svg {
+  display: none;
+}
+
+[data-theme='magic'] .watermark::before {
+  content: '';
+  width: min(50%, 520px);
+  aspect-ratio: 4 / 3;
+  background: url('./rune.svg') center / contain no-repeat;
+  filter: drop-shadow(0 0 2px rgba(255, 214, 120, 0.35));
+}
+
+/* Яркие звёзды мерцают (всегда). */
+[data-theme='magic'] .map::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 1.6px at 11% 22%, #fff8e1 0 60%, transparent 100%),
+    radial-gradient(ellipse 9px 1.2px at 11% 22%, rgba(255, 248, 225, 0.8), transparent 100%),
+    radial-gradient(ellipse 1.2px 9px at 11% 22%, rgba(255, 248, 225, 0.8), transparent 100%),
+    radial-gradient(circle 1.4px at 63% 11%, #fff8e1 0 60%, transparent 100%),
+    radial-gradient(circle 1.8px at 86% 58%, #fff8e1 0 60%, transparent 100%),
+    radial-gradient(ellipse 11px 1.3px at 86% 58%, rgba(255, 248, 225, 0.8), transparent 100%),
+    radial-gradient(ellipse 1.3px 11px at 86% 58%, rgba(255, 248, 225, 0.8), transparent 100%),
+    radial-gradient(circle 1.4px at 24% 88%, #fff8e1 0 60%, transparent 100%),
+    radial-gradient(circle 1.5px at 49% 39%, #fff8e1 0 60%, transparent 100%);
+  animation: magic-twinkle 12s ease-in-out infinite;
+}
+
+@keyframes magic-twinkle {
+  0%, 100% {
+    opacity: 0.9;
+  }
+  35% {
+    opacity: 0.25;
+  }
+  60% {
+    opacity: 1;
+  }
+}
+
+/* Узлы: тёмная плашка с тонкой золотой рамкой, мягкое свечение цвета типа, звёздочка в углу.
+   Полоска слева (у микросхемы — и справа) — зачарованный металл цвета типа: выпуклая
+   полированная планка с бликами, самоцветом посередине и бегущим по ней отблеском. Рисуется
+   фоном под прозрачной рамкой, поэтому повторяет скругление узла. */
+[data-theme='magic'] .sound-node {
+  --metal-dark: color-mix(in srgb, var(--cat) 42%, #05061a);
+  --metal-light: color-mix(in srgb, var(--cat) 45%, #ffffff);
+  /* Отблеск: светлая полоса, которая медленно проходит сверху вниз. */
+  --metal-sheen: linear-gradient(180deg, transparent 0 42%, rgba(255, 255, 255, 0.75) 50%, transparent 58% 100%);
+  /* Самоцвет посередине планки. */
+  --metal-gem: radial-gradient(circle 2.8px at 50% 50%, #ffffff 0 30%, var(--metal-light) 55%, var(--metal-dark) 85%, transparent 100%);
+  /* Объём: блик сверху, тень снизу. */
+  --metal-bevel: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, transparent 14%, transparent 84%, rgba(0, 0, 0, 0.45) 100%);
+  /* Сам металл: тёмные края и светлая середина, как у выпуклой полированной планки. */
+  --metal-body: linear-gradient(90deg, var(--metal-dark) 0%, var(--metal-light) 38%, var(--cat) 62%, var(--metal-dark) 100%);
+  background:
+    var(--metal-sheen) left 0 top var(--sheen-y, 120%) / 6px 300% no-repeat border-box,
+    var(--metal-gem) left top / 6px 100% no-repeat border-box,
+    var(--metal-bevel) left top / 6px 100% no-repeat border-box,
+    var(--metal-body) left top / 6px 100% no-repeat border-box,
+    linear-gradient(180deg, #171d4a 0%, #10153a 100%) border-box;
+  border-color: rgba(232, 194, 106, 0.55);
+  border-left-color: transparent;
+  box-shadow:
+    inset 0 0 0 3px rgba(10, 14, 39, 0.9),
+    inset 0 0 0 4px rgba(232, 194, 106, 0.18),
+    -3px 0 10px -4px var(--cat),
+    0 0 18px -6px var(--cat),
+    var(--shadow);
+  animation: magic-metal-sheen 18s ease-in-out infinite;
+}
+
+/* У микросхемы такая же планка и справа. */
+[data-theme='magic'] .sound-node.chip-node {
+  background:
+    var(--metal-sheen) left 0 top var(--sheen-y, 120%) / 6px 300% no-repeat border-box,
+    var(--metal-gem) left top / 6px 100% no-repeat border-box,
+    var(--metal-bevel) left top / 6px 100% no-repeat border-box,
+    var(--metal-body) left top / 6px 100% no-repeat border-box,
+    var(--metal-sheen) right 0 top var(--sheen-y, 120%) / 6px 300% no-repeat border-box,
+    var(--metal-gem) right top / 6px 100% no-repeat border-box,
+    var(--metal-bevel) right top / 6px 100% no-repeat border-box,
+    var(--metal-body) right top / 6px 100% no-repeat border-box,
+    linear-gradient(180deg, #171d4a 0%, #10153a 100%) border-box;
+  border-right-color: transparent;
+}
+
+/* Отблеск пробегает по планке раз в 18 с; у разных типов узлов — в разное время. */
+@property --sheen-y {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 120%;
+}
+
+@keyframes magic-metal-sheen {
+  0%, 88% {
+    --sheen-y: 120%;
+  }
+  100% {
+    --sheen-y: -20%;
+  }
+}
+
+[data-theme='magic'] .sound-node.cat-processing {
+  animation-delay: -5.3s;
+}
+
+[data-theme='magic'] .sound-node.cat-output {
+  animation-delay: -9.7s;
+}
+
+[data-theme='magic'] .sound-node.cat-button {
+  animation-delay: -13.9s;
+}
+
+[data-theme='magic'] .sound-node.selected {
+  border-color: #ffe08a;
+  border-left-color: transparent;
+  box-shadow:
+    inset 0 0 0 3px rgba(10, 14, 39, 0.9),
+    inset 0 0 0 4px rgba(255, 224, 138, 0.35),
+    -3px 0 12px -3px var(--cat),
+    0 0 24px -2px rgba(255, 214, 110, 0.65),
+    var(--shadow);
+}
+
+[data-theme='magic'] .sound-node.chip-node.selected {
+  border-right-color: transparent;
+}
+
+[data-theme='magic'] .sound-node::after {
+  content: '✦';
+  position: absolute;
+  top: 3px;
+  right: 7px;
+  font-size: 10px;
+  line-height: 1;
+  color: #e8c26a;
+  opacity: 0.75;
+  text-shadow: 0 0 6px rgba(255, 214, 110, 0.9);
+  pointer-events: none;
+}
+
+[data-theme='magic'] .sound-node-title {
+  text-shadow: 0 0 8px color-mix(in srgb, var(--cat) 55%, transparent);
+}
+
+[data-theme='magic'] .sound-node .react-flow__handle {
+  box-shadow: 0 0 7px var(--cat);
+}
+
+/* Вывеска — золото с сиянием. */
+[data-theme='magic'] .brand {
+  background: linear-gradient(180deg, #fff3c4 0%, #e8c26a 55%, #b8862e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 6px rgba(255, 214, 110, 0.55));
+}
+
+[data-theme='magic'] button.primary,
+[data-theme='magic'] .sound-toggle.on {
+  background-image: linear-gradient(180deg, #ffe7a3 0%, #e8c26a 55%, #c99a3e 100%);
+  box-shadow: 0 0 14px rgba(255, 214, 110, 0.45);
+}
+
+/* Провода — светящиеся нити. */
+[data-theme='magic'] .react-flow__edge-path {
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(185, 147, 255, 0.85));
+}
+
+[data-theme='magic'] .react-flow__edge.selected .react-flow__edge-path,
+[data-theme='magic'] .react-flow__edge:hover .react-flow__edge-path {
+  filter: drop-shadow(0 0 4px rgba(255, 214, 110, 0.9));
+}
+
+/* Искорка раз в 20 с пробегает по проводу от выхода ко входу (провод — 100 единиц длины). */
+[data-theme='magic'] .wire-wisp {
+  stroke: #fff6d8;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 2.5 97.5;
+  stroke-dashoffset: 2.5;
+  opacity: 0;
+  filter: drop-shadow(0 0 3px #ffe08a) drop-shadow(0 0 7px rgba(255, 190, 90, 0.8));
+  pointer-events: none;
+  animation: magic-wisp 20s linear infinite;
+}
+
+@keyframes magic-wisp {
+  0% {
+    stroke-dashoffset: 2.5;
+    opacity: 0;
+  }
+  1% {
+    opacity: 1;
+  }
+  9% {
+    opacity: 1;
+  }
+  10% {
+    stroke-dashoffset: -97.5;
+    opacity: 0;
+  }
+  100% {
+    stroke-dashoffset: -97.5;
+    opacity: 0;
+  }
+}
