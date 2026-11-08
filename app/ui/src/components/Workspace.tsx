@@ -17,7 +17,7 @@ import {
   type Edge,
   type OnSelectionChangeParams,
 } from '@xyflow/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, isCmdError, onTemplatesOpened, type Settings, type UserTemplate } from '../api';
 import {
   arrange,
@@ -47,6 +47,7 @@ import SimpleView from './SimpleView';
 import SoundNodeView from './SoundNodeView';
 import TemplatesDialog from './TemplatesDialog';
 import Toolbar, { type SaveState } from './Toolbar';
+import Mascot from './Mascot';
 import Watermark from './Watermark';
 import WelcomeDialog from './WelcomeDialog';
 
@@ -76,6 +77,15 @@ export default function Workspace({ project, version, settings, lang, onSettings
   const [freshTemplates, setFreshTemplates] = useState<string[]>([]);
   const [cableOpen, setCableOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  // Подпись провода при наведении: обычный слой поверх карты (подпись React Flow рисуется в
+  // слое проводов, то есть под узлами).
+  const [wireTip, setWireTip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const showWireTip = useCallback((ev: MouseEvent, edge: Edge) => {
+    const box = mapRef.current?.getBoundingClientRect();
+    if (!box || typeof edge.label !== 'string') return;
+    setWireTip({ text: edge.label, x: ev.clientX - box.left, y: ev.clientY - box.top });
+  }, []);
+  const hideWireTip = useCallback(() => setWireTip(null), []);
   const welcome = !settings.welcomeDone;
   const dialogOpen = hotkeysOpen || templatesOpen || cableOpen || clearOpen || welcome;
   const mapRef = useRef<HTMLDivElement>(null);
@@ -417,6 +427,12 @@ export default function Workspace({ project, version, settings, lang, onSettings
       <main className="main">
         <div className="map" ref={mapRef}>
           <Watermark />
+          <Mascot theme={settings.theme} />
+          {wireTip && (
+            <div className="wire-tip" style={{ left: wireTip.x, top: wireTip.y }} role="tooltip">
+              {wireTip.text}
+            </div>
+          )}
           {nodes.length === 0 && (
             <div className="empty-hint">
               <strong>{t('empty.title')}</strong>
@@ -435,6 +451,9 @@ export default function Workspace({ project, version, settings, lang, onSettings
             onConnect={onConnect}
             isValidConnection={isValidConnection}
             onSelectionChange={onSelectionChange}
+            onEdgeMouseEnter={showWireTip}
+            onEdgeMouseMove={showWireTip}
+            onEdgeMouseLeave={hideWireTip}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             connectionLineType={traces ? ConnectionLineType.SmoothStep : ConnectionLineType.Bezier}
@@ -473,6 +492,8 @@ export default function Workspace({ project, version, settings, lang, onSettings
           fresh={freshTemplates}
           hidden={settings.hiddenTemplates ?? []}
           onHidden={(ids) => onSettings({ ...settings, hiddenTemplates: ids })}
+          current={settings.currentTemplate ?? null}
+          onCurrent={(id) => onSettings({ ...settings, currentTemplate: id })}
           onPick={addTemplate}
           onClose={() => {
             setTemplatesOpen(false);

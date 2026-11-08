@@ -1,0 +1,13 @@
+{
+  "id": "kids-dark",
+  "names": {
+    "ru": "Детская тёмная",
+    "en": "Kids Dark",
+    "uk": "Дитяча темна"
+  },
+  "fonts": [
+    "Comic Sans MS",
+    "Comic Neue"
+  ],
+  "order": 4
+}

@@ -212,6 +212,13 @@ fn save_template(state: State<AppState>, name: String, description: String, proj
 }
 
 #[tauri::command]
+fn update_template(state: State<AppState>, id: String, project: Project) -> Result<UserTemplate, CmdError> {
+    let t = templates::update(&state.paths.templates, &id, &project).map_err(template_error)?;
+    applog::info(&format!("template updated: {id}"));
+    Ok(t)
+}
+
+#[tauri::command]
 fn delete_template(state: State<AppState>, id: String) -> Result<(), CmdError> {
     templates::delete(&state.paths.templates, &id).map_err(template_error)?;
     applog::info(&format!("template deleted: {id}"));
@@ -330,6 +337,7 @@ fn main() {
             get_ui_state,
             list_templates,
             save_template,
+            update_template,
             delete_template,
             import_template,
             export_template,

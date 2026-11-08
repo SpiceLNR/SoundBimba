@@ -25,11 +25,14 @@ interface Props {
   className?: string;
   /** Список той же ширины, что кнопка (иначе — не уже кнопки, по содержимому). */
   matchWidth?: boolean;
+  /** Кнопка шириной с самый длинный пункт списка, список — ровно с кнопку (на любом языке и в
+   *  любой теме: в кнопке невидимо лежат все пункты и задают её ширину). */
+  fit?: boolean;
   align?: 'left' | 'right';
   ariaLabel?: string;
 }
 
-export default function Dropdown({ label, groups, onSelect, className, matchWidth, align = 'left', ariaLabel }: Props) {
+export default function Dropdown({ label, groups, onSelect, className, matchWidth, fit, align = 'left', ariaLabel }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -54,13 +57,22 @@ export default function Dropdown({ label, groups, onSelect, className, matchWidt
         title={ariaLabel}
         onClick={() => setOpen((o) => !o)}
       >
-        <span className="dropdown-label">{label}</span>
+        <span className={`dropdown-label${fit ? ' fit' : ''}`}>
+          <span>{label}</span>
+          {fit && (
+            <span className="dropdown-ghost" aria-hidden="true">
+              {groups.flatMap((g) => g.items).map((it) => (
+                <span key={it.value}>{it.label}</span>
+              ))}
+            </span>
+          )}
+        </span>
         <span className="dropdown-caret" aria-hidden="true">
           ▾
         </span>
       </button>
       {open && (
-        <div className={`dropdown-list align-${align}${matchWidth ? ' match-width' : ''}`} role="listbox">
+        <div className={`dropdown-list align-${align}${matchWidth || fit ? ' match-width' : ''}`} role="listbox">
           {groups.map((g, gi) => (
             <div key={g.title ?? gi} className="dropdown-group" role="group" aria-label={g.title}>
               {g.title && <div className="dropdown-group-title">{g.title}</div>}

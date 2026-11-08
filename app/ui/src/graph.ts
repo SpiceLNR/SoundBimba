@@ -17,9 +17,11 @@ interface KindInfo {
 }
 
 export const KINDS: Record<NodeKind, KindInfo> = {
+  // Порядок здесь — порядок списка «Добавить узел» и цифр 1–9; кнопка — первая (просьба автора
+  // 2026-11-08).
+  'sound-button': { category: 'button', input: false, output: true, defaults: { file: '' } },
   'app-source': { category: 'source', input: false, output: true, defaults: { exe: '' } },
   'mic-input': { category: 'source', input: false, output: true, defaults: { device: 'default' } },
-  'sound-button': { category: 'button', input: false, output: true, defaults: { file: '' } },
   volume: { category: 'processing', input: true, output: true, defaults: { gain: 1, mute: false } },
   // Те же значения, что набор «Голос» и COMPRESSOR_DEFAULTS в движке.
   compressor: {
@@ -36,7 +38,7 @@ export const KINDS: Record<NodeKind, KindInfo> = {
 };
 
 export const KIND_ORDER = Object.keys(KINDS) as NodeKind[];
-export const CATEGORY_ORDER: Category[] = ['source', 'button', 'processing', 'output'];
+export const CATEGORY_ORDER: Category[] = ['button', 'source', 'processing', 'output'];
 
 export interface ProjectNode {
   id: string;
@@ -142,94 +144,348 @@ export function newNode(kind: NodeKind, id: string, x: number, y: number): Sound
   return { id, type: 'sound', position: { x, y }, data: { kind, params: { ...KINDS[kind].defaults } } };
 }
 
-const COLUMN_STEP = NODE_WIDTH + 100;
-const ROW_STEP = NODE_HEIGHT + 46;
-const LOOSE_GAP = 70;
+const COLUMN_GAP = 64;
+const ROW_GAP = 26;
+/** Кнопки — плотная стопка. */
+const BUTTON_GAP = 10;
+const COMPONENT_GAP = 28;
+const LOOSE_GAP = 28;
+/** Высота «коридора» для длинного провода, проходящего через столбец. */
+const CORRIDOR = 10;
+const BUTTON_WIDTH = 250;
+const BUTTON_HEIGHT = 112;
+
+/** Размер узла: настоящий, если карта его уже измерила, иначе — по типу. */
+function sizeOf(n: SoundNode): { w: number; h: number } {
+  const button = n.data.kind === 'sound-button';
+  return {
+    w: n.measured?.width ?? (button ? BUTTON_WIDTH : NODE_WIDTH),
+    h: n.measured?.height ?? (button ? BUTTON_HEIGHT : NODE_HEIGHT),
+  };
+}
+
+/** Элемент столбца: узел или «коридор» длинного провода. */
+interface Slot {
+  id: string;
+  node?: SoundNode;
+  h: number;
+  preds: string[];
+  succs: string[];
+}
+
+/** Число пересечений проводов между двумя соседними столбцами при данном порядке. */
+function crossings(left: string[], right: string[], slots: Map<string, Slot>): number {
+  const pos = new Map(right.map((id, i) => [id, i]));
+  const pairs: [number, number][] = [];
+  left.forEach((id, i) => {
+    for (const s of slots.get(id)!.succs) if (pos.has(s)) pairs.push([i, pos.get(s)!]);
+  });
+  let n = 0;
+  for (let a = 0; a < pairs.length; a++)
+    for (let b = a + 1; b < pairs.length; b++)
+      if ((pairs[a][0] - pairs[b][0]) * (pairs[a][1] - pairs[b][1]) < 0) n++;
+  return n;
+}
 
 /**
- * Автораскладка «Упорядочить» — столбцами слева направо:
- *  - первый столбец — источники и кнопки, последний — выходы, между ними — обработка
- *    (громкость после громкости уходит на столбец правее);
- *  - внутри столбца узлы стоят так, чтобы провода меньше пересекались;
- *  - узлы без проводов не сбиваются в одну линию: каждый встаёт в столбец своего типа,
- *    ниже соединённой схемы — как «ещё не подключённые».
+ * Автораскладка «Упорядочить» (послойная, как в схемах-графах):
+ *  - столбцы слева направо (просьба автора 2026-11-08): кнопки, источники, обработка (громкость
+ *    после громкости — правее), все выходы — в одном, последнем столбце; если кнопок нет,
+ *    источники — в первом столбце; схемы с кнопками — первыми;
+ *  - каждая отдельная (не связанная проводами с другими) схема — своей полосой, полосы одна под
+ *    другой в том порядке, в каком они стояли на карте;
+ *  - порядок в столбцах — с наименьшим числом пересечений проводов («центр тяжести» соседей +
+ *    перестановки соседних, лучший из найденных); длинный провод учитывается через «коридоры»
+ *    в промежуточных столбцах (по высоте они места не занимают);
+ *  - высоты — ровными строками, как автор расставляет руками: узел на одной строке с одним
+ *    соседом слева, строки плотно сверху вниз; кнопки — отдельной плотной стопкой;
+ *  - неподключённые узлы — ниже всего, каждый в столбце своего типа.
  */
 export function arrange(nodes: SoundNode[], edges: Edge[]): SoundNode[] {
-  const ids = new Set(nodes.map((n) => n.id));
-  const links = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const links = edges.filter((e) => byId.has(e.source) && byId.has(e.target) && e.source !== e.target);
   const preds = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
   const succs = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
   for (const e of links) {
     preds.get(e.target)!.push(e.source);
     succs.get(e.source)!.push(e.target);
   }
-  const kindOf = new Map(nodes.map((n) => [n.id, n.data.kind]));
-  const cat = (id: string) => KINDS[kindOf.get(id)!].category;
+  const cat = (id: string) => KINDS[byId.get(id)!.data.kind].category;
 
-  // Столбец обработки = 1 + самый дальний столбец среди тех, кто подаёт в него звук.
+  // Столбцы (общие для всей карты — чтобы одинаковые типы стояли друг под другом).
   const procRank = new Map<string, number>();
+  const sourceCol = nodes.some((n) => cat(n.id) === 'button') ? 1 : 0;
   const rankOf = (id: string, seen = new Set<string>()): number => {
-    if (cat(id) === 'source' || cat(id) === 'button') return 0;
+    if (cat(id) === 'button') return 0;
+    if (cat(id) === 'source') return sourceCol;
     const known = procRank.get(id);
     if (known !== undefined) return known;
     if (seen.has(id)) return 1; // циклов быть не должно; защита от зависания
     seen.add(id);
-    const r = 1 + Math.max(0, ...preds.get(id)!.map((p) => (cat(p) === 'output' ? 0 : rankOf(p, seen))));
+    // По настоящим входам: громкость, в которую идут только кнопки, встаёт в столбец источников
+    // (она для остальной схемы и есть источник); обработка без входов — сразу за источниками.
+    const ins = preds.get(id)!.filter((p) => cat(p) !== 'output');
+    const r = ins.length ? 1 + Math.max(...ins.map((p) => rankOf(p, seen))) : sourceCol + 1;
     procRank.set(id, r);
     return r;
   };
   const processing = nodes.filter((n) => cat(n.id) === 'processing');
   const maxProc = Math.max(0, ...processing.map((n) => rankOf(n.id)));
-  const last = processing.length > 0 ? Math.max(maxProc, 1) + 1 : 1;
+  const last = Math.max(maxProc, sourceCol) + 1;
   const column = (id: string) => (cat(id) === 'output' ? last : rankOf(id));
 
-  const isLinked = (id: string) => preds.get(id)!.length > 0 || succs.get(id)!.length > 0;
-  const byY = (a: SoundNode, b: SoundNode) => a.position.y - b.position.y || a.id.localeCompare(b.id);
-  const linked = nodes.filter((n) => isLinked(n.id)).sort(byY);
-  const loose = nodes.filter((n) => !isLinked(n.id)).sort(byY);
+  // Ширина столбца — по самому широкому узлу в нём.
+  const colWidth = new Array<number>(last + 1).fill(NODE_WIDTH);
+  for (const n of nodes) colWidth[column(n.id)] = Math.max(colWidth[column(n.id)], sizeOf(n).w);
+  const colX: number[] = [];
+  colWidth.reduce((x, w, c) => ((colX[c] = x), x + w + COLUMN_GAP), 0);
 
-  // Соединённая часть: по столбцам, затем порядок внутри них по «центру тяжести» соседей.
-  const cols: string[][] = Array.from({ length: last + 1 }, () => []);
-  for (const n of linked) cols[column(n.id)].push(n.id);
-  const index = new Map<string, number>();
-  const reindex = () => cols.forEach((c) => c.forEach((id, i) => index.set(id, i)));
-  reindex();
-  const sortBy = (col: string[], neighbours: Map<string, string[]>) => {
-    const centre = (id: string) => {
-      const ns = neighbours.get(id)!.filter((x) => index.has(x));
-      return ns.length ? ns.reduce((sum, x) => sum + index.get(x)!, 0) / ns.length : index.get(id)!;
-    };
-    const keyed = col.map((id) => ({ id, key: centre(id) }));
-    keyed.sort((a, b) => a.key - b.key || index.get(a.id)! - index.get(b.id)!);
-    col.splice(0, col.length, ...keyed.map((k) => k.id));
-  };
-  for (let pass = 0; pass < 4; pass++) {
-    for (let c = 1; c <= last; c++) {
-      sortBy(cols[c], preds);
-      reindex();
+  const isLinked = (id: string) => preds.get(id)!.length > 0 || succs.get(id)!.length > 0;
+  const byY = (a: SoundNode, b: SoundNode) => a.position.y - b.position.y || a.position.x - b.position.x || a.id.localeCompare(b.id);
+
+  // Отдельные схемы (связанные проводами части), в порядке их верха на карте.
+  const seen = new Set<string>();
+  const components: SoundNode[][] = [];
+  for (const start of nodes.filter((n) => isLinked(n.id)).sort(byY)) {
+    if (seen.has(start.id)) continue;
+    const comp: SoundNode[] = [];
+    const stack = [start.id];
+    seen.add(start.id);
+    while (stack.length) {
+      const id = stack.pop()!;
+      comp.push(byId.get(id)!);
+      for (const x of [...preds.get(id)!, ...succs.get(id)!]) {
+        if (!seen.has(x)) {
+          seen.add(x);
+          stack.push(x);
+        }
+      }
     }
-    for (let c = last - 1; c >= 0; c--) {
-      sortBy(cols[c], succs);
-      reindex();
-    }
+    components.push(comp.sort(byY));
   }
+  const hasButton = (comp: SoundNode[]) => (comp.some((n) => n.data.kind === 'sound-button') ? 0 : 1);
+  components.sort((a, b) => hasButton(a) - hasButton(b)); // порядок сортировки устойчив
 
   const pos = new Map<string, { x: number; y: number }>();
-  const tallest = Math.max(0, ...cols.map((c) => c.length));
-  cols.forEach((col, c) => {
-    const top = ((tallest - col.length) * ROW_STEP) / 2; // столбцы выровнены по центру
-    col.forEach((id, i) => pos.set(id, { x: c * COLUMN_STEP, y: top + i * ROW_STEP }));
-  });
+  let top = 0;
+  for (const comp of components) {
+    const bottom = layoutComponent(comp, column, last, succs);
+    for (const [id, y] of bottom.ys) pos.set(id, { x: colX[column(id)], y: top + y });
+    top += bottom.height + COMPONENT_GAP;
+  }
 
-  // Неподключённые — ниже схемы, каждый в столбце своего типа.
-  const looseTop = tallest > 0 ? tallest * ROW_STEP + LOOSE_GAP : 0;
-  const looseCount = new Array<number>(last + 1).fill(0);
-  for (const n of loose) {
+  // Неподключённые — ниже всего, каждый в столбце своего типа.
+  const looseTop = components.length ? top - COMPONENT_GAP + LOOSE_GAP : 0;
+  const looseY = new Array<number>(last + 1).fill(looseTop);
+  for (const n of nodes.filter((x) => !isLinked(x.id)).sort(byY)) {
     const c = column(n.id);
-    pos.set(n.id, { x: c * COLUMN_STEP, y: looseTop + looseCount[c]++ * ROW_STEP });
+    pos.set(n.id, { x: colX[c], y: looseY[c] });
+    looseY[c] += sizeOf(n).h + ROW_GAP;
   }
 
   return nodes.map((n) => ({ ...n, position: pos.get(n.id)! }));
+}
+
+/** Кнопки идут раньше всех в своём столбце. */
+const buttonRank = (n?: SoundNode) => (n?.data.kind === 'sound-button' ? 0 : 1);
+
+/** Раскладка одной связанной схемы: высота каждого узла (от верха схемы) и общая высота. */
+function layoutComponent(
+  comp: SoundNode[],
+  column: (id: string) => number,
+  last: number,
+  succs: Map<string, string[]>,
+): { ys: Map<string, number>; height: number } {
+  // Слоты: узлы и коридоры длинных проводов.
+  const slots = new Map<string, Slot>();
+  const cols: string[][] = Array.from({ length: last + 1 }, () => []);
+  for (const n of comp) {
+    slots.set(n.id, { id: n.id, node: n, h: sizeOf(n).h, preds: [], succs: [] });
+    cols[column(n.id)].push(n.id); // comp уже в порядке «сверху вниз» на карте
+  }
+  const link = (a: string, b: string) => {
+    slots.get(a)!.succs.push(b);
+    slots.get(b)!.preds.push(a);
+  };
+  for (const n of comp) {
+    for (const t of succs.get(n.id)!) {
+      let from = n.id;
+      for (let c = column(n.id) + 1; c < column(t); c++) {
+        const id = `${n.id}->${t}#${c}`;
+        slots.set(id, { id, h: CORRIDOR, preds: [], succs: [] });
+        cols[c].push(id);
+        link(from, id);
+        from = id;
+      }
+      link(from, t);
+    }
+  }
+  const group = (id: string) => buttonRank(slots.get(id)!.node);
+  for (const col of cols) col.sort((a, b) => group(a) - group(b)); // кнопки — сверху
+
+  // Порядок в столбцах: центр тяжести соседей туда-обратно + перестановки соседних.
+  const index = new Map<string, number>();
+  const reindex = () => cols.forEach((c) => c.forEach((id, i) => index.set(id, i)));
+  const total = () => cols.slice(0, -1).reduce((sum, c, i) => sum + crossings(c, cols[i + 1], slots), 0);
+  const sortBy = (col: string[], side: 'preds' | 'succs') => {
+    const centre = (id: string) => {
+      const ns = slots.get(id)![side];
+      return ns.length ? ns.reduce((s, x) => s + index.get(x)!, 0) / ns.length : index.get(id)!;
+    };
+    const keyed = col.map((id) => ({ id, key: centre(id) }));
+    keyed.sort((a, b) => group(a.id) - group(b.id) || a.key - b.key || index.get(a.id)! - index.get(b.id)!);
+    col.splice(0, col.length, ...keyed.map((k) => k.id));
+    reindex();
+  };
+  const transpose = () => {
+    let improved = true;
+    for (let guard = 0; improved && guard < 20; guard++) {
+      improved = false;
+      for (let c = 0; c <= last; c++) {
+        for (let i = 0; i + 1 < cols[c].length; i++) {
+          if (group(cols[c][i]) !== group(cols[c][i + 1])) continue; // кнопки не опускаем под источники
+          const local = () =>
+            (c > 0 ? crossings(cols[c - 1], cols[c], slots) : 0) + (c < last ? crossings(cols[c], cols[c + 1], slots) : 0);
+          const before = local();
+          [cols[c][i], cols[c][i + 1]] = [cols[c][i + 1], cols[c][i]];
+          if (local() < before) improved = true;
+          else [cols[c][i], cols[c][i + 1]] = [cols[c][i + 1], cols[c][i]];
+        }
+      }
+    }
+    reindex();
+  };
+  reindex();
+  let best = cols.map((c) => [...c]);
+  let bestCount = total();
+  for (let pass = 0; pass < 8 && bestCount > 0; pass++) {
+    for (let c = 1; c <= last; c++) sortBy(cols[c], 'preds');
+    for (let c = last - 1; c >= 0; c--) sortBy(cols[c], 'succs');
+    transpose();
+    const count = total();
+    if (count < bestCount) {
+      bestCount = count;
+      best = cols.map((c) => [...c]);
+    }
+  }
+  best.forEach((c, i) => cols[i].splice(0, cols[i].length, ...c));
+
+  // Узел, в который идут только кнопки (обычно их громкость), — в середину своего столбца: к нему
+  // сходятся провода от всей стопки кнопок, и схема получается симметричной.
+  const buttonOnly = (id: string) => {
+    const s = slots.get(id)!;
+    return !!s.node && s.node.data.kind !== 'sound-button' && s.preds.length > 0 && s.preds.every((p) => slots.get(p)!.node?.data.kind === 'sound-button');
+  };
+  for (const col of cols) {
+    const fed = col.filter(buttonOnly);
+    if (!fed.length) continue;
+    const rest = col.filter((id) => !buttonOnly(id));
+    const realBefore = Math.floor(rest.filter((id) => slots.get(id)!.node).length / 2);
+    let at = 0;
+    for (let seen = 0; at < rest.length && seen < realBefore; at++) if (slots.get(rest[at])!.node) seen++;
+    col.splice(0, col.length, ...rest.slice(0, at), ...fed, ...rest.slice(at));
+  }
+
+  // Высоты. Коридоры нужны только для порядка: по высоте место не занимают. Кнопки — отдельная
+  // плотная стопка слева и остальную схему не тянут (иначе всё растягивается по высоте кнопок).
+  const isButton = (id: string) => slots.get(id)!.node?.data.kind === 'sound-button';
+  const rows = cols.map((col) => col.filter((id) => slots.get(id)!.node && !isButton(id)));
+  const h = (id: string) => slots.get(id)!.h;
+  const y = new Map<string, number>();
+  // Настоящие соседи (сквозь коридоры), без кнопок; «близкие» — в соседнем столбце.
+  const neighbours = (id: string, side: 'preds' | 'succs') => {
+    const out: { id: string; near: boolean }[] = [];
+    for (let n of slots.get(id)![side]) {
+      let near = true;
+      while (!slots.get(n)!.node) {
+        n = slots.get(n)![side][0];
+        near = false;
+      }
+      if (!isButton(n)) out.push({ id: n, near });
+    }
+    return out;
+  };
+
+  // Ровные строки (как автор расставляет руками): каждый узел встаёт на одну строку с одним
+  // соседом слева — средним из входов (при чётном числе — верхним из двух средних), если тот
+  // ещё свободен и это не перекрещивает другие строки. Так получаются цепочки-«строки».
+  const rowIndex = new Map<string, number>();
+  rows.forEach((col) => col.forEach((id, i) => rowIndex.set(id, i)));
+  const root = new Map<string, string>(comp.map((n) => [n.id, n.id]));
+  const taken = new Set<string>();
+  for (let c = 1; c <= last; c++) {
+    let lastUsed = -1;
+    for (const v of rows[c]) {
+      const ps = neighbours(v, 'preds')
+        .filter((n) => n.near)
+        .map((n) => n.id)
+        .sort((a, b) => rowIndex.get(a)! - rowIndex.get(b)!);
+      if (!ps.length) continue;
+      const choices = [ps[Math.ceil(ps.length / 2) - 1], ps[Math.floor(ps.length / 2)]];
+      const u = choices.find((p) => !taken.has(p) && rowIndex.get(p)! > lastUsed);
+      if (!u) continue;
+      root.set(v, root.get(u)!);
+      taken.add(u);
+      lastUsed = rowIndex.get(u)!;
+    }
+  }
+  // Строки укладываются плотно сверху вниз: в каждом столбце узел не выше, чем позволяет узел
+  // над ним. Положение строки — по середине её узлов (узлы бывают разной высоты).
+  const middle = new Map<string, number>();
+  for (const col of rows) for (const id of col) middle.set(root.get(id)!, Math.max(middle.get(root.get(id)!) ?? 0, h(id) / 2));
+  for (let changed = true, guard = 0; changed && guard < 500; guard++) {
+    changed = false;
+    for (const col of rows) {
+      for (let i = 1; i < col.length; i++) {
+        const u = col[i - 1];
+        const v = col[i];
+        const need = middle.get(root.get(u)!)! + h(u) / 2 + ROW_GAP + h(v) / 2;
+        if (middle.get(root.get(v)!)! < need - 0.01) {
+          middle.set(root.get(v)!, need);
+          changed = true;
+        }
+      }
+    }
+  }
+  for (const col of rows) for (const id of col) y.set(id, middle.get(root.get(id)!)! - h(id) / 2);
+  const centre = (id: string) => y.get(id)! + h(id) / 2;
+
+  // Кнопки — плотная стопка, отцентрованная напротив того, куда они идут (обычно их громкости):
+  // схема оказывается посередине стопки. Несколько групп кнопок — каждая напротив своей цели,
+  // без наложений (то же «ближайший неубывающий ряд», что и выше).
+  for (const col of cols) {
+    const stack = col.filter((id) => slots.get(id)!.node && isButton(id));
+    if (!stack.length) continue;
+    const want = stack.map((id) => {
+      const cs = neighbours(id, 'succs')
+        .map((n) => centre(n.id))
+        .sort((a, b) => a - b);
+      return cs.length ? cs[Math.ceil(cs.length / 2) - 1] - h(id) / 2 : 0;
+    });
+    const offset: number[] = [];
+    stack.reduce((acc, id, i) => ((offset[i] = acc), acc + h(id) + BUTTON_GAP), 0);
+    const groups: { sum: number; n: number }[] = [];
+    for (let i = 0; i < stack.length; i++) {
+      groups.push({ sum: want[i] - offset[i], n: 1 });
+      while (groups.length > 1) {
+        const g2 = groups[groups.length - 1];
+        const g1 = groups[groups.length - 2];
+        if (g1.sum / g1.n <= g2.sum / g2.n) break;
+        g1.sum += g2.sum;
+        g1.n += g2.n;
+        groups.pop();
+      }
+    }
+    let i = 0;
+    for (const g of groups) for (let k = 0; k < g.n; k++, i++) y.set(stack[i], g.sum / g.n + offset[i]);
+  }
+
+  // Схема — от нуля по высоте.
+  const real = comp.map((n) => n.id);
+  const minY = Math.min(...real.map((id) => y.get(id)!));
+  const ys = new Map(real.map((id) => [id, y.get(id)! - minY]));
+  const height = Math.max(...real.map((id) => ys.get(id)! + slots.get(id)!.h));
+  return { ys, height };
 }
 
 /** Короткая подпись под названием узла: что выбрано. */
@@ -277,18 +533,39 @@ export interface VolumeRoute {
   from: string;
   /** Куда звук уходит дальше, через запятую. */
   to: string;
+  /** То же списками — простой режим сворачивает длинные перечисления. */
+  fromNames: string[];
+  toNames: string[];
+}
+
+/** Порядок в простом режиме — число simpleOrder в параметрах узла: так он попадает и в файл
+ *  проекта, и в шаблон .bmb, а звуковой движок его не читает (и не перезапускается). Узлы без
+ *  номера — после пронумерованных, в порядке карты. */
+export function simpleSorted<T extends { params: Params }>(items: T[]): T[] {
+  const key = (x: T) => (typeof x.params.simpleOrder === 'number' ? x.params.simpleOrder : 1e9);
+  return items
+    .map((x, i) => ({ x, i }))
+    .sort((a, b) => key(a.x) - key(b.x) || a.i - b.i)
+    .map((a) => a.x);
+}
+
+/** Ставит id на место target (остальные сдвигаются) — новые номера всех элементов раздела. */
+export function moveTo(ids: string[], id: string, target: string): Record<string, number> {
+  const from = ids.indexOf(id);
+  const to = ids.indexOf(target);
+  const next = ids.filter((x) => x !== id);
+  if (from >= 0 && to >= 0) next.splice(to, 0, id);
+  return Object.fromEntries(next.map((x, i) => [x, i]));
 }
 
 /** Регуляторы для простого режима (громкость, морфер): «откуда → куда» по соседним узлам. */
 export function volumeRoutes(p: Project, t: Translate, kind: NodeKind = 'volume'): VolumeRoute[] {
   const byId = new Map(p.nodes.map((n) => [n.id, n]));
-  const names = (ids: string[]) =>
-    [...new Set(ids.map((id) => byId.get(id)).filter((n): n is ProjectNode => !!n).map((n) => shortName(n, t)))].join(', ');
-  return p.nodes
-    .filter((n) => n.type === kind)
-    .map((n) => ({
-      id: n.id,
-      from: names(p.edges.filter((e) => e.to === n.id).map((e) => e.from)),
-      to: names(p.edges.filter((e) => e.from === n.id).map((e) => e.to)),
-    }));
+  const names = (ids: string[]) => [...new Set(ids.map((id) => byId.get(id)).filter((n): n is ProjectNode => !!n).map((n) => shortName(n, t)))];
+  return simpleSorted(p.nodes.filter((n) => n.type === kind))
+    .map((n) => {
+      const fromNames = names(p.edges.filter((e) => e.to === n.id).map((e) => e.from));
+      const toNames = names(p.edges.filter((e) => e.from === n.id).map((e) => e.to));
+      return { id: n.id, from: fromNames.join(', '), to: toNames.join(', '), fromNames, toNames };
+    });
 }

@@ -102,8 +102,8 @@ export default function Toolbar(p: Props) {
         {t('toolbar.hotkeys')}
       </button>
       <Dropdown
-        className="settings-menu"
         label={t('toolbar.settings')}
+        fit
         align="right"
         onSelect={(v) => {
           const [what, value] = v.split(':');

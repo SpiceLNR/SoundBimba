@@ -143,3 +143,15 @@
 [data-theme='engineer'] .meter {
   background: #262626;
 }
+
+/* Кнопки-значки (окно шаблонов): плоские кнопки темы без фона и рамки — значок висел бы в
+   пустоте, поэтому у него заливка-плитка и тонкая рамка; при наведении — рамка цвета акцента. */
+[data-theme='engineer'] .icon-button:not(.primary) {
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+
+[data-theme='engineer'] .icon-button:not(.primary):hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}

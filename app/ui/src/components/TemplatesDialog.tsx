@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Окно «Готовые схемы»: встроенные шаблоны и свои (файлы .bmb в папке программы). Свой шаблон
-// можно сохранить из текущей карты, открыть из файла, сохранить в файл (поделиться) и удалить.
+// можно сохранить из текущей карты, обновить из карты, открыть из файла, сохранить в файл
+// (поделиться) и удалить. Действия — кнопки-значки с подписью при наведении.
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type UserTemplate } from '../api';
 import { KINDS, type NodeKind, type Project } from '../graph';
 import { useT } from '../i18n';
 import { fromProject, TEMPLATES, type Template } from '../templates';
+import IconButton from './IconButton';
 import type { Notify } from './Notices';
 
 interface Props {
@@ -17,6 +19,9 @@ interface Props {
   /** Убранные встроенные шаблоны. */
   hidden: string[];
   onHidden: (ids: string[]) => void;
+  /** Свой шаблон, с которым сейчас работают (последний добавленный или сохранённый). */
+  current: string | null;
+  onCurrent: (id: string) => void;
   onPick: (tpl: Template, name: string) => void;
   onClose: () => void;
   notify: Notify;
@@ -36,11 +41,12 @@ function Parts({ kinds }: { kinds: NodeKind[] }) {
   );
 }
 
-export default function TemplatesDialog({ project, fresh, hidden, onHidden, onPick, onClose, notify, reason }: Props) {
+export default function TemplatesDialog({ project, fresh, hidden, onHidden, current, onCurrent, onPick, onClose, notify, reason }: Props) {
   const t = useT();
   const [mine, setMine] = useState<UserTemplate[]>([]);
   const [form, setForm] = useState<{ name: string; description: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmUpdate, setConfirmUpdate] = useState<string | null>(null);
   const filters = useMemo(() => [{ name: t('dialog.templateFilter'), extensions: ['bmb'] }], [t]);
 
   const reload = useCallback(() => {
@@ -57,6 +63,7 @@ export default function TemplatesDialog({ project, fresh, hidden, onHidden, onPi
       const saved = await api.saveTemplate(form.name, form.description, project);
       setForm(null);
       reload();
+      onCurrent(saved.id);
       notify('notice.templateSaved', { name: saved.name });
     } catch (e) {
       notify('error.templateSave', { reason: reason(e) }, true);
@@ -86,6 +93,20 @@ export default function TemplatesDialog({ project, fresh, hidden, onHidden, onPi
     }
   };
 
+  // Обновить шаблон: схема на карте (с порядком простого режима) заменяет схему в его файле;
+  // название и описание остаются. Встроенные шаблоны не обновляются.
+  const update = async (tpl: UserTemplate) => {
+    setConfirmUpdate(null);
+    onCurrent(tpl.id);
+    try {
+      await api.updateTemplate(tpl.id, project);
+      reload();
+      notify('notice.templateUpdated', { name: tpl.name });
+    } catch (e) {
+      notify('error.templateUpdate', { reason: reason(e) }, true);
+    }
+  };
+
   const remove = async (tpl: UserTemplate) => {
     setConfirmDelete(null);
     try {
@@ -104,9 +125,12 @@ export default function TemplatesDialog({ project, fresh, hidden, onHidden, onPi
   return (
     <div className="dialog-backdrop">
       <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="templates-title">
-        <h2 id="templates-title" className="panel-title">
-          {t('templates.title')}
-        </h2>
+        <div className="dialog-head">
+          <h2 id="templates-title" className="panel-title">
+            {t('templates.title')}
+          </h2>
+          <IconButton icon="close" label={t('templates.close')} onClick={onClose} />
+        </div>
         <p className="panel-desc">{t('templates.hint')}</p>
 
         <h3 className="template-section">{t('templates.mine')}</h3>
@@ -168,9 +192,21 @@ export default function TemplatesDialog({ project, fresh, hidden, onHidden, onPi
                 <strong>
                   {tpl.name}
                   {fresh.includes(tpl.id) && <span className="template-new">{t('templates.new')}</span>}
+                  {tpl.id === current && <span className="template-new">{t('templates.current')}</span>}
                 </strong>
                 {tpl.description && <span className="panel-desc">{tpl.description}</span>}
                 <Parts kinds={tpl.project.nodes.map((n) => n.type)} />
+                {confirmUpdate === tpl.id && (
+                  <span className="template-confirm">
+                    <span>{t('templates.updateConfirm', { name: tpl.name })}</span>
+                    <button type="button" autoFocus onClick={() => setConfirmUpdate(null)}>
+                      {t('templates.cancel')}
+                    </button>
+                    <button type="button" className="primary" onClick={() => void update(tpl)}>
+                      {t('templates.updateYes')}
+                    </button>
+                  </span>
+                )}
                 {confirmDelete === tpl.id && (
                   <span className="template-confirm">
                     <span>{t('templates.deleteConfirm', { name: tpl.name })}</span>
@@ -184,20 +220,24 @@ export default function TemplatesDialog({ project, fresh, hidden, onHidden, onPi
                 )}
               </div>
               <div className="template-buttons">
-                <button
-                  type="button"
-                  className="primary"
+                <IconButton
+                  icon="add"
+                  primary
+                  label={t('templates.add')}
                   disabled={tpl.project.nodes.length === 0}
-                  onClick={() => onPick(fromProject(tpl.id, tpl.project), tpl.name)}
-                >
-                  {t('templates.add')}
-                </button>
-                <button type="button" title={t('templates.exportTitle')} onClick={() => void exportFile(tpl)}>
-                  {t('templates.export')}
-                </button>
-                <button type="button" onClick={() => setConfirmDelete(tpl.id)}>
-                  {t('templates.delete')}
-                </button>
+                  onClick={() => {
+                    onCurrent(tpl.id);
+                    onPick(fromProject(tpl.id, tpl.project), tpl.name);
+                  }}
+                />
+                <IconButton
+                  icon="update"
+                  label={t('templates.update')}
+                  disabled={mapEmpty || confirmUpdate !== null}
+                  onClick={() => setConfirmUpdate(tpl.id)}
+                />
+                <IconButton icon="export" label={t('templates.export')} onClick={() => void exportFile(tpl)} />
+                <IconButton icon="delete" label={t('templates.delete')} onClick={() => setConfirmDelete(tpl.id)} />
               </div>
             </div>
           ))}
@@ -246,23 +286,13 @@ export default function TemplatesDialog({ project, fresh, hidden, onHidden, onPi
                 )}
               </div>
               <div className="template-buttons">
-                <button type="button" className="primary" onClick={() => onPick(tpl, t(`template.${tpl.id}.title`))}>
-                  {t('templates.add')}
-                </button>
-                <button type="button" onClick={() => setConfirmDelete(`builtin:${tpl.id}`)}>
-                  {t('templates.delete')}
-                </button>
+                <IconButton icon="add" primary label={t('templates.add')} onClick={() => onPick(tpl, t(`template.${tpl.id}.title`))} />
+                <IconButton icon="delete" label={t('templates.delete')} onClick={() => setConfirmDelete(`builtin:${tpl.id}`)} />
               </div>
             </div>
           ))}
         </div>
 
-        <div className="dialog-actions">
-          <span className="toolbar-gap" />
-          <button type="button" onClick={onClose}>
-            {t('templates.close')}
-          </button>
-        </div>
       </div>
     </div>
   );

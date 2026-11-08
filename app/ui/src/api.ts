@@ -19,6 +19,8 @@ export interface Settings {
   welcomeDone?: boolean;
   /** Встроенные шаблоны, убранные из списка. */
   hiddenTemplates?: string[];
+  /** Свой шаблон, который последним добавляли на карту или сохраняли (у него — «Сохранить изменения»). */
+  currentTemplate?: string | null;
 }
 
 /** Свой шаблон из папки пользователя (`id` — имя файла .bmb без расширения). */
@@ -162,6 +164,11 @@ function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     previewTemplates.push(t);
     return Promise.resolve(t as T);
   }
+  if (cmd === 'update_template') {
+    const t = previewTemplates.find((x) => x.id === args?.id)!;
+    t.project = args?.project as Project;
+    return Promise.resolve(t as T);
+  }
   if (cmd === 'delete_template') previewTemplates.splice(previewTemplates.findIndex((t) => t.id === args?.id), 1);
   if (cmd === 'take_opened_templates') return Promise.resolve({ templates: [], errors: [] } as T);
   if (cmd === 'press_button') {
@@ -241,6 +248,7 @@ export const api = {
   listTemplates: () => call<UserTemplate[]>('list_templates'),
   saveTemplate: (name: string, description: string, project: Project) =>
     call<UserTemplate>('save_template', { name, description, project }),
+  updateTemplate: (id: string, project: Project) => call<UserTemplate>('update_template', { id, project }),
   deleteTemplate: (id: string) => call<void>('delete_template', { id }),
   importTemplate: (path: string) => call<UserTemplate>('import_template', { path }),
   exportTemplate: (id: string, path: string) => call<void>('export_template', { id, path }),

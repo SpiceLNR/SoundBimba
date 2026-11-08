@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { canConnect, fromFlow, newNode, toFlow, wouldCreateCycle, type Project } from './graph';
+import { canConnect, fromFlow, moveTo, newNode, simpleSorted, toFlow, wouldCreateCycle, type Project } from './graph';
 import { DICTS, LANGUAGES } from './i18n';
 import { applyTemplate, fromProject, TEMPLATES } from './templates';
 
@@ -18,6 +18,26 @@ describe('templates', () => {
       }
       expect(edges.some((e) => wouldCreateCycle(edges.filter((x) => x !== e), e.source, e.target))).toBe(false);
     }
+  });
+
+  it('simple-mode order: move a button, and the order goes into the template and back', () => {
+    // Три кнопки; третью ставим первой.
+    const ids = ['b1', 'b2', 'b3'];
+    const order = moveTo(ids, 'b3', 'b1');
+    expect(order).toEqual({ b3: 0, b1: 1, b2: 2 });
+    expect(moveTo(ids, 'b1', 'b3')).toEqual({ b2: 0, b3: 1, b1: 2 });
+    const nodes = ids.map((id, i) => {
+      const n = newNode('sound-button', id, 0, i * 100);
+      n.data.params = { ...n.data.params, simpleOrder: order[id] };
+      return n;
+    });
+    // Сохранили как шаблон и добавили на пустую карту: номера узлов новые, порядок тот же.
+    const tpl = fromProject('mine', fromFlow(nodes, []));
+    const added = applyTemplate([], [], tpl).nodes;
+    const sorted = simpleSorted(added.map((n) => ({ id: n.id, params: n.data.params })));
+    expect(sorted.map((n) => added.findIndex((a) => a.id === n.id))).toEqual([2, 0, 1]);
+    // Узлы без номера — после пронумерованных, в порядке карты.
+    expect(simpleSorted([{ params: {} }, { params: { simpleOrder: 0 } }, { params: {} }]).map((x) => x.params.simpleOrder ?? 'none')).toEqual([0, 'none', 'none']);
   });
 
   it('every template has a name and description in all languages', () => {

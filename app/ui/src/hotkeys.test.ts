@@ -52,6 +52,15 @@ describe('hotkeys', () => {
     expect(digits).toEqual(['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9']);
   });
 
+  it('the sound button is first: digit 1, old saved 1–3 move along', () => {
+    expect(DEFAULT_BINDINGS['add-sound-button']).toBe('Digit1');
+    // Сохранено, как было до 2026-11-08: приложение 1, микрофон 2, кнопка 3.
+    const b = mergeBindings({ 'add-app-source': 'Digit1', 'add-mic-input': 'Digit2', 'add-sound-button': 'Digit3' });
+    expect(b['add-sound-button']).toBe('Digit1');
+    expect(b['add-app-source']).toBe('Digit2');
+    expect(b['add-mic-input']).toBe('Digit3');
+  });
+
   it('old saved defaults move to the new digits, own choices stay', () => {
     // Сохранено, как было раньше: наушники 5, виртуальный микрофон 6 — и своя клавиша у компрессора.
     const b = mergeBindings({ 'add-speaker-out': 'Digit5', 'add-virtual-out': 'Digit6', 'add-compressor': 'KeyC', 'add-volume': 'Digit4' });

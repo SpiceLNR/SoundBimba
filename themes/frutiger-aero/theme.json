@@ -1,6 +1,19 @@
 {
   "id": "frutiger-aero",
-  "names": { "ru": "Фрутигер аэро", "en": "Frutiger Aero", "uk": "Фрутігер аеро" },
-  "fonts": ["Segoe UI", "Open Sans"],
-  "order": 6
+  "names": {
+    "ru": "Фрутигер аэро",
+    "en": "Frutiger Aero",
+    "uk": "Фрутігер аеро"
+  },
+  "fonts": [
+    "Segoe UI",
+    "Open Sans"
+  ],
+  "order": 7,
+  "mascot": {
+    "lines": [
+      "mascot.frutiger-aero.1",
+      "mascot.frutiger-aero.2"
+    ]
+  }
 }

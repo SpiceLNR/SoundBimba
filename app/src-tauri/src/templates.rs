@@ -198,6 +198,16 @@ pub fn delete(dir: &Path, id: &str) -> Result<(), TemplateError> {
     Ok(fs::remove_file(path)?)
 }
 
+/// Сохраняет изменения в свой шаблон: та же схема-файл, название и описание прежние, схема —
+/// новая (кнопка «Сохранить изменения» у текущего шаблона).
+pub fn update(dir: &Path, id: &str, project: &Project) -> Result<UserTemplate, TemplateError> {
+    let path = own_path(dir, id).ok_or(TemplateError::NotTemplate)?;
+    let (name, description, _) = parse(&read_limited(&path)?)?;
+    graph::validate(project).map_err(|e| TemplateError::Project(e.code(), e.to_string()))?;
+    write_atomic(&path, &to_text(&name, &description, project))?;
+    Ok(UserTemplate { id: id.into(), name, description, project: project.clone() })
+}
+
 /// Добавляет шаблон из файла (например, присланного другом) в свои.
 pub fn import(dir: &Path, src: &Path) -> Result<UserTemplate, TemplateError> {
     let (name, description, project) = parse(&read_limited(src)?)?;
@@ -238,13 +248,23 @@ mod tests {
         let b = save(&dir, "Мой стрим", "", &p).unwrap();
         assert_ne!(a.id, b.id, "одинаковые названия — разные файлы");
         assert_eq!(list(&dir).len(), 2);
+        // Сохранить изменения: та же запись, название и описание прежние, схема новая.
+        let mut changed = p.clone();
+        changed.nodes[0].params.insert("simpleOrder".into(), serde_json::json!(3));
+        let u = update(&dir, &a.id, &changed).unwrap();
+        assert_eq!((u.id.as_str(), u.name.as_str(), u.description.as_str()), (a.id.as_str(), "Мой стрим", "Музыка тише голоса"));
+        let again = list(&dir).into_iter().find(|t| t.id == a.id).unwrap();
+        assert_eq!(again.project, changed);
+        assert_eq!(list(&dir).len(), 2);
+        assert!(update(&dir, "../x", &p).is_err());
+        assert!(update(&dir, "нет такого", &p).is_err());
 
         let out = dir.join("export.bmb.out");
         export(&dir, &a.id, &out).unwrap();
         let other = temp_dir("other");
         let imported = import(&other, &out).unwrap();
         assert_eq!((imported.name.as_str(), imported.description.as_str()), ("Мой стрим", "Музыка тише голоса"));
-        assert_eq!(imported.project, p);
+        assert_eq!(imported.project, changed, "порядок простого режима переживает экспорт и импорт");
 
         delete(&dir, &a.id).unwrap();
         assert_eq!(list(&dir).len(), 1);

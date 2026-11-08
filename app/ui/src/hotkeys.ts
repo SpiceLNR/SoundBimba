@@ -36,9 +36,9 @@ export const DEFAULT_BINDINGS: Bindings = {
   diagnostics: '',
   // Цифры 1–9 (без Ctrl) — по порядку списка «Добавить узел»: быстро добавить узел, когда курсор
   // не в поле ввода.
-  'add-app-source': 'Digit1',
-  'add-mic-input': 'Digit2',
-  'add-sound-button': 'Digit3',
+  'add-sound-button': 'Digit1',
+  'add-app-source': 'Digit2',
+  'add-mic-input': 'Digit3',
   'add-volume': 'Digit4',
   'add-compressor': 'Digit5',
   'add-voice-morpher': 'Digit6',
@@ -47,14 +47,18 @@ export const DEFAULT_BINDINGS: Bindings = {
   'add-virtual-out': 'Digit9',
 };
 
-/** Прежние сочетания по умолчанию (до 2026-11-03: цифры шли не по порядку списка). Сохранённое
- *  прежнее значение по умолчанию считаем «не менял» и даём новое. */
-const PREVIOUS_DEFAULTS: Partial<Record<Action, string>> = {
-  'add-speaker-out': 'Digit5',
-  'add-virtual-out': 'Digit6',
-  'add-compressor': 'Digit7',
-  'add-voice-morpher': 'Digit8',
-  'add-denoise': 'Digit9',
+/** Прежние сочетания по умолчанию (до 2026-11-03 цифры шли не по порядку списка; до 2026-11-08
+ *  кнопка была третьей, а не первой). Сохранённое прежнее значение по умолчанию считаем «не
+ *  менял» и даём новое. */
+const PREVIOUS_DEFAULTS: Partial<Record<Action, string[]>> = {
+  'add-app-source': ['Digit1'],
+  'add-mic-input': ['Digit2'],
+  'add-sound-button': ['Digit3'],
+  'add-speaker-out': ['Digit5'],
+  'add-virtual-out': ['Digit6'],
+  'add-compressor': ['Digit7'],
+  'add-voice-morpher': ['Digit8'],
+  'add-denoise': ['Digit9'],
 };
 
 const MODIFIERS = new Set(['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight']);
@@ -110,7 +114,7 @@ export function mergeBindings(saved?: Record<string, string>): Bindings {
   const own = new Set<Action>();
   for (const a of ACTIONS) {
     const v = saved?.[a];
-    if (typeof v !== 'string' || v === PREVIOUS_DEFAULTS[a]) continue;
+    if (typeof v !== 'string' || PREVIOUS_DEFAULTS[a]?.includes(v)) continue;
     b[a] = v;
     own.add(a);
   }

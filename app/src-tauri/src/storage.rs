@@ -63,6 +63,10 @@ pub struct Settings {
     /// Встроенные шаблоны, которые человек убрал из списка (их можно вернуть).
     #[serde(default)]
     pub hidden_templates: Vec<String>,
+    /// Свой шаблон, который последним добавляли на карту или сохраняли: у него в окне шаблонов
+    /// кнопка «Сохранить изменения».
+    #[serde(default)]
+    pub current_template: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -88,6 +92,7 @@ impl Default for Settings {
             mode: default_mode(),
             welcome_done: false,
             hidden_templates: Vec::new(),
+            current_template: None,
         }
     }
 }

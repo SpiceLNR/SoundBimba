@@ -1,0 +1,244 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Тема «Детская тёмная»: та же дурашливая флеш-игра нулевых, что «Детская» (глянцевые пухлые
+   кнопки, толстые обводки, жёсткие мультяшные тени, пастельная радужная вывеска, подпрыгивающие
+   узлы, огоньки по проводам), но ночью: звёздное небо с луной, приглушённые сливово-серые карточки,
+   тёмная пастель (мягкие, неконтрастные цвета), светлый текст. Шрифт — Comic Sans MS из Windows (не распространяем), запасной
+   Comic Neue (SIL OFL). Если в Windows выключены эффекты анимации — всё стоит на месте. */
+[data-theme='kids-dark'] {
+  --font: 'Comic Sans MS', 'Comic Neue', cursive;
+  --font-size: 15px;
+  --title-weight: 700;
+  --title-transform: none;
+  --title-spacing: 0;
+
+  --bg: #2a2638;
+  --surface: #353048;
+  --surface-2: #433c5a;
+  --text: #efe8f4;
+  --text-muted: #b6aecb;
+  --border: #1a1724;
+  --border-width: 3px;
+  --accent: #e9a6c8;
+  --accent-text: #2a2638;
+  --danger: #e89a9a;
+  --radius: 18px;
+  --radius-small: 12px;
+  --shadow: 4px 4px 0 #1a1724;
+
+  --control-bg: #433c5a;
+  --control-bg-hover: #4f4769;
+  --control-border-hover: #e9a6c8;
+  --control-border: #1a1724;
+
+  /* Comic Sans широкий — список «Добавить узел» тоже. */
+  --add-node-width: 268px;
+
+  --slider-track: #211e2d;
+  --slider-track-height: 10px;
+  --slider-thumb-bg: #e9a6c8;
+  --slider-thumb-width: 26px;
+  --slider-thumb-height: 26px;
+  --slider-thumb-radius: 50%;
+
+  --node-bg: #3a344f;
+  --node-text: #efe8f4;
+  --node-source: #9ccbe6;
+  --node-processing: #c4abe6;
+  --node-output: #a6d8b2;
+  --node-button: #efc79a;
+  --node-selected: #eedd9e;
+  --handle-size: 20px;
+
+  --wire: #efc79a;
+  --wire-selected: #e9a6c8;
+  --dots: #433c5a;
+  --watermark-color: #eedd9e;
+  --watermark-opacity: 0.07;
+
+  /* Толстые розовые полосы прокрутки. */
+  --scrollbar-size: 16px;
+  --scrollbar-track: #353048;
+  --scrollbar-thumb: #d9a2c0;
+  --scrollbar-thumb-hover: #e9a6c8;
+  --scrollbar-radius: 10px;
+
+  --backdrop: rgba(14, 12, 22, 0.6);
+  --notice-bg: #433c5a;
+  --notice-error-bg: #5a3646;
+}
+
+/* Ночное небо: звёзды, луна, далёкое сияние. */
+[data-theme='kids-dark'] .map {
+  background:
+    radial-gradient(circle 34px at 86% 14%, #f3e8c0 0 60%, rgba(243, 232, 192, 0.25) 70%, transparent 74%),
+    radial-gradient(circle 26px at 89% 12%, #2a2638 0 92%, transparent 96%),
+    radial-gradient(circle 2px at 10% 12%, #ffffff 0 70%, transparent 100%),
+    radial-gradient(circle 1.5px at 22% 30%, #ffffff 0 70%, transparent 100%),
+    radial-gradient(circle 2.5px at 38% 8%, #efe2bc 0 70%, transparent 100%),
+    radial-gradient(circle 1.5px at 52% 24%, #ffffff 0 70%, transparent 100%),
+    radial-gradient(circle 2px at 66% 6%, #ffffff 0 70%, transparent 100%),
+    radial-gradient(circle 1.5px at 74% 34%, #efe2bc 0 70%, transparent 100%),
+    radial-gradient(circle 2px at 6% 48%, #ffffff 0 70%, transparent 100%),
+    radial-gradient(circle 1.5px at 30% 62%, #ffffff 0 70%, transparent 100%),
+    radial-gradient(circle 2px at 94% 52%, #ffffff 0 70%, transparent 100%),
+    radial-gradient(ellipse 140% 40% at 50% 120%, rgba(233, 166, 200, 0.18), transparent 70%),
+    linear-gradient(180deg, #211d30 0%, #2a2638 55%, #3a3250 100%);
+}
+
+/* Глянцевая фиолетово-малиновая панель сверху. */
+[data-theme='kids-dark'] .toolbar {
+  background: linear-gradient(180deg, #6f6290 0%, #5c507c 48%, #4e436c 52%, #625684 100%);
+  border-bottom: 3px solid #1a1724;
+}
+
+/* Радужная вывеска, которая слегка качается. */
+[data-theme='kids-dark'] .brand {
+  font-size: 1.45em;
+  background: linear-gradient(90deg, #f0a8a8, #f2c79c, #eee0a0, #b0dcb6, #a6cdea, #c8b0ea);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1px #1a1724;
+  display: inline-block;
+}
+
+/* Глянцевые пухлые кнопки с мультяшной тенью. */
+[data-theme='kids-dark'] button:not(.button-disc):not(.react-flow__controls-button) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 50%, rgba(0, 0, 0, 0.08) 51%, rgba(255, 255, 255, 0) 100%);
+  box-shadow: 3px 3px 0 #1a1724;
+  font-weight: 700;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+[data-theme='kids-dark'] button:not(.button-disc):not(.react-flow__controls-button):hover:not(:disabled) {
+  transform: translateY(-2px) rotate(-1.5deg) scale(1.04);
+}
+
+[data-theme='kids-dark'] button:not(.button-disc):not(.react-flow__controls-button):active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #1a1724;
+}
+
+/* Кнопки масштаба карты — одна пухлая панель с обводкой и общей тенью. */
+[data-theme='kids-dark'] .react-flow__controls {
+  border: 3px solid #1a1724;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 4px 4px 0 #1a1724;
+}
+
+[data-theme='kids-dark'] .react-flow__controls-button {
+  width: 26px;
+  height: 26px;
+  background: #433c5a;
+  border-bottom: 2px solid #1a1724;
+}
+
+[data-theme='kids-dark'] .react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+[data-theme='kids-dark'] .react-flow__controls-button:hover {
+  background: #4f4769;
+}
+
+[data-theme='kids-dark'] .react-flow__controls-button svg {
+  fill: #efe8f4;
+}
+
+[data-theme='kids-dark'] .side-panel,
+[data-theme='kids-dark'] .dialog {
+  box-shadow: 6px 6px 0 #1a1724;
+}
+
+[data-theme='kids-dark'] .dialog {
+  border-width: 4px;
+  border-color: #1a1724;
+}
+
+/* Узлы — мультяшные карточки. */
+[data-theme='kids-dark'] .sound-node {
+  border: 3px solid #1a1724;
+  border-left: 12px solid var(--cat);
+  background-image: linear-gradient(180deg, #454060 0%, #3a344f 55%, #322d45 100%);
+  box-shadow: 5px 5px 0 #1a1724;
+}
+
+[data-theme='kids-dark'] .sound-node.selected {
+  outline: 4px dashed var(--node-selected);
+  outline-offset: 4px;
+}
+
+/* Точки подключения — большие цветные шарики с бликом. */
+[data-theme='kids-dark'] .sound-node .react-flow__handle {
+  border: 3px solid #1a1724;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0 18%, var(--cat) 22% 100%);
+}
+
+/* Провода: толстые, с тёмной обводкой; по ним бегут огоньки. */
+[data-theme='kids-dark'] .react-flow__edge-path {
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 14 9;
+  filter: drop-shadow(1.5px 0 0 #1a1724) drop-shadow(-1.5px 0 0 #1a1724) drop-shadow(0 1.5px 0 #1a1724) drop-shadow(0 -1.5px 0 #1a1724);
+}
+
+[data-theme='kids-dark'] .meter {
+  height: 8px;
+  border: 2px solid #1a1724;
+  background: #211e2d;
+}
+
+@keyframes kids-dark-wobble {
+  0%, 100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg) scale(1.05);
+  }
+}
+
+@keyframes kids-dark-hop {
+  0%, 100% {
+    transform: translateY(0) rotate(0);
+  }
+  40% {
+    transform: translateY(-5px) rotate(-1.5deg);
+  }
+  70% {
+    transform: translateY(0) rotate(1deg);
+  }
+}
+
+@keyframes kids-dark-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes kids-dark-current {
+  to {
+    stroke-dashoffset: -46;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='kids-dark'] .brand {
+    animation: kids-dark-wobble 2.4s ease-in-out infinite;
+  }
+
+  [data-theme='kids-dark'] .sound-node:hover {
+    animation: kids-dark-hop 0.5s ease-out;
+  }
+
+  [data-theme='kids-dark'] .watermark svg {
+    animation: kids-dark-bounce 3s ease-in-out infinite;
+  }
+
+  [data-theme='kids-dark'] .react-flow__edge-path {
+    animation: kids-dark-current 1.2s linear infinite;
+  }
+}

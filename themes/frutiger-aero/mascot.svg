@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 280">
+  <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+  <!-- Мультяшный усатый мужичок в сером пиджаке с пальцами вверх (тема «Фрутигер аэро»).
+       Нарисован для SoundBimba; обобщённый персонаж, не портрет реального человека. -->
+  <defs>
+    <linearGradient id="suit" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c4c4cc"/>
+      <stop offset="1" stop-color="#9c9ca6"/>
+    </linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3c6a0"/>
+      <stop offset="1" stop-color="#dfa47c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Туловище: пиджак, рубашка, галстук -->
+  <path d="M40 280 C40 214 62 192 110 186 C158 192 180 214 180 280 Z" fill="url(#suit)" stroke="#5e5e68" stroke-width="3"/>
+  <path d="M92 188 L110 236 L128 188 Z" fill="#5d6e60" stroke="#3f4a41" stroke-width="2"/>
+  <path d="M104 192 L116 192 L120 244 L110 258 L100 244 Z" fill="#cdbd92" stroke="#8f8160" stroke-width="2"/>
+  <path d="M92 188 L84 206 L102 226 L110 236 Z" fill="#b3b3bc" stroke="#5e5e68" stroke-width="2"/>
+  <path d="M128 188 L136 206 L118 226 L110 236 Z" fill="#b3b3bc" stroke="#5e5e68" stroke-width="2"/>
+  <circle cx="112" cy="266" r="3.5" fill="#7c7c86"/>
+
+  <!-- Руки вверх, кулаки с большими пальцами -->
+  <path d="M52 222 C34 206 30 176 36 150" fill="none" stroke="url(#suit)" stroke-width="22" stroke-linecap="round"/>
+  <path d="M52 222 C34 206 30 176 36 150" fill="none" stroke="#5e5e68" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+  <path d="M168 222 C186 206 190 176 184 150" fill="none" stroke="url(#suit)" stroke-width="22" stroke-linecap="round"/>
+  <path d="M168 222 C186 206 190 176 184 150" fill="none" stroke="#5e5e68" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+  <!-- Кулак: поджатые пальцы видны спереди; большой палец — сбоку, у внутреннего края, чуть
+       наклонён наружу, с ногтем (чтобы жест читался как «класс»). -->
+  <g id="thumb-up-left" stroke="#a86f4c" stroke-width="2.5" stroke-linejoin="round">
+    <path d="M44 126 L40 102 C39 93 52 91 54 100 L58 126 Z" fill="url(#skin)" transform="rotate(-10 50 126)"/>
+    <ellipse cx="47.2" cy="99.5" rx="4.6" ry="3.4" fill="#f9dcc4" stroke-width="1.4" transform="rotate(-10 50 126)"/>
+    <rect x="18" y="120" width="40" height="36" rx="12" fill="url(#skin)"/>
+    <path d="M18 129 C24 128 30 128 36 130 M18 138 C24 137 30 137 36 139 M18 147 C24 146 30 146 36 148" fill="none" stroke-width="1.8"/>
+  </g>
+  <use href="#thumb-up-left" transform="translate(220 0) scale(-1 1)"/>
+
+  <!-- Шея и голова -->
+  <rect x="98" y="166" width="24" height="26" rx="8" fill="url(#skin)" stroke="#a86f4c" stroke-width="2"/>
+  <ellipse cx="68" cy="114" rx="9" ry="13" fill="url(#skin)" stroke="#a86f4c" stroke-width="2.5"/>
+  <ellipse cx="152" cy="114" rx="9" ry="13" fill="url(#skin)" stroke="#a86f4c" stroke-width="2.5"/>
+  <ellipse cx="110" cy="114" rx="42" ry="56" fill="url(#skin)" stroke="#a86f4c" stroke-width="3"/>
+
+  <!-- Кудри -->
+  <g fill="#231812">
+    <circle cx="78" cy="70" r="16"/>
+    <circle cx="96" cy="58" r="17"/>
+    <circle cx="116" cy="55" r="17"/>
+    <circle cx="136" cy="62" r="16"/>
+    <circle cx="148" cy="80" r="13"/>
+    <circle cx="70" cy="88" r="11"/>
+    <circle cx="88" cy="72" r="12"/>
+    <circle cx="126" cy="70" r="12"/>
+  </g>
+
+  <!-- Брови, глаза -->
+  <path d="M82 96 Q94 88 104 96" fill="none" stroke="#231812" stroke-width="5" stroke-linecap="round"/>
+  <path d="M116 96 Q126 88 138 96" fill="none" stroke="#231812" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="94" cy="108" rx="8" ry="7" fill="#ffffff" stroke="#6b4a36" stroke-width="1.5"/>
+  <ellipse cx="126" cy="108" rx="8" ry="7" fill="#ffffff" stroke="#6b4a36" stroke-width="1.5"/>
+  <circle cx="95" cy="109" r="3.6" fill="#3a2418"/>
+  <circle cx="125" cy="109" r="3.6" fill="#3a2418"/>
+  <circle cx="96.2" cy="107.6" r="1.1" fill="#ffffff"/>
+  <circle cx="126.2" cy="107.6" r="1.1" fill="#ffffff"/>
+
+  <!-- Нос -->
+  <path d="M110 110 Q104 128 108 132 Q112 134 116 131" fill="none" stroke="#a86f4c" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Широкая улыбка -->
+  <path d="M86 146 Q110 172 134 146 Q110 156 86 146 Z" fill="#ffffff" stroke="#7a3e2c" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M92 150 Q110 160 128 150" fill="none" stroke="#d6c8bf" stroke-width="1.2"/>
+
+  <!-- Пышные усы -->
+  <path d="M110 134 C100 132 88 134 80 142 C76 147 78 152 84 150 C92 147 100 146 110 146 C120 146 128 147 136 150 C142 152 144 147 140 142 C132 134 120 132 110 134 Z" fill="#231812"/>
+
+  <!-- Румянец -->
+  <ellipse cx="82" cy="130" rx="7" ry="4" fill="#ef8f7a" opacity="0.45"/>
+  <ellipse cx="138" cy="130" rx="7" ry="4" fill="#ef8f7a" opacity="0.45"/>
+</svg>
