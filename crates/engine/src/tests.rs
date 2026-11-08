@@ -321,16 +321,46 @@ fn two_nodes_on_one_output_are_mixed_once_per_block() {
 }
 
 #[test]
-fn soft_limiter_keeps_quiet_sound_and_tames_peaks() {
-    let mut buf = vec![0.5, -0.89, 0.95, -1.5, 3.0, 1.0];
-    let overloaded = super::soft_limit(&mut buf);
-    assert!(overloaded);
-    assert_eq!(&buf[..2], &[0.5, -0.89], "тихое не трогаем");
-    assert!(buf[2] > 0.9 && buf[2] < 0.95);
-    assert!(buf[3] > -1.0 && buf[3] < -0.9);
-    assert!(buf[4] <= 1.0 && buf[4] > buf[2], "громче — ближе к максимуму, но не выше");
-    let mut quiet = vec![0.3; 8];
-    assert!(!super::soft_limit(&mut quiet));
+fn limiter_leaves_quiet_sound_untouched() {
+    let input: Vec<f32> = sine(RATE as usize / 2, 440.0, 0.9, RATE);
+    let mut buf = input.clone();
+    let mut gain = 1.0;
+    for chunk in buf.chunks_mut(BLOCK_SAMPLES) {
+        assert!(!super::limit(chunk, &mut gain));
+    }
+    assert_eq!(buf, input, "тише потолка — ни одного изменённого отсчёта");
+}
+
+#[test]
+fn limiter_turns_down_volume_without_distorting_the_wave() {
+    // Тон в 1,5 раза громче максимума (так бывает, когда громкий трек складывается с голосом).
+    let input = sine(RATE as usize, 440.0, 1.5, RATE);
+    let mut buf = input.clone();
+    let mut gain = 1.0;
+    let mut overloaded = false;
+    for chunk in buf.chunks_mut(BLOCK_SAMPLES) {
+        overloaded |= super::limit(chunk, &mut gain);
+    }
+    assert!(overloaded, "перегруз замечен");
+    assert!(buf.iter().all(|s| s.abs() <= LIMIT_CEILING + 1e-6), "выше потолка ничего нет");
+    // После первых 10 мс — та же синусоида, только тише: форма волны не искажена.
+    let k = LIMIT_CEILING / 1.5;
+    let worst = buf.iter().zip(&input).skip(RATE as usize / 100 * CHANNELS).map(|(o, i)| (o - i * k).abs()).fold(0.0f32, f32::max);
+    assert!(worst < 0.01, "искажение {worst}");
+}
+
+#[test]
+fn limiter_lets_go_after_the_peak() {
+    let mut gain = 1.0;
+    let mut loud = vec![1.96f32; BLOCK_SAMPLES];
+    super::limit(&mut loud, &mut gain);
+    assert!((gain - 0.5).abs() < 1e-3, "пик вдвое громче потолка — громкость вдвое ниже");
+    // Полсекунды тихого звука — громкость вернулась почти полностью.
+    for _ in 0..(RATE as usize / 2 / BLOCK) {
+        let mut quiet = vec![0.1f32; BLOCK_SAMPLES];
+        super::limit(&mut quiet, &mut gain);
+    }
+    assert!(gain > 0.99, "{gain}");
 }
 
 #[test]
@@ -511,6 +541,38 @@ fn long_sound_continues_from_disk_after_the_head() {
     assert_eq!(peaks[1], 0.5);
     assert!(peaks[2..].iter().all(|&p| p > 0.24 && p <= 0.25), "дальше — с диска: {peaks:?}");
     let _ = &mut r;
+}
+
+#[test]
+fn head_to_disk_seam_has_no_dip() {
+    use std::sync::atomic::Ordering::Acquire;
+    // Звук 0,5 и в памяти, и с диска; подкачка готова заранее — на стыке громкость не проседает
+    // (раньше там было «плавное вступление» с нуля — щелчок на 2-й секунде длинных звуков).
+    let head = BLOCK * 2;
+    let (mut g, mut r, shared, feed) = button_rig_with(head, (BLOCK * 8) as u64);
+    let (mut prod, ctl) = feed.unwrap();
+    let btn = shared["btn"].clone();
+    btn.press();
+    g.process();
+    prod.push(f32::NAN).unwrap();
+    prod.push(ctl.want_gen.load(Acquire) as f32).unwrap();
+    for _ in 0..BLOCK * 6 * CHANNELS {
+        prod.push(0.5).unwrap();
+    }
+    // Первый блок уже обработан; дальше — блок движка и блок с выхода, как в жизни.
+    let mut left = Vec::new();
+    let mut buf = vec![0.0; BLOCK_SAMPLES];
+    for _ in 0..14 {
+        g.process();
+        r.read(&mut buf);
+        left.extend(buf.iter().step_by(2).copied());
+    }
+    // Выход отдаёт звук после запаса кольца; ищем начало и смотрим 6 блоков после вступления.
+    let start = left.iter().position(|&s| s > 0.0).expect("звук пошёл");
+    // После вступления первых 5 мс — ровно 0,5 до конца звука, в том числе на стыке.
+    let body = &left[start + STOP_FADE..start + BLOCK * 7];
+    let min = body.iter().copied().fold(f32::MAX, f32::min);
+    assert!(min > 0.499, "провал на стыке до {min}");
 }
 
 #[test]

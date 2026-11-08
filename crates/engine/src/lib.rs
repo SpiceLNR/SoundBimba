@@ -99,6 +99,10 @@ struct Playback {
     synced: bool,
     /// Ждём запаса подкачки (после перемотки или нехватки данных).
     buffering: bool,
+    /// Звук на время замолкал (ждали подкачку): тогда после ожидания — плавное вступление.
+    /// Переход с начала в памяти на подкачку без ожидания — бесшовный, без вступления: иначе
+    /// громкость на миг падает до нуля — щелчок на 2-й секунде каждого длинного звука.
+    waited: bool,
 }
 
 enum Op {
@@ -137,6 +141,8 @@ pub struct Graph {
     in_bufs: Vec<[f32; BLOCK_SAMPLES]>,
     /// Сумма для каждого выхода: несколько узлов на одном устройстве складываются.
     out_bufs: Vec<[f32; BLOCK_SAMPLES]>,
+    /// Громкость ограничителя каждого выхода (память между блоками).
+    limit_gains: Vec<f32>,
 }
 
 /// Описание портов, которые нужно открыть для скомпилированного графа (по порядку индексов).
@@ -214,7 +220,8 @@ impl Graph {
         let buffers = (0..steps.len()).map(|_| block()).collect();
         let in_bufs = (0..inputs.len()).map(|_| block()).collect();
         let out_bufs = (0..outputs.len()).map(|_| block()).collect();
-        Ok(Graph { steps, buffers, inputs, outputs, in_bufs, out_bufs })
+        let limit_gains = vec![1.0; outputs.len()];
+        Ok(Graph { steps, buffers, inputs, outputs, in_bufs, out_bufs, limit_gains })
     }
 
     /// Обрабатывает один блок (BLOCK кадров). Реальное время: без выделения памяти и блокировок.
@@ -266,8 +273,8 @@ impl Graph {
             }
             step.shared.report_peak(&out[..]);
         }
-        for (writer, buf) in self.outputs.iter_mut().zip(self.out_bufs.iter_mut()) {
-            if soft_limit(&mut buf[..]) {
+        for ((writer, buf), gain) in self.outputs.iter_mut().zip(self.out_bufs.iter_mut()).zip(self.limit_gains.iter_mut()) {
+            if limit(&mut buf[..], gain) {
                 writer.stats().overloads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
             writer.write(&buf[..]);
@@ -299,6 +306,7 @@ fn start_button(src: &ButtonSource, pb: &mut Playback, pos: u64) {
     pb.paused = false;
     pb.fade_left = None;
     pb.fade_in = STOP_FADE;
+    pb.waited = false;
     if let Some(tail) = &src.tail {
         let head_frames = (src.head.len() / CHANNELS) as u64;
         pb.gen = pb.gen.wrapping_add(1).max(1);
@@ -372,6 +380,7 @@ fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeS
                 Some(tail) => {
                     // Подкачка ещё не ответила на перемотку — тишина, позиция стоит.
                     if !pb.synced {
+                        pb.waited = true;
                         break;
                     }
                     let avail = (tail.cons.slots() / CHANNELS) as u64;
@@ -380,10 +389,14 @@ fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeS
                     if pb.buffering {
                         // Ждём запаса (или всего, что осталось до конца), потом — плавно.
                         if avail < TAIL_PREFILL.min(total - pb.pos) && !file_ended {
+                            pb.waited = true;
                             break;
                         }
                         pb.buffering = false;
-                        pb.fade_in = STOP_FADE;
+                        if pb.waited {
+                            pb.fade_in = STOP_FADE;
+                            pb.waited = false;
+                        }
                     }
                     if avail == 0 {
                         if file_ended {
@@ -391,6 +404,7 @@ fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeS
                             break;
                         }
                         pb.buffering = true; // диск не успел — подождём запаса, а не будем заикаться
+                        pb.waited = true;
                         break;
                     }
                     (tail.cons.pop().unwrap_or(0.0), tail.cons.pop().unwrap_or(0.0))
@@ -422,20 +436,32 @@ fn play_button(src: Option<&mut ButtonSource>, pb: &mut Playback, shared: &NodeS
     shared.set_button(pb.playing, shown, total);
 }
 
-/// Порог мягкого ограничителя: тише — звук не меняется вовсе.
-const LIMIT_KNEE: f32 = 0.9;
+/// Потолок ограничителя на выходе: тише — звук не меняется вовсе.
+const LIMIT_CEILING: f32 = 0.98;
+/// Как быстро ограничитель отпускает громкость после пика: 80 мс.
+const LIMIT_RELEASE_MS: f32 = 80.0;
 
-/// Мягкий ограничитель на выходе: громкие пики (сумма источников, усиление выше 100 %) плавно
-/// прижимаются к максимуму вместо жёсткого среза — жёсткий срез слышен как хруст.
+/// Ограничитель на выходе: если сумма источников громче потолка, **вся** громкость мгновенно
+/// убавляется ровно настолько, чтобы пик пришёлся на потолок, и потом плавно (80 мс) возвращается.
+/// Форма волны не искажается — меняется только громкость. (Прежний ограничитель прижимал каждый
+/// отсчёт отдельно — при перегрузе это слышно как треск.) `gain` — память между блоками.
 /// Возвращает true, если в блоке был перегруз (звук громче максимума).
-fn soft_limit(buf: &mut [f32]) -> bool {
+fn limit(buf: &mut [f32], gain: &mut f32) -> bool {
+    let release = 1.0 - (-1.0 / (LIMIT_RELEASE_MS * 0.001 * RATE as f32)).exp();
     let mut overloaded = false;
-    for s in buf.iter_mut() {
-        let a = s.abs();
-        if a > LIMIT_KNEE {
-            overloaded |= a > 1.0;
-            let room = 1.0 - LIMIT_KNEE;
-            *s = s.signum() * (LIMIT_KNEE + room * ((a - LIMIT_KNEE) / room).tanh());
+    for frame in buf.as_chunks_mut::<CHANNELS>().0 {
+        let peak = frame.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+        overloaded |= peak > 1.0;
+        let wanted = if peak > LIMIT_CEILING { LIMIT_CEILING / peak } else { 1.0 };
+        if wanted < *gain {
+            *gain = wanted;
+        } else {
+            *gain += (wanted - *gain) * release;
+        }
+        if *gain < 1.0 {
+            for s in frame.iter_mut() {
+                *s = (*s * *gain).clamp(-1.0, 1.0);
+            }
         }
     }
     overloaded

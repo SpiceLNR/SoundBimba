@@ -27,6 +27,11 @@ use symphonia::core::probe::Hint;
 pub const HEAD_SECONDS: u32 = 2;
 /// Запас подкачки впереди позиции проигрывания, секунд.
 const TAIL_BUFFER_SECONDS: usize = 3;
+/// До этой позиции подкачка не перематывает файл, а читает его с начала тем же способом, что и
+/// начало в памяти, и пропускает лишнее уже после перевода частоты: так стык «память → подкачка»
+/// совпадает до отсчёта. Перемотка сбрасывает декодер (у MP3 звук сразу после неё чуть другой) и
+/// фазу перевода частоты — на стыке был бы щелчок.
+const SEAMLESS_SECONDS: u64 = 4;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ClipError {
@@ -279,6 +284,8 @@ fn stream(path: &Path, mut prod: rtrb::Producer<f32>, ctl: &TailControl, stop: &
     let mut pending: Vec<f32> = Vec::new();
     let mut sent = 0usize;
     let mut skip = 0usize;
+    // Сколько кадров 48 кГц выбросить после перевода частоты (чтение с начала файла).
+    let mut skip_out = 0u64;
     let mut eof = false;
     let mut scratch = Vec::new();
     let wait = || std::thread::sleep(Duration::from_millis(4));
@@ -288,15 +295,26 @@ fn stream(path: &Path, mut prod: rtrb::Producer<f32>, ctl: &TailControl, stop: &
             my_gen = g;
             let pos48 = ctl.want_pos.load(Ordering::Acquire);
             let src = pos48 * reader.rate as u64 / RATE as u64;
-            skip = match reader.seek(src) {
-                Ok(extra) => extra as usize,
-                Err(_) => {
-                    // Файл не перематывается — читаем сначала и пропускаем до позиции.
-                    match Reader::open(path) {
-                        Ok(r) => reader = r,
-                        Err(_) => return,
+            skip_out = 0;
+            skip = if pos48 <= SEAMLESS_SECONDS * RATE as u64 {
+                // Близко к началу (обычно — сразу за началом в памяти): с начала файла, без перемотки.
+                match Reader::open(path) {
+                    Ok(r) => reader = r,
+                    Err(_) => return,
+                }
+                skip_out = pos48;
+                0
+            } else {
+                match reader.seek(src) {
+                    Ok(extra) => extra as usize,
+                    Err(_) => {
+                        // Файл не перематывается — читаем сначала и пропускаем до позиции.
+                        match Reader::open(path) {
+                            Ok(r) => reader = r,
+                            Err(_) => return,
+                        }
+                        src as usize
                     }
-                    src as usize
                 }
             };
             resampler = Resampler::new(reader.rate);
@@ -337,6 +355,9 @@ fn stream(path: &Path, mut prod: rtrb::Producer<f32>, ctl: &TailControl, stop: &
                     let drop_frames = skip.min(scratch.len() / CHANNELS);
                     skip -= drop_frames;
                     resampler.push(&scratch[drop_frames * CHANNELS..], &mut pending);
+                    let drop_out = skip_out.min((pending.len() / CHANNELS) as u64);
+                    skip_out -= drop_out;
+                    sent = drop_out as usize * CHANNELS;
                 }
                 Ok(false) | Err(_) => eof = true,
             }

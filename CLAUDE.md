@@ -77,6 +77,8 @@
   Windows только для тестовой программы — с разрешения автора 2026-11-03).
 - Проверки кнопок на настоящем треке: `set SB_TRACK=путь\к\треку.mp3`, затем `cargo test -p clips
   --test seek_real_file -- --ignored --nocapture` (перемотка без провалов) и `--test real_track_end` (конец трека).
+- Щелчки кнопки на стыке «память → диск» (без железа и трека): `cargo test --release -p clips --test
+  button_clicks -- --ignored --nocapture`.
 - Проба: `cargo build --release -p probe` → `target\release\probe.exe` (`--help`; без окна: `--no-pause`).
 - Данные приложения: `%APPDATA%\SoundBimba\` — `project.json`, `settings.json`, `logs\soundbimba.log`.
 
