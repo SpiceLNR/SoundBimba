@@ -49,6 +49,7 @@ import { DICTS, useT, type Lang } from '../i18n';
 import { wireShape } from '../theme';
 import { applyTemplate, type Template } from '../templates';
 import { IdPrefix } from './chipContext';
+import TraceEdge from './TraceEdge';
 import CableWizard from './CableWizard';
 import HotkeysDialog from './HotkeysDialog';
 import type { Notify } from './Notices';
@@ -62,6 +63,7 @@ import Watermark from './Watermark';
 import WelcomeDialog from './WelcomeDialog';
 
 const nodeTypes = { sound: SoundNodeView };
+const edgeTypes = { trace: TraceEdge };
 const SAVE_DELAY_MS = 600;
 
 interface Props {
@@ -143,7 +145,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
   );
   // Форма проводов — из темы: у «Инженерской» дорожки с прямыми углами, как на плате.
   const traces = wireShape(settings.theme) === 'traces';
-  const edgeType = traces ? 'smoothstep' : 'default';
+  const edgeType = traces ? 'trace' : 'default';
   // Подпись провода «откуда → куда» видна при наведении (см. app.css).
   const shownEdges = useMemo(
     () => edges.map((e) => ({ ...e, type: edgeType, label: `${titleOf(e.source)} → ${titleOf(e.target)}` })),
@@ -550,6 +552,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
             nodes={nodes}
             edges={shownEdges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}

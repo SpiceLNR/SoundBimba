@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { canConnect, chipPins, composeRoot, flattenProject, fromFlow, newNode, patchNested, toFlow, volumeRoutes, type Project } from './graph';
+import { arrange, canConnect, chipPins, composeRoot, flattenProject, fromFlow, newNode, patchNested, toFlow, volumeRoutes, type Project } from './graph';
 import { translate } from './i18n';
 import { applyTemplate, fromProject } from './templates';
 
@@ -129,5 +129,25 @@ describe('chips', () => {
     const inner = params.inner as Project;
     expect(inner.nodes[1].params).toEqual({ gain: 1.5, mute: false });
     expect(inner.nodes[0]).toEqual((withChip.nodes[1].params.inner as Project).nodes[0]);
+  });
+
+  it('arrange: a chip without inputs stands with the sources, rows stay straight', () => {
+    // Как на карте автора (2026-11-08): микросхема с кнопками внутри (только выход) → громкость → наушники.
+    const chip = newNode('chip', 'c', 0, 0);
+    chip.data.params = { ...chip.data.params, inner: { nodes: [{ id: 'o', type: 'chip-out', pos: [0, 0], params: {} }], edges: [] } };
+    const nodes = [newNode('app-source', 'a', 0, 0), newNode('volume', 'av', 0, 0), chip, newNode('volume', 'cv', 0, 0), newNode('speaker-out', 'h', 0, 0)];
+    const edges = [
+      { id: 'a->av', source: 'a', target: 'av' },
+      { id: 'av->h', source: 'av', target: 'h' },
+      { id: 'c->cv', source: 'c', target: 'cv', sourceHandle: 'o' },
+      { id: 'cv->h', source: 'cv', target: 'h' },
+    ];
+    const laid = arrange(nodes, edges);
+    const at = (id: string) => laid.find((n) => n.id === id)!.position;
+    expect(at('c').x).toBe(at('a').x);
+    expect(at('cv').x).toBe(at('av').x);
+    // Одна строка — середины на одной высоте (микросхема выше: строка на ножку).
+    expect(at('cv').y + 32).toBe(at('c').y + (64 + 24) / 2);
+    expect(at('h').x).toBeGreaterThan(at('cv').x);
   });
 });

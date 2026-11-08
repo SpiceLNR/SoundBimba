@@ -104,9 +104,21 @@
   box-shadow: 0 2px 12px rgba(0, 25, 60, 0.35);
 }
 
-[data-theme='frutiger-aero'] .dropdown-list,
 [data-theme='frutiger-aero'] .dialog {
   background: rgba(14, 80, 155, 0.78);
+}
+
+/* Выпадающие списки и путь «Назад · Карта › Микросхема» — плотнее: стекло внутри стеклянной
+   панели не размывает фон (размытие не вкладывается), и текст под ними просвечивал. */
+[data-theme='frutiger-aero'] .dropdown-list,
+[data-theme='frutiger-aero'] .chip-path {
+  background: rgba(12, 72, 145, 0.93);
+}
+
+[data-theme='frutiger-aero'] .chip-path {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: 0 4px 14px rgba(0, 25, 60, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 /* Глянцевые стеклянные кнопки: блик на верхней половине. */

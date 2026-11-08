@@ -769,7 +769,8 @@ button:disabled {
 .meter {
   height: 4px;
   margin-top: 7px;
-  border-radius: 2px;
+  /* Скругление — как у темы: в плоских («Метро», «Инженерская») углы прямые. */
+  border-radius: min(2px, var(--radius-small));
   background: var(--surface-2);
   overflow: hidden;
 }
