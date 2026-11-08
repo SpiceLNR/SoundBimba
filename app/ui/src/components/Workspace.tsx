@@ -511,7 +511,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
               <button type="button" className="chip-back" onClick={() => exitTo(stack.length - 1)}>
                 ← {t('chip.back')}
               </button>
-              <button type="button" className="link-button" onClick={() => exitTo(0)}>
+              <button type="button" className="crumb" onClick={() => exitTo(0)}>
                 {t('chip.map')}
               </button>
               {stack.map((level, i) => {
@@ -520,11 +520,15 @@ export default function Workspace({ project, version, settings, lang, onSettings
                 const last = i === stack.length - 1;
                 return (
                   <span key={i} className="chip-path-step">
-                    <span aria-hidden="true">›</span>
+                    <span className="crumb-sep" aria-hidden="true">
+                      ›
+                    </span>
                     {last ? (
-                      <strong aria-current="page">{name}</strong>
+                      <strong className="crumb current" aria-current="page">
+                        {name}
+                      </strong>
                     ) : (
-                      <button type="button" className="link-button" onClick={() => exitTo(i + 1)}>
+                      <button type="button" className="crumb" onClick={() => exitTo(i + 1)}>
                         {name}
                       </button>
                     )}

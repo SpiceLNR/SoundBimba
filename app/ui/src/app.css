@@ -448,18 +448,46 @@ input[type='range']:focus-visible {
   box-shadow: var(--shadow);
 }
 
-.chip-path .link-button {
-  align-self: auto;
-}
-
 .chip-path-step {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.chip-path-step strong {
-  color: var(--node-chip);
+/* Разделы пути — текст, а не кнопки: без подчёркивания, рамки и глянца кнопок из тем; при
+   наведении — цвет акцента и лёгкая подложка. Текущий раздел — цветом микросхемы. */
+.crumb,
+.crumb:hover,
+.crumb:active {
+  background-image: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  transform: none !important;
+  border-color: transparent !important;
+}
+
+.crumb {
+  padding: 3px 8px;
+  background-color: transparent !important;
+  color: var(--text) !important;
+  font: inherit;
+  font-weight: var(--title-weight);
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+button.crumb:hover {
+  background-color: var(--control-bg-hover) !important;
+  color: var(--accent) !important;
+}
+
+.crumb.current {
+  color: var(--node-chip) !important;
+  cursor: default;
+}
+
+.crumb-sep {
+  color: var(--text-muted);
 }
 
 /* Микросхема: цветная рамка с обеих сторон (ножки и слева, и справа), выемка сверху, как у
