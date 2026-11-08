@@ -72,13 +72,32 @@ jobs:
           npx tsc --noEmit
           npm test
 
+      # Инструменты сборки установщика (NSIS и его дополнения), которые Tauri скачивает с GitHub
+      # Releases. Храним их в кэше: 2026-11-08 скачивание с GitHub часами отвечало ошибкой 504,
+      # и установщик не собирался. Ключ меняется вместе с версией Tauri (package-lock.json).
+      - uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/tauri
+          key: tauri-tools-${{ runner.os }}-${{ hashFiles('app/package-lock.json') }}
+          restore-keys: tauri-tools-${{ runner.os }}-
+
       # Папка target берётся из кэша прошлых сборок — старые установщики из неё убираем, иначе
       # они попадают в релиз (так в v0.2.0 попал установщик 0.1.0).
+      # Если скачивание инструментов сорвалось (сбой GitHub), пробуем ещё раз — до 4 попыток
+      # с паузой в минуту; программа при этом заново не компилируется.
       - name: Installer
         working-directory: app
         run: |
-          Remove-Item ../target/release/bundle -Recurse -Force -ErrorAction SilentlyContinue
-          npx tauri build
+          for ($try = 1; $try -le 4; $try++) {
+            Remove-Item ../target/release/bundle -Recurse -Force -ErrorAction SilentlyContinue
+            npx tauri build
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($try -lt 4) {
+              Write-Host "Попытка $try не удалась, повтор через 60 с"
+              Start-Sleep -Seconds 60
+            }
+          }
+          exit 1
 
       - name: SHA-256
         run: |
