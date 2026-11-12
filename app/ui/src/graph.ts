@@ -2,7 +2,7 @@
 // Модель карты на стороне интерфейса: та же схема, что в crates/graph (Rust проверяет её при сохранении).
 import type { Edge, Node } from '@xyflow/react';
 import { signed } from './compressor';
-import { voiceOf } from './morpher';
+import { voiceName, voiceOf, voicesOf } from './morpher';
 import type { Translate } from './i18n';
 
 export type NodeKind =
@@ -697,8 +697,9 @@ export function summary(kind: NodeKind, params: Params, t: Translate): string {
     case 'denoise':
       return `${t('param.amount')} ${Math.round(Number(params.amount ?? 1) * 100)} %`;
     case 'voice-morpher': {
-      const voice = voiceOf(params);
-      return voice ? t(`voice.${voice}`) : t('voice.custom');
+      const id = voiceOf(params);
+      const voice = voicesOf(params).find((v) => v.id === id);
+      return voice ? voiceName(voice, t) : t('voice.custom');
     }
     case 'mic-input':
     case 'speaker-out':

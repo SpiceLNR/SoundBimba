@@ -36,3 +36,41 @@ describe('voice morpher', () => {
       }
   });
 });
+
+describe('own voices', () => {
+  it('saves the current setting as a voice, picks it, removes it', async () => {
+    const { addVoice, removeVoice, voiceOf, voicesOf } = await import('./morpher');
+    let p: Record<string, unknown> = { pitch: -3, robot: 0.4, radio: 0, echo: 0.1, wobble: 0 };
+    expect(voiceOf(p)).toBeNull();
+    p = { ...p, ...addVoice(p, '  Мой бас  ') };
+    const mine = voicesOf(p).at(-1)!;
+    expect(mine).toMatchObject({ id: 'c1', custom: true, name: 'Мой бас' });
+    expect(voiceOf(p)).toBe('c1');
+    // Второй свой голос получает новый номер, даже если первый удалили.
+    p = { ...p, ...addVoice({ ...p, pitch: 5 }, 'Писк') };
+    p = { ...p, ...removeVoice(p, 'c1') };
+    expect(voicesOf(p).filter((v) => v.custom).map((v) => v.id)).toEqual(['c2']);
+    p = { ...p, ...addVoice(p, 'Ещё') };
+    expect(voicesOf(p).filter((v) => v.custom).map((v) => v.id)).toEqual(['c2', 'c3']);
+  });
+
+  it('built-in voices are hidden, not lost, and come back; "normal" always stays', async () => {
+    const { removeVoice, restoreVoices, voicesOf, VOICES } = await import('./morpher');
+    let p: Record<string, unknown> = {};
+    p = { ...p, ...removeVoice(p, 'alien') };
+    p = { ...p, ...removeVoice(p, 'robot') };
+    expect(removeVoice(p, 'normal')).toEqual({});
+    expect(voicesOf(p).map((v) => v.id)).toEqual(VOICES.map((v) => v.id).filter((id) => id !== 'alien' && id !== 'robot'));
+    p = { ...p, ...restoreVoices() };
+    expect(voicesOf(p).map((v) => v.id)).toEqual(VOICES.map((v) => v.id));
+    // «Пришелец» после возврата — тот же самый.
+    expect(voicesOf(p).find((v) => v.id === 'alien')!.params).toEqual({ pitch: 3, robot: 0, radio: 0, echo: 0.25, wobble: 0.7 });
+  });
+
+  it('broken voice entries in a file are skipped', async () => {
+    const { voicesOf } = await import('./morpher');
+    const p = { voices: [null, 5, { id: 'c1' }, { id: 'c2', name: 'Ок', params: { pitch: 2, robot: 'x' } }] };
+    const own = voicesOf(p).filter((v) => v.custom);
+    expect(own).toEqual([{ id: 'c2', name: 'Ок', custom: true, params: { pitch: 2, robot: 0, radio: 0, echo: 0, wobble: 0 } }]);
+  });
+});

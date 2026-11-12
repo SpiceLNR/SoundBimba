@@ -12,7 +12,17 @@ const SETTINGS: Partial<Record<NodeKind, Record<string, unknown>>> = {
   'mic-input': { device: 'mic-2', name: 'Мой микрофон' },
   volume: { gain: 0.35, mute: true, name: 'Тише', simpleOrder: 1 },
   compressor: { threshold: -30, ratio: 5, attack: 2, release: 300, makeup: 6 },
-  'voice-morpher': { pitch: 3, robot: 0, radio: 0, echo: 0.25, wobble: 0.7, simpleOrder: 0 },
+  'voice-morpher': {
+    pitch: 3,
+    robot: 0,
+    radio: 0,
+    echo: 0.25,
+    wobble: 0.7,
+    simpleOrder: 0,
+    // Свои голоса и убранные готовые — тоже в шаблоне.
+    voices: [{ id: 'c1', name: 'Мой бас', params: { pitch: -4, robot: 0.3, radio: 0, echo: 0, wobble: 0 } }],
+    hiddenVoices: ['cave'],
+  },
   denoise: { amount: 0.4 },
   'speaker-out': { device: 'phones-1' },
   'virtual-out': { device: 'virtual-2' },

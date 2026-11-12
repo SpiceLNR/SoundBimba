@@ -1,29 +1,111 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Морфер голоса: выбор готового голоса (он же — в простом режиме) и ползунки пяти эффектов.
+// Морфер голоса: выбор голоса (он же — в простом режиме), свои голоса и ползунки пяти эффектов.
 import type React from 'react';
+import { useState } from 'react';
 import type { Params, SoundNode } from '../graph';
 import { useT } from '../i18n';
-import { VOICES, voiceOf } from '../morpher';
+import { addVoice, hiddenVoices, KEEP_VOICE, removeVoice, restoreVoices, voiceName, voiceOf, voicesOf } from '../morpher';
+import IconButton from './IconButton';
 
-/** Кнопки готовых голосов. Используется в боковой панели и в простом режиме. */
-export function VoicePicker({ params, onPick }: { params: Params; onPick: (p: Params) => void }) {
+const MAX_NAME = 24;
+
+/**
+ * Кнопки голосов: готовые и свои. Используется в боковой панели и в простом режиме.
+ * `editable` — ещё и «Сохранить как голос», убрать голос (×) и вернуть убранные готовые.
+ */
+export function VoicePicker({ params, onPick, editable }: { params: Params; onPick: (p: Params) => void; editable?: boolean }) {
   const t = useT();
   const active = voiceOf(params);
+  const voices = voicesOf(params);
+  const [naming, setNaming] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const hidden = hiddenVoices(params).length;
+  const save = () => {
+    if (naming?.trim()) onPick(addVoice(params, naming.slice(0, MAX_NAME)));
+    setNaming(null);
+  };
   return (
-    <div className="preset-row">
-      {VOICES.map((v) => (
-        <button
-          key={v.id}
-          type="button"
-          className={active === v.id ? 'primary' : undefined}
-          aria-pressed={active === v.id}
-          title={t(`voice.${v.id}.hint`)}
-          onClick={() => onPick(v.params)}
-        >
-          {t(`voice.${v.id}`)}
-        </button>
-      ))}
-    </div>
+    <>
+      <div className="preset-row">
+        {voices.map((v) => {
+          const name = voiceName(v, t);
+          if (confirm === v.id) {
+            return (
+              <span key={v.id} className="voice-confirm">
+                {t('voice.removeAsk', { name })}
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => {
+                    setConfirm(null);
+                    onPick(removeVoice(params, v.id));
+                  }}
+                >
+                  {t('voice.removeYes')}
+                </button>
+                <button type="button" onClick={() => setConfirm(null)}>
+                  {t('voice.cancel')}
+                </button>
+              </span>
+            );
+          }
+          return (
+            <span key={v.id} className={`voice-chip${editable && v.id !== KEEP_VOICE ? ' removable' : ''}`}>
+              <button
+                type="button"
+                className={active === v.id ? 'primary' : undefined}
+                aria-pressed={active === v.id}
+                title={v.custom ? t('voice.customHint') : t(`voice.${v.id}.hint`)}
+                onClick={() => onPick(v.params)}
+              >
+                {name}
+              </button>
+              {editable && v.id !== KEEP_VOICE && (
+                <IconButton icon="close" label={t('voice.remove', { name })} onClick={() => setConfirm(v.id)} />
+              )}
+            </span>
+          );
+        })}
+      </div>
+      {editable && (
+        <div className="voice-tools">
+          {naming === null ? (
+            <button type="button" disabled={active !== null} title={active !== null ? t('voice.saveSame') : undefined} onClick={() => setNaming('')}>
+              {t('voice.save')}
+            </button>
+          ) : (
+            <form
+              className="voice-name"
+              onSubmit={(e) => {
+                e.preventDefault();
+                save();
+              }}
+            >
+              <input
+                type="text"
+                autoFocus
+                maxLength={MAX_NAME}
+                placeholder={t('voice.namePlaceholder')}
+                value={naming}
+                onChange={(e) => setNaming(e.target.value)}
+                onKeyDown={(e) => e.key === 'Escape' && setNaming(null)}
+              />
+              <button type="submit" className="primary" disabled={!naming.trim()}>
+                {t('voice.saveOk')}
+              </button>
+              <button type="button" onClick={() => setNaming(null)}>
+                {t('voice.cancel')}
+              </button>
+            </form>
+          )}
+          {hidden > 0 && (
+            <button type="button" className="link" onClick={() => onPick(restoreVoices())}>
+              {t('voice.restore', { n: hidden })}
+            </button>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -57,7 +139,7 @@ export default function MorpherParams({ node, onParams }: { node: SoundNode; onP
     <>
       <div className="field">
         <span>{t('param.voices')}</span>
-        <VoicePicker params={p} onPick={set} />
+        <VoicePicker params={p} onPick={set} editable />
       </div>
       <label className="field" title={t('param.pitchHint')}>
         <span>

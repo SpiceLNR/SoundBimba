@@ -737,4 +737,18 @@ mod tests {
         // Файл 0.5 с микросхемой — новее, чем понимала 0.4 (она отложит его, а не испортит).
         assert_eq!(ok.schema, 2);
     }
+
+    #[test]
+    fn morpher_keeps_own_voices_in_file() {
+        // Свои голоса и убранные готовые лежат в параметрах морфера: файл проходит проверку и
+        // сохраняется без потерь.
+        let text = r#"{"schema": 1, "nodes": [
+            {"id": "m", "type": "voice-morpher", "pos": [0, 0], "params": {"pitch": 3, "wobble": 0.7,
+             "voices": [{"id": "c1", "name": "Мой бас", "params": {"pitch": -4, "robot": 0.3}}],
+             "hiddenVoices": ["cave"]}}], "edges": []}"#;
+        let p: Project = serde_json::from_str(text).unwrap();
+        validate(&p).unwrap();
+        let back: Project = serde_json::from_str(&to_json(&p)).unwrap();
+        assert_eq!(back.nodes[0].params, p.nodes[0].params);
+    }
 }
