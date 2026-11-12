@@ -10,7 +10,7 @@
 //!
 //! Уровни и состояния узлов ~15 раз в секунду уходят в интерфейс событием `audio-state`.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
@@ -34,6 +34,14 @@ pub const CAPTURE_RESERVE_MS: f64 = 12.0;
 const TICK: Duration = Duration::from_secs(2);
 const RETRY_AFTER_FAILURE: Duration = Duration::from_secs(5);
 const LEVELS_EVERY: Duration = Duration::from_millis(66);
+/// Устойчивый вывод: буфер устройства, мс (см. `RenderMode::Steady`). 40 мс — на «Virtual Desktop
+/// Audio» (VR-шлем) провалов 0, при 60 мс щёлкал кабель (замер 2026-11-12).
+const STEADY_BUFFER_MS: u32 = 40;
+
+/// Устройство Virtual Desktop (звук по сети в VR-шлем): в быстром режиме у него трещит.
+fn is_virtual_desktop(device_name: &str) -> bool {
+    device_name.to_lowercase().contains("virtual desktop")
+}
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -109,6 +117,8 @@ struct ButtonEvent {
 /// Как узлы проекта связаны с устройствами, процессами и файлами прямо сейчас.
 struct Resolved {
     ports: HashMap<String, PortKey>,
+    /// Выходы Virtual Desktop (id устройств).
+    vd_outputs: BTreeSet<String>,
     /// Кнопки с годным файлом: id узла → путь.
     clips: HashMap<String, String>,
     status: HashMap<String, NodeStatus>,
@@ -145,7 +155,8 @@ fn find_device<'a>(devs: &'a [DeviceInfo], wanted: Option<&str>, render: bool) -
 fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
     let devs = devices::list().unwrap_or_default();
     let procs = processes::list();
-    let mut r = Resolved { ports: HashMap::new(), clips: HashMap::new(), status: HashMap::new() };
+    let mut r = Resolved { ports: HashMap::new(), vd_outputs: BTreeSet::new(), clips: HashMap::new(), status: HashMap::new() };
+    r.vd_outputs = devs.iter().filter(|d| d.render && is_virtual_desktop(&d.name)).map(|d| d.id.clone()).collect();
     for n in &p.nodes {
         if n.kind == NodeKind::SoundButton {
             let status = match param(n, "file") {
@@ -267,6 +278,8 @@ struct Running {
 enum Cmd {
     Project(Box<Project>),
     Enabled(bool),
+    /// Настройка «Звук в VR (Virtual Desktop)»: устойчивый режим для его выхода.
+    VdSteady(bool),
     Shutdown,
 }
 
@@ -287,6 +300,10 @@ struct Controller {
     /// Что SoundBimba поменяла в Windows («Оригинал звука») и куда сохранять журнал.
     journal: Journal,
     journal_path: PathBuf,
+    /// Выход Virtual Desktop — в устойчивом режиме (настройка; остальные выходы всегда быстрые).
+    vd_steady: bool,
+    /// Настройку поменяли — перезапустить звук.
+    restart_for_mode: bool,
 }
 
 impl Controller {
@@ -352,8 +369,17 @@ impl Controller {
             .is_some_and(|r| r.streams.iter().any(|(_, s, _)| s.as_ref().is_some_and(|s| s.failed().is_some())));
         let changed = self.structure.as_ref() != Some(&structure);
         let retry = failed && self.last_restart.elapsed() > RETRY_AFTER_FAILURE;
-        if self.running.is_none() || changed || retry {
-            let why = if self.running.is_none() { "start" } else if changed { "graph or devices changed" } else { "device failed, retrying" };
+        let steady = std::mem::take(&mut self.restart_for_mode);
+        if self.running.is_none() || changed || retry || steady {
+            let why = if self.running.is_none() {
+                "start"
+            } else if changed {
+                "graph or devices changed"
+            } else if retry {
+                "device failed, retrying"
+            } else {
+                "VR output mode changed"
+            };
             applog::info(&format!("audio restart: {why}"));
             self.restart(&project, &resolved);
             self.structure = Some(structure);
@@ -408,7 +434,12 @@ impl Controller {
         let mut outputs = Vec::new();
         for key in &plan.outputs {
             let PortKey::Render(id) = key else { unreachable!("capture port in outputs") };
-            match streams::open_render(id, RENDER_RESERVE_MS) {
+            let mode = if self.vd_steady && resolved.vd_outputs.contains(id) {
+                streams::RenderMode::Steady { buffer_ms: STEADY_BUFFER_MS }
+            } else {
+                streams::RenderMode::LowLatency
+            };
+            match streams::open_render_with(id, RENDER_RESERVE_MS, mode) {
                 Ok((stream, writer)) => {
                     applog::info(&format!("opened {}: {:?}", port_name(key), stream.info));
                     outputs.push(writer);
@@ -459,6 +490,7 @@ impl Controller {
     fn publish(&mut self, project: &Project, resolved: &Resolved) {
         let mut status = resolved.status.clone();
         let mut ports = Vec::new();
+
         if let Some(r) = &self.running {
             status.extend(r.button_errors.iter().map(|(id, s)| (id.clone(), *s)));
             for (key, stream, open_error) in &r.streams {
@@ -568,6 +600,8 @@ impl Audio {
             clip_cache: HashMap::new(),
             last_late: 0,
             journal: Journal::load(&journal_path),
+            vd_steady: true,
+            restart_for_mode: false,
             journal_path,
         };
         let control = std::thread::Builder::new()
@@ -583,6 +617,13 @@ impl Audio {
                         Ok(Cmd::Enabled(on)) => {
                             c.enabled = on;
                             applog::info(if on { "sound on" } else { "sound off" });
+                        }
+                        Ok(Cmd::VdSteady(on)) => {
+                            if c.vd_steady != on {
+                                c.vd_steady = on;
+                                c.restart_for_mode = c.running.is_some();
+                                applog::info(if on { "VR output: steady" } else { "VR output: fast" });
+                            }
                         }
                         Ok(Cmd::Shutdown) => break,
                         Err(RecvTimeoutError::Timeout) => {}
@@ -642,6 +683,10 @@ impl Audio {
         let _ = self.tx.lock().unwrap().send(Cmd::Project(Box::new(p)));
     }
 
+    pub fn set_vd_steady(&self, on: bool) {
+        let _ = self.tx.lock().unwrap().send(Cmd::VdSteady(on));
+    }
+
     pub fn set_enabled(&self, on: bool) {
         let _ = self.tx.lock().unwrap().send(Cmd::Enabled(on));
     }
@@ -666,5 +711,18 @@ impl Audio {
 
     pub fn snapshot(&self) -> Snapshot {
         self.snapshot.lock().unwrap().clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_virtual_desktop;
+
+    #[test]
+    fn finds_virtual_desktop_output_by_name() {
+        assert!(is_virtual_desktop("Speakers (Virtual Desktop Audio)"));
+        assert!(is_virtual_desktop("Динамики (VIRTUAL DESKTOP Audio)"));
+        assert!(!is_virtual_desktop("CABLE Input (VB-Audio Virtual Cable)"));
+        assert!(!is_virtual_desktop("Speakers (Realtek(R) Audio)"));
     }
 }

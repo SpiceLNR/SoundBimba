@@ -113,6 +113,7 @@ export default function Toolbar(p: Props) {
           if (what === 'lang') p.onSettings({ ...p.settings, language: isLang(value) ? value : null });
           if (what === 'theme') p.onSettings({ ...p.settings, theme: value });
           if (what === 'mode') p.onSettings({ ...p.settings, mode: value === 'simple' ? 'simple' : 'expert' });
+          if (what === 'vr') p.onSettings({ ...p.settings, vrSteady: value === 'steady' });
           if (what === 'window') p.onOpenPanel();
         }}
         groups={[
@@ -121,6 +122,13 @@ export default function Toolbar(p: Props) {
             items: [
               { value: 'mode:expert', label: t('mode.expert'), selected: p.settings.mode !== 'simple' },
               { value: 'mode:simple', label: t('mode.simple'), selected: p.settings.mode === 'simple' },
+            ],
+          },
+          {
+            title: t('toolbar.vr'),
+            items: [
+              { value: 'vr:steady', label: t('vr.steady'), selected: p.settings.vrSteady !== false },
+              { value: 'vr:fast', label: t('vr.fast'), selected: p.settings.vrSteady === false },
             ],
           },
           {

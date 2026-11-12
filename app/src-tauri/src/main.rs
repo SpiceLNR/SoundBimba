@@ -61,6 +61,7 @@ fn load_state(state: State<AppState>, audio: State<Audio>) -> LoadState {
     let loaded = storage::load_project(&state.paths);
     let settings = storage::load_settings(&state.paths);
     audio.set_project(loaded.project.clone());
+    audio.set_vd_steady(settings.vr_steady);
     audio.set_enabled(settings.audio_enabled);
     LoadState { project: loaded.project, settings, recovered_from: loaded.recovered_from, version: env!("CARGO_PKG_VERSION") }
 }
@@ -172,8 +173,9 @@ fn list_audio_apps() -> Result<Vec<AppDto>, CmdError> {
 }
 
 #[tauri::command]
-fn save_settings(app: tauri::AppHandle, state: State<AppState>, settings: Settings) -> Result<(), CmdError> {
+fn save_settings(app: tauri::AppHandle, state: State<AppState>, audio: State<Audio>, settings: Settings) -> Result<(), CmdError> {
     let _ = app.emit("settings-changed", &settings);
+    audio.set_vd_steady(settings.vr_steady);
     let text = serde_json::to_string_pretty(&settings).map_err(|e| CmdError::new("io", e))?;
     let _guard = state.write_lock.lock().unwrap();
     storage::write_atomic(&state.paths.settings, &text).map_err(|e| CmdError::new("io", e))

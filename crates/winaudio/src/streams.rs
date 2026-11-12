@@ -140,10 +140,34 @@ fn device_client(id: &str) -> WinResult<IAudioClient> {
 /// (кадров). Если устройство умеет порции меньше обычных 10 мс (IAudioClient3, Windows 10+),
 /// берём самую маленькую — это заметно снижает задержку. Иначе — обычный режим.
 fn init_shared(client: &IAudioClient, extra_flags: u32) -> WinResult<(Fmt, u32)> {
+    init_shared_with(client, extra_flags, RenderMode::LowLatency)
+}
+
+/// Как выводить звук на устройство.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RenderMode {
+    /// Самая маленькая порция устройства (IAudioClient3), в буфере устройства — две порции.
+    /// Наименьшая задержка.
+    LowLatency,
+    /// Обычная порция Windows (10 мс) и буфер устройства `buffer_ms`, заполненный целиком —
+    /// так играет большинство программ. Задержка больше, зато устойчиво на устройствах, которые
+    /// забирают звук неровно (например, «Virtual Desktop Audio» — звук по сети в VR-шлем).
+    Steady { buffer_ms: u32 },
+}
+
+fn init_shared_with(client: &IAudioClient, extra_flags: u32, mode: RenderMode) -> WinResult<(Fmt, u32)> {
     unsafe {
         let mix = client.GetMixFormat()?;
         let fmt = Fmt::from_ptr(mix);
         let flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK | extra_flags;
+        if let RenderMode::Steady { buffer_ms } = mode {
+            let r = client.Initialize(AUDCLNT_SHAREMODE_SHARED, flags, buffer_ms as i64 * 10_000, 0, mix, None);
+            CoTaskMemFree(Some(mix as _));
+            r?;
+            let mut def = 0i64;
+            client.GetDevicePeriod(Some(&mut def), None)?;
+            return Ok((fmt, ((def as f64 * fmt.rate as f64 / 10_000_000.0).round() as u32).max(1)));
+        }
         let low_latency = client.cast::<IAudioClient3>().ok().and_then(|c3| {
             let (mut def, mut fund, mut min, mut max) = (0u32, 0u32, 0u32, 0u32);
             c3.GetSharedModeEnginePeriod(mix, &mut def, &mut fund, &mut min, &mut max).ok()?;
@@ -282,12 +306,17 @@ pub fn open_capture(source: Source, reserve_ms: f64) -> Result<(Stream, RingRead
 
 /// Вывод на устройство: движок пишет в возвращённый `RingWriter`, поток отдаёт звук Windows.
 pub fn open_render(device_id: &str, reserve_ms: f64) -> Result<(Stream, RingWriter), String> {
+    open_render_with(device_id, reserve_ms, RenderMode::LowLatency)
+}
+
+/// Вывод на устройство в выбранном режиме (см. [`RenderMode`]).
+pub fn open_render_with(device_id: &str, reserve_ms: f64, mode: RenderMode) -> Result<(Stream, RingWriter), String> {
     let id = device_id.to_string();
     spawn("sb-render", move |stop, error, ready| {
         let opened = (|| -> WinResult<_> {
             ensure_com()?;
             let client = device_client(&id)?;
-            let (fmt, period) = init_shared(&client, 0)?;
+            let (fmt, period) = init_shared_with(&client, 0, mode)?;
             let event = EventHandle::new()?;
             unsafe { client.SetEventHandle(event.0)? };
             let rc: IAudioRenderClient = unsafe { client.GetService()? };
@@ -308,8 +337,12 @@ pub fn open_render(device_id: &str, reserve_ms: f64) -> Result<(Stream, RingWrit
         let stats = writer.stats().clone();
         let info =
             StreamInfo { rate: fmt.rate, format: fmt.describe(), buffer_frames: buffer, period_frames: period, reserve_ms };
-        // В буфере устройства держим две порции, не больше: лишнее — лишняя задержка.
-        let keep = buffer.min(period * 2);
+        // В буфере устройства держим две порции, не больше: лишнее — лишняя задержка. В устойчивом
+        // режиме — весь буфер.
+        let keep = match mode {
+            RenderMode::LowLatency => buffer.min(period * 2),
+            RenderMode::Steady { .. } => buffer,
+        };
         if ready.send(Ok((info, writer, stats.clone()))).is_err() {
             return;
         }

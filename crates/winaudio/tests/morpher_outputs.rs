@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use engine::{ButtonSource, Graph, PortKey, PortResolver, BLOCK, BLOCK_SAMPLES, RATE};
 use graph::{Edge, Node, NodeKind, Project};
 use winaudio::devices;
-use winaudio::streams::{open_capture, open_render, Source};
+use winaudio::streams::{open_capture, open_render_with, RenderMode, Source};
 
 struct Ports(HashMap<String, PortKey>);
 
@@ -28,6 +28,15 @@ fn node(id: &str, kind: NodeKind, params: serde_json::Value) -> Node {
 
 fn edge(a: &str, b: &str) -> Edge {
     Edge::audio(a, b)
+}
+
+/// SB_RENDER: «low» (по умолчанию, как в программе) или «steady:МС» — обычная порция и буфер
+/// устройства МС миллисекунд, заполненный целиком (для всех выходов).
+fn render_mode() -> RenderMode {
+    match std::env::var("SB_RENDER").ok().as_deref().and_then(|m| m.strip_prefix("steady:")) {
+        Some(ms) => RenderMode::Steady { buffer_ms: ms.parse().expect("steady:МС") },
+        None => RenderMode::LowLatency,
+    }
 }
 
 /// Щелчки в левом канале: вторая разность больше, чем бывает у синуса такой частоты и уровня.
@@ -50,7 +59,11 @@ fn run(phones_gain: Option<f64>, listen_phones: bool, morph: serde_json::Value, 
     let devs = devices::list().expect("devices");
     let cable = devices::primary_cable_render(&devs).expect("нет VB-CABLE");
     let cable_mic = devices::primary_cable_capture(&devs).expect("нет CABLE Output");
-    let phones = devices::default_device(&devs, true).expect("нет наушников по умолчанию");
+    // SB_DEVICE — часть названия устройства «наушников» (по умолчанию — устройство Windows по умолчанию).
+    let phones = match std::env::var("SB_DEVICE") {
+        Ok(name) => devs.iter().find(|d| d.render && d.name.contains(&name)).expect("нет такого устройства"),
+        Err(_) => devices::default_device(&devs, true).expect("нет наушников по умолчанию"),
+    };
 
     let mut nodes = vec![
         node("btn", NodeKind::SoundButton, serde_json::json!({})),
@@ -74,7 +87,9 @@ fn run(phones_gain: Option<f64>, listen_phones: bool, morph: serde_json::Value, 
     let mut outputs = Vec::new();
     for key in &plan.outputs {
         let PortKey::Render(id) = key else { unreachable!() };
-        let (s, w) = open_render(id, 8.0).expect("render");
+        // Режим SB_RENDER — только для «наушников»; кабель всегда в быстром режиме, как в программе.
+        let mode = if *id == phones.id { render_mode() } else { RenderMode::LowLatency };
+        let (s, w) = open_render_with(id, 8.0, mode).expect("render");
         streams.push(s);
         outputs.push(w);
     }
@@ -147,7 +162,9 @@ fn tone_straight_to_headphones() {
         Err(_) => devices::default_device(&devs, true).expect("нет наушников по умолчанию"),
     };
     println!("устройство: {}", phones.name);
-    let (out, mut writer) = open_render(&phones.id, 8.0).expect("render");
+    let mode = render_mode();
+    println!("режим: {mode:?}");
+    let (out, mut writer) = open_render_with(&phones.id, 8.0, mode).expect("render");
     println!("вывод: {:?}", out.info);
     let (listen, mut reader) = open_capture(Source::Loopback(phones.id.clone()), 60.0).expect("loopback");
     let seconds = 20.0;

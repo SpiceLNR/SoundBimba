@@ -67,6 +67,10 @@ pub struct Settings {
     /// кнопка «Сохранить изменения».
     #[serde(default)]
     pub current_template: Option<String>,
+    /// «Звук в VR (Virtual Desktop)»: устойчивый вывод на его устройство (без треска, задержка
+    /// больше ≈30 мс). Остальные выходы всегда в быстром режиме.
+    #[serde(default = "default_true")]
+    pub vr_steady: bool,
 }
 
 fn default_true() -> bool {
@@ -93,6 +97,7 @@ impl Default for Settings {
             welcome_done: false,
             hidden_templates: Vec::new(),
             current_template: None,
+            vr_steady: true,
         }
     }
 }

@@ -21,6 +21,8 @@ export interface Settings {
   hiddenTemplates?: string[];
   /** Свой шаблон, который последним добавляли на карту или сохраняли (у него — «Сохранить изменения»). */
   currentTemplate?: string | null;
+  /** «Звук в VR (Virtual Desktop)»: устойчивый вывод на его устройство (по умолчанию — да). */
+  vrSteady?: boolean;
 }
 
 /** Свой шаблон из папки пользователя (`id` — имя файла .bmb без расширения). */
