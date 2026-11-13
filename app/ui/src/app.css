@@ -1404,25 +1404,57 @@ button:disabled {
 
 /* Компрессор: готовые наборы, свёрнутая точная настройка, шкала сжатия. */
 .preset-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 6px;
 }
 
-/* Свои голоса морфера: у голоса, который можно убрать, — маленький крестик рядом. */
+/* Голос — одна кнопка ровной ширины в сетке; крестик «убрать» — внутри неё, у правого края,
+   неприметный (ярче при наведении). Без отдельной плитки во всех темах. */
 .voice-chip {
-  display: inline-flex;
-  align-items: center;
+  position: relative;
+  display: flex;
+  min-width: 0;
 }
 
-.voice-chip.removable .icon-button {
-  margin-left: -4px;
-  padding: 2px;
-  opacity: 0.55;
+.voice-chip > button {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.voice-chip.removable .icon-button:hover,
-.voice-chip.removable .icon-button:focus-visible {
+.voice-chip.removable > button {
+  padding-right: 26px;
+}
+
+.voice-chip .icon-button-wrap {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+
+/* Поверх оформления кнопок-значков в темах (плитки, глянец). */
+.voice-chip .icon-button,
+.voice-chip .icon-button:hover:not(:disabled) {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  opacity: 0.45;
+}
+
+.voice-chip:hover .icon-button,
+.voice-chip .icon-button:focus-visible {
+  opacity: 0.8;
+}
+
+.voice-chip .icon-button:hover:not(:disabled) {
   opacity: 1;
 }
 
@@ -1431,12 +1463,40 @@ button:disabled {
   height: 14px;
 }
 
+/* «Убрать «…»?» — отдельная плашка на всю ширину сетки (свой фон, рамка, отступы): вопрос
+   слева, две компактные кнопки справа — не сливаются с кнопками голосов. Не помещаются в
+   строку (крупный шрифт темы) — кнопки переходят вместе под вопрос, вправо. */
 .voice-confirm {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
+  grid-column: 1 / -1;
   align-items: center;
   gap: 6px;
-  color: var(--text-muted);
+  margin: 4px 0;
+  padding: 6px 6px 6px 10px;
+  background: var(--surface-2);
+  /* Рамка цвета «опасного» действия, но приглушённая: видна и в плоских темах без рамок. */
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: var(--radius-small);
+}
+
+.voice-confirm-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-confirm-buttons {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.voice-confirm-buttons > button {
+  margin-top: 0;
+  padding: 3px 10px;
 }
 
 .voice-tools {

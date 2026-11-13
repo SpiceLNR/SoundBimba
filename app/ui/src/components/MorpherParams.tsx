@@ -31,21 +31,23 @@ export function VoicePicker({ params, onPick, editable }: { params: Params; onPi
           const name = voiceName(v, t);
           if (confirm === v.id) {
             return (
-              <span key={v.id} className="voice-confirm">
-                {t('voice.removeAsk', { name })}
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={() => {
-                    setConfirm(null);
-                    onPick(removeVoice(params, v.id));
-                  }}
-                >
-                  {t('voice.removeYes')}
-                </button>
-                <button type="button" onClick={() => setConfirm(null)}>
-                  {t('voice.cancel')}
-                </button>
+              <span key={v.id} className="voice-confirm" role="group" aria-label={t('voice.removeAsk', { name })}>
+                <span className="voice-confirm-text">{t('voice.removeAsk', { name })}</span>
+                <span className="voice-confirm-buttons">
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => {
+                      setConfirm(null);
+                      onPick(removeVoice(params, v.id));
+                    }}
+                  >
+                    {t('voice.removeYes')}
+                  </button>
+                  <button type="button" onClick={() => setConfirm(null)}>
+                    {t('voice.cancel')}
+                  </button>
+                </span>
               </span>
             );
           }

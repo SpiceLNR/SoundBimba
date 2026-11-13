@@ -78,3 +78,15 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* Голоса морфера — плитки с заливкой, как кнопки-значки (плоская кнопка темы — просто текст). */
+[data-theme='metro'] .voice-chip > button:not(.primary),
+[data-theme='metro'] .voice-confirm-buttons > button:not(.danger):not(.primary) {
+  background: var(--border);
+}
+
+[data-theme='metro'] .voice-chip > button:not(.primary):hover,
+[data-theme='metro'] .voice-confirm-buttons > button:not(.danger):not(.primary):hover {
+  background: var(--control-bg-hover);
+  color: var(--accent);
+}

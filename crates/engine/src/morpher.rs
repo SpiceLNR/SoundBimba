@@ -1406,4 +1406,48 @@ mod tests {
         let (a, b) = (hiss_flutter(&mono, &chunks, 0), hiss_flutter(&out, &chunks, PSOLA_LATENCY));
         assert!(b < a * 1.1, "дробление: было {a}, стало {b}");
     }
+
+    /// Ручное прослушивание готовых голосов: SB_WAV — голос без морфера, SB_OUT — папка.
+    /// (pitch, robot, radio, echo, wobble, formant, growl, chorus, hall, tone) — как в morpher.ts.
+    #[test]
+    #[ignore = "ручное прослушивание"]
+    fn render_voices() {
+        let mono = read_wav(&std::env::var("SB_WAV").expect("SB_WAV"));
+        let dir = std::env::var("SB_OUT").expect("SB_OUT");
+        let stereo: Vec<f32> = mono.iter().flat_map(|&v| [v, v]).collect();
+        let voices: [(&str, [f32; 10]); 9] = [
+            ("giant", [-5.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.2, 0.0]),
+            ("legion_old", [-2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            ("legion_new", [0.0, 0.0, 0.0, 0.0, 0.0, -2.0, 0.0, 1.0, 0.25, -3.0]),
+            ("demon_old", [-6.0, 0.0, 0.0, 0.0, 0.0, -2.0, 0.8, 0.5, 0.3, 0.0]),
+            ("demon_new", [0.0, 0.0, 0.0, 0.0, 0.0, -3.0, 0.4, 0.25, 0.3, -7.0]),
+            ("cathedral_old", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+            ("cathedral_new", [0.0, 0.0, 0.0, 0.15, 0.0, -1.0, 0.0, 0.0, 1.0, -1.0]),
+            ("ghost_old", [2.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.4, 0.7, 0.0]),
+            ("ghost_new", [0.0, 0.0, 0.15, 0.0, 0.0, 3.0, 0.0, 0.5, 0.8, 3.0]),
+        ];
+        for (name, v) in voices {
+            let p = with(|p| {
+                for (cell, x) in [&p.pitch, &p.robot, &p.radio, &p.echo, &p.wobble, &p.formant, &p.growl, &p.chorus, &p.hall, &p.tone].into_iter().zip(v) {
+                    cell.store(x);
+                }
+            });
+            let out = run(&p, &stereo);
+            let left: Vec<f32> = out.iter().step_by(2).copied().collect();
+            let mut b = Vec::new();
+            let data = (left.len() * 4) as u32;
+            b.extend_from_slice(b"RIFF");
+            b.extend_from_slice(&(36 + data).to_le_bytes());
+            b.extend_from_slice(b"WAVEfmt ");
+            for v in [16u32.to_le_bytes(), [3, 0, 1, 0], RATE.to_le_bytes(), (RATE * 4).to_le_bytes(), [4, 0, 32, 0]] {
+                b.extend_from_slice(&v);
+            }
+            b.extend_from_slice(b"data");
+            b.extend_from_slice(&data.to_le_bytes());
+            for v in left {
+                b.extend_from_slice(&v.to_le_bytes());
+            }
+            std::fs::write(format!("{dir}/{name}.wav"), b).unwrap();
+        }
+    }
 }

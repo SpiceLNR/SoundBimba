@@ -35,10 +35,11 @@ export const VOICES: MorpherVoice[] = [
   // «Девушка»: выше на 5 полутонов и окраска легче на 2 — без писка бурундука.
   voice('girl', { tone: 5, formant: 2 }),
   voice('giant', { pitch: -5, formant: 2, hall: 0.2 }),
-  voice('legion', { pitch: -2, chorus: 1 }),
-  voice('demon', { pitch: -6, formant: -2, growl: 0.8, chorus: 0.5, hall: 0.3 }),
-  voice('cathedral', { hall: 1 }),
-  voice('ghost', { pitch: 2, wobble: 0.2, chorus: 0.4, hall: 0.7 }),
+  // 2026-11-13, выбраны автором на слух (его голос, запись 11): основа — естественная высота и
+  // тембр, эффекты — понемногу.
+  voice('legion', { tone: -3, formant: -2, chorus: 1, hall: 0.25 }),
+  voice('demon', { tone: -7, formant: -3, growl: 0.4, chorus: 0.25, hall: 0.3 }),
+  voice('cathedral', { tone: -1, formant: -1, echo: 0.15, hall: 1 }),
 ];
 
 

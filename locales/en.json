@@ -292,8 +292,6 @@
   "voice.demon.hint": "A low growl from the underworld",
   "voice.cathedral": "Cathedral",
   "voice.cathedral.hint": "A voice under high vaults",
-  "voice.ghost": "Ghost",
-  "voice.ghost.hint": "A quiet voice drifting in the void",
   "param.tone": "Pitch",
   "param.toneHint": "Higher or lower while the voice keeps its own colour — natural, no chipmunk. In semitones.",
   "voice.custom": "custom",
