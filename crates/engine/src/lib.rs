@@ -263,7 +263,7 @@ impl Graph {
                 step.shared.report_reduction(reduction);
             }
             if let Op::Denoise(state) = &mut step.op {
-                let voice = state.process(&mut out[..], step.shared.denoise_amount());
+                let voice = state.process(&mut out[..], step.shared.denoise_amount(), step.shared.denoise_gate());
                 step.shared.report_voice(voice);
             }
             if let Op::Morpher(state) = &mut step.op {

@@ -3,6 +3,9 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering::Relaxed};
 
+/// «Тишина между словами» у шумоподавления по умолчанию.
+pub const DENOISE_GATE_DEFAULT: f32 = 0.7;
+
 /// f32 в атомарной ячейке (через биты u32).
 #[derive(Debug)]
 pub struct AtomicF32(AtomicU32);
@@ -46,6 +49,8 @@ pub struct NodeShared {
     morph: crate::morpher::MorpherParams,
     /// Шумоподавление: сила (пишет интерфейс) и наибольшая вероятность голоса с прошлого опроса.
     denoise_amount: AtomicF32,
+    /// «Тишина между словами» 0…1.
+    denoise_gate: AtomicF32,
     voice: AtomicF32,
 }
 
@@ -93,6 +98,7 @@ impl Default for NodeShared {
             reduction: AtomicF32::new(0.0),
             morph: crate::morpher::MorpherParams::default(),
             denoise_amount: AtomicF32::new(1.0),
+            denoise_gate: AtomicF32::new(DENOISE_GATE_DEFAULT),
             voice: AtomicF32::new(0.0),
         }
     }
@@ -116,6 +122,9 @@ impl NodeShared {
         if node.kind == graph::NodeKind::Denoise {
             let v = node.params.get("amount").and_then(|v| v.as_f64()).unwrap_or(1.0);
             self.denoise_amount.store(v.clamp(0.0, 1.0) as f32);
+            // Нет в файле (схемы до 2026-11-14) — включено по умолчанию: жалоба тестировщика.
+            let g = node.params.get("gate").and_then(|v| v.as_f64()).unwrap_or(DENOISE_GATE_DEFAULT as f64);
+            self.denoise_gate.store(g.clamp(0.0, 1.0) as f32);
         }
         if node.kind == graph::NodeKind::VoiceMorpher {
             let m = &self.morph;
@@ -124,6 +133,10 @@ impl NodeShared {
                 cell.store(v.clamp(*range.start(), *range.end()) as f32);
             }
         }
+    }
+
+    pub fn denoise_gate(&self) -> &AtomicF32 {
+        &self.denoise_gate
     }
 
     pub fn denoise_amount(&self) -> &AtomicF32 {

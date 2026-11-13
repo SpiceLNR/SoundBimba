@@ -25,6 +25,7 @@ export const TEMPLATES: Template[] = [
     id: 'soundpad-discord',
     nodes: [
       { key: 'mic', kind: 'mic-input' },
+      { key: 'clean', kind: 'denoise' },
       { key: 'b1', kind: 'sound-button' },
       { key: 'b2', kind: 'sound-button' },
       { key: 'vol', kind: 'volume', params: { gain: 0.8, mute: false } },
@@ -32,7 +33,8 @@ export const TEMPLATES: Template[] = [
       { key: 'phones', kind: 'speaker-out' },
     ],
     edges: [
-      ['mic', 'virt'],
+      ['mic', 'clean'],
+      ['clean', 'virt'],
       ['b1', 'vol'],
       ['b2', 'vol'],
       ['vol', 'virt'],
@@ -44,13 +46,15 @@ export const TEMPLATES: Template[] = [
     nodes: [
       { key: 'game', kind: 'app-source' },
       { key: 'mic', kind: 'mic-input' },
+      { key: 'clean', kind: 'denoise' },
       { key: 'vol', kind: 'volume', params: { gain: 0.7, mute: false } },
       { key: 'virt', kind: 'virtual-out' },
     ],
     edges: [
       ['game', 'vol'],
       ['vol', 'virt'],
-      ['mic', 'virt'],
+      ['mic', 'clean'],
+      ['clean', 'virt'],
     ],
   },
   {
@@ -59,12 +63,14 @@ export const TEMPLATES: Template[] = [
       { key: 'player', kind: 'app-source' },
       { key: 'vol', kind: 'volume', params: { gain: 0.4, mute: false } },
       { key: 'mic', kind: 'mic-input' },
+      { key: 'clean', kind: 'denoise' },
       { key: 'virt', kind: 'virtual-out' },
     ],
     edges: [
       ['player', 'vol'],
       ['vol', 'virt'],
-      ['mic', 'virt'],
+      ['mic', 'clean'],
+      ['clean', 'virt'],
     ],
   },
   {
@@ -85,11 +91,13 @@ export const TEMPLATES: Template[] = [
     id: 'voice-changer',
     nodes: [
       { key: 'mic', kind: 'mic-input' },
+      { key: 'clean', kind: 'denoise' },
       { key: 'morph', kind: 'voice-morpher', params: { pitch: 0, robot: 1, radio: 0, echo: 0.2 } },
       { key: 'virt', kind: 'virtual-out' },
     ],
     edges: [
-      ['mic', 'morph'],
+      ['mic', 'clean'],
+      ['clean', 'morph'],
       ['morph', 'virt'],
     ],
   },

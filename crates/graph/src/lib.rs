@@ -388,7 +388,7 @@ pub const MORPHER_RANGES: [(&str, std::ops::RangeInclusive<f64>); 12] = [
 ];
 
 /// Шумоподавление: сила 0…1 (смесь очищенного и исходного).
-pub const DENOISE_RANGES: [(&str, std::ops::RangeInclusive<f64>); 1] = [("amount", 0.0..=1.0)];
+pub const DENOISE_RANGES: [(&str, std::ops::RangeInclusive<f64>); 2] = [("amount", 0.0..=1.0), ("gate", 0.0..=1.0)];
 
 fn check_params(n: &Node) -> Result<(), GraphError> {
     let bad = |param| GraphError::BadParam { node: n.id.clone(), param };

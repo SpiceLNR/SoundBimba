@@ -61,7 +61,7 @@ describe('templates', () => {
     const tpl = TEMPLATES.find((t) => t.id === 'game-to-mic')!;
     const r = applyTemplate(existing.nodes, existing.edges, tpl);
     expect(r.nodes).toHaveLength(2 + tpl.nodes.length);
-    expect(r.added).toEqual(['n8', 'n9', 'n10', 'n11']);
+    expect(r.added).toEqual(['n8', 'n9', 'n10', 'n11', 'n12']);
     const old = r.nodes.filter((n) => !r.added.includes(n.id));
     expect(old.map((n) => n.position)).toEqual(existing.nodes.map((n) => n.position));
     for (const id of r.added) expect(r.nodes.find((n) => n.id === id)!.position.y).toBeGreaterThan(300);

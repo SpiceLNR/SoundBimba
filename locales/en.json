@@ -330,6 +330,8 @@
   "param.wobble": "Wobble",
   "node.denoise.title": "Noise suppression",
   "node.denoise.desc": "Keeps your voice and removes background: fans, hum, keyboard. Put it right after the microphone.",
+  "param.gate": "Silence between words",
+  "param.gateHint": "While you are silent, the microphone is turned down: no keyboard, mouse or computer noise. It opens the moment you speak.",
   "param.amount": "Strength",
   "param.voiceHeard": "Voice detected",
   "param.voiceNone": "Background only — removing it",

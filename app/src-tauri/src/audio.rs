@@ -152,8 +152,31 @@ fn find_device<'a>(devs: &'a [DeviceInfo], wanted: Option<&str>, render: bool) -
     }
 }
 
+/// Последний удачно прочитанный список устройств. Не прочитался (Windows на миг не ответила) —
+/// берём его: иначе все устройства, и кабель тоже, «пропадают», и звук перезапускается.
+static LAST_DEVICES: std::sync::Mutex<Vec<DeviceInfo>> = std::sync::Mutex::new(Vec::new());
+/// Какие виртуальные кабели видны сейчас (для журнала: когда кабель пропал и появился).
+static LAST_CABLES: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+pub fn current_devices() -> Vec<DeviceInfo> {
+    let mut last = LAST_DEVICES.lock().unwrap_or_else(|e| e.into_inner());
+    match devices::list() {
+        Ok(devs) if !devs.is_empty() => *last = devs,
+        Ok(_) => applog::info("audio devices: Windows returned an empty list, keeping the previous one"),
+        Err(e) => applog::error(&format!("audio devices: cannot list ({}), keeping the previous list", e.message())),
+    }
+    let cables: Vec<String> = last.iter().filter(|d| d.cable.is_some()).map(|d| format!("{}{}", if d.render { "out " } else { "in " }, d.name)).collect();
+    let cables = if cables.is_empty() { "none".to_string() } else { cables.join(", ") };
+    let mut seen = LAST_CABLES.lock().unwrap_or_else(|e| e.into_inner());
+    if *seen != cables {
+        applog::info(&format!("virtual cables now: {cables}"));
+        *seen = cables;
+    }
+    last.clone()
+}
+
 fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
-    let devs = devices::list().unwrap_or_default();
+    let devs = current_devices();
     let procs = processes::list();
     let mut r = Resolved { ports: HashMap::new(), vd_outputs: BTreeSet::new(), clips: HashMap::new(), status: HashMap::new() };
     r.vd_outputs = devs.iter().filter(|d| d.render && is_virtual_desktop(&d.name)).map(|d| d.id.clone()).collect();

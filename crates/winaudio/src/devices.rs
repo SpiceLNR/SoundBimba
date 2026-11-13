@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Список активных звуковых устройств (вывод и ввод) с отметкой виртуальных кабелей.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use windows::core::{Result, PWSTR};
 use windows::Win32::Devices::FunctionDiscovery::{
-    PKEY_DeviceInterface_FriendlyName, PKEY_Device_FriendlyName,
+    PKEY_DeviceInterface_FriendlyName, PKEY_Device_DeviceDesc, PKEY_Device_FriendlyName,
 };
 use windows::Win32::Foundation::{PROPERTYKEY, RPC_E_CHANGED_MODE};
 use windows::Win32::Media::Audio::{
@@ -17,6 +20,7 @@ use windows::Win32::System::Com::{
 
 use crate::cables::{cable_of, CableKind};
 
+#[derive(Clone)]
 pub struct DeviceInfo {
     pub id: String,
     pub name: String,
@@ -50,16 +54,35 @@ fn prop(dev: &IMMDevice, key: &PROPERTYKEY) -> Result<String> {
     }
 }
 
+/// Последние прочитанные названия устройств (id → название, адаптер). Windows иногда на миг не
+/// отдаёт название (смена устройств, выход из сна) — тогда берём запомненное: иначе виртуальный
+/// кабель, который узнаём по названию, «пропадает» (так было у тестировщика на Windows 10).
+static NAMES: Mutex<Option<HashMap<String, (String, String)>>> = Mutex::new(None);
+
+fn names_of(dev: &IMMDevice, id: &str) -> (String, String) {
+    let name = prop(dev, &PKEY_Device_FriendlyName).or_else(|_| prop(dev, &PKEY_Device_DeviceDesc)).ok();
+    let adapter = prop(dev, &PKEY_DeviceInterface_FriendlyName).ok();
+    let mut cache = NAMES.lock().unwrap_or_else(|e| e.into_inner());
+    let cache = cache.get_or_insert_with(HashMap::new);
+    let known = cache.get(id).cloned();
+    let name = name.filter(|n| !n.is_empty()).or_else(|| known.as_ref().map(|k| k.0.clone())).unwrap_or_else(|| "?".into());
+    let adapter = adapter.filter(|a| !a.is_empty()).or_else(|| known.map(|k| k.1)).unwrap_or_default();
+    if name != "?" {
+        cache.insert(id.to_string(), (name.clone(), adapter.clone()));
+    }
+    (name, adapter)
+}
+
 fn list_flow(en: &IMMDeviceEnumerator, flow: EDataFlow, out: &mut Vec<DeviceInfo>) -> Result<()> {
     let default_id = unsafe { en.GetDefaultAudioEndpoint(flow, eConsole) }
         .and_then(|d| unsafe { d.GetId() }.map(take))
         .unwrap_or_default();
     let coll = unsafe { en.EnumAudioEndpoints(flow, DEVICE_STATE_ACTIVE)? };
     for i in 0..unsafe { coll.GetCount()? } {
-        let dev = unsafe { coll.Item(i)? };
-        let id = take(unsafe { dev.GetId()? });
-        let name = prop(&dev, &PKEY_Device_FriendlyName).unwrap_or_else(|_| "?".into());
-        let adapter = prop(&dev, &PKEY_DeviceInterface_FriendlyName).unwrap_or_default();
+        // Одно устройство не прочиталось — пропускаем его, а не весь список.
+        let Ok(dev) = (unsafe { coll.Item(i) }) else { continue };
+        let Ok(id) = (unsafe { dev.GetId() }).map(take) else { continue };
+        let (name, adapter) = names_of(&dev, &id);
         out.push(DeviceInfo {
             is_default: id == default_id,
             cable: cable_of(&name, &adapter),

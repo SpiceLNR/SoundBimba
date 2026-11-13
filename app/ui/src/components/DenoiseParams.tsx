@@ -14,6 +14,9 @@ export default function DenoiseParams({ node, onParams }: { node: SoundNode; onP
   const audio = useAudio();
   const amount = typeof node.data.params.amount === 'number' ? node.data.params.amount : 1;
   const percent = Math.round(amount * 100);
+  // Нет в файле (схемы до 2026-11-14) — 70 %, как в движке.
+  const gate = typeof node.data.params.gate === 'number' ? node.data.params.gate : 0.7;
+  const gatePercent = Math.round(gate * 100);
   const full = useFullId(node.id);
   const voice = audio.enabled ? (audio.voices?.[full] ?? 0) : 0;
   const speaking = voice >= VOICE_LEVEL;
@@ -31,6 +34,20 @@ export default function DenoiseParams({ node, onParams }: { node: SoundNode; onP
           value={percent}
           style={{ '--fill': `${percent}%` } as React.CSSProperties}
           onChange={(e) => onParams(node.id, { amount: Number(e.target.value) / 100 })}
+        />
+      </label>
+      <label className="field" title={t('param.gateHint')}>
+        <span>
+          {t('param.gate')}: {gatePercent} %
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={gatePercent}
+          style={{ '--fill': `${gatePercent}%` } as React.CSSProperties}
+          onChange={(e) => onParams(node.id, { gate: Number(e.target.value) / 100 })}
         />
       </label>
       {audio.enabled && (

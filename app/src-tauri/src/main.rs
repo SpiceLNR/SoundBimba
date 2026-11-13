@@ -120,7 +120,8 @@ struct DeviceDto {
 /// Звуковые устройства для выбора в боковой панели.
 #[tauri::command]
 fn list_audio_devices() -> Result<Vec<DeviceDto>, CmdError> {
-    let devs = winaudio::devices::list().map_err(|e| CmdError::new("io", e.message()))?;
+    // Тот же устойчивый список, что у звука: не прочитался — прежний.
+    let devs = audio::current_devices();
     Ok(devs
         .into_iter()
         .map(|d| DeviceDto { id: d.id, name: d.name, render: d.render, is_default: d.is_default, cable: d.cable.map(|c| c.label) })
