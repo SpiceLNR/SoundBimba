@@ -119,7 +119,7 @@ impl NodeShared {
         }
         if node.kind == graph::NodeKind::VoiceMorpher {
             let m = &self.morph;
-            for (cell, (name, range)) in [&m.pitch, &m.robot, &m.radio, &m.echo, &m.wobble].into_iter().zip(graph::MORPHER_RANGES) {
+            for (cell, (name, range)) in [&m.pitch, &m.robot, &m.radio, &m.echo, &m.wobble, &m.formant, &m.growl, &m.chorus, &m.hall, &m.tone].into_iter().zip(graph::MORPHER_RANGES) {
                 let v = node.params.get(name).and_then(|v| v.as_f64()).unwrap_or(0.0);
                 cell.store(v.clamp(*range.start(), *range.end()) as f32);
             }

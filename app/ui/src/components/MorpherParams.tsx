@@ -135,12 +135,43 @@ export default function MorpherParams({ node, onParams }: { node: SoundNode; onP
   const num = (k: string) => (typeof p[k] === 'number' ? (p[k] as number) : 0);
   const set = (patch: Params) => onParams(node.id, patch);
   const pitch = num('pitch');
+  const formant = num('formant');
+  const tone = num('tone');
+  const semis = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : '0');
   return (
     <>
       <div className="field">
         <span>{t('param.voices')}</span>
         <VoicePicker params={p} onPick={set} editable />
       </div>
+      <label className="field" title={t('param.toneHint')}>
+        <span>
+          {t('param.tone')}: {semis(tone)}
+        </span>
+        <input
+          type="range"
+          min={-12}
+          max={12}
+          step={1}
+          value={tone}
+          style={{ '--fill': `${((tone + 12) / 24) * 100}%` } as React.CSSProperties}
+          onChange={(e) => set({ tone: Number(e.target.value) })}
+        />
+      </label>
+      <label className="field" title={t('param.formantHint')}>
+        <span>
+          {t('param.formant')}: {semis(formant)}
+        </span>
+        <input
+          type="range"
+          min={-8}
+          max={8}
+          step={1}
+          value={formant}
+          style={{ '--fill': `${((formant + 8) / 16) * 100}%` } as React.CSSProperties}
+          onChange={(e) => set({ formant: Number(e.target.value) })}
+        />
+      </label>
       <label className="field" title={t('param.pitchHint')}>
         <span>
           {t('param.pitch')}: {pitch > 0 ? `+${pitch}` : pitch < 0 ? `−${-pitch}` : '0'}
@@ -159,7 +190,11 @@ export default function MorpherParams({ node, onParams }: { node: SoundNode; onP
       <Amount label={t('param.radio')} value={num('radio')} onChange={(radio) => set({ radio })} />
       <Amount label={t('param.wobble')} value={num('wobble')} onChange={(wobble) => set({ wobble })} />
       <Amount label={t('param.echo')} value={num('echo')} onChange={(echo) => set({ echo })} />
+      <Amount label={t('param.growl')} value={num('growl')} onChange={(growl) => set({ growl })} />
+      <Amount label={t('param.chorus')} value={num('chorus')} onChange={(chorus) => set({ chorus })} />
+      <Amount label={t('param.hall')} value={num('hall')} onChange={(hall) => set({ hall })} />
       {(pitch !== 0 || num('wobble') > 0) && <p className="later">{t('param.pitchDelay')}</p>}
+      {(formant !== 0 || tone !== 0) && <p className="later">{t('param.formantDelay')}</p>}
     </>
   );
 }

@@ -1,27 +1,46 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Готовые голоса морфера — сочетания пяти эффектов движка (crates/engine/src/morpher.rs):
-// высота в полутонах (−12…12), «робот», «рация», эхо и дрожание высоты — сила 0…1.
+// Готовые голоса морфера — сочетания эффектов движка (crates/engine/src/morpher.rs):
+// высота в полутонах (−12…12), «робот», «рация», эхо, дрожание высоты — сила 0…1; с 2026-11-12
+// ещё тембр (сдвиг формант, полутона −8…8), рык, хор и зал — сила 0…1.
 import type { Params } from './graph';
 
 export interface MorpherVoice {
   id: string;
-  params: { pitch: number; robot: number; radio: number; echo: number; wobble: number };
+  params: Effects;
 }
 
+/** Все эффекты морфера. Новые добавлять в конец; у старых голосов новые эффекты — 0. */
+export const KEYS = ['pitch', 'robot', 'radio', 'echo', 'wobble', 'formant', 'growl', 'chorus', 'hall', 'tone'] as const;
+type Effects = Record<(typeof KEYS)[number], number>;
+
+/** Голос из нескольких эффектов (остальные — 0). */
+const voice = (id: string, set: Partial<Effects>): MorpherVoice => ({
+  id,
+  params: { ...(Object.fromEntries(KEYS.map((k) => [k, 0])) as Effects), ...set },
+});
+
 export const VOICES: MorpherVoice[] = [
-  { id: 'normal', params: { pitch: 0, robot: 0, radio: 0, echo: 0, wobble: 0 } },
-  { id: 'monster', params: { pitch: -7, robot: 0, radio: 0, echo: 0, wobble: 0 } },
-  { id: 'chipmunk', params: { pitch: 7, robot: 0, radio: 0, echo: 0, wobble: 0 } },
-  { id: 'robot', params: { pitch: 0, robot: 1, radio: 0, echo: 0.2, wobble: 0 } },
-  { id: 'radio', params: { pitch: 0, robot: 0, radio: 1, echo: 0, wobble: 0 } },
-  { id: 'cave', params: { pitch: 0, robot: 0, radio: 0, echo: 0.8, wobble: 0 } },
+  voice('normal', {}),
+  voice('monster', { pitch: -7 }),
+  voice('chipmunk', { pitch: 7 }),
+  voice('robot', { robot: 1, echo: 0.2 }),
+  voice('radio', { radio: 1 }),
+  voice('cave', { echo: 0.8 }),
   // «Плавающий» инопланетный голос: чуть выше, высота непрерывно дрожит, лёгкое эхо корабля.
   // (Первая версия — «чуть выше + робот» — автору не понравилась: смесь двух других голосов.)
-  { id: 'alien', params: { pitch: 3, robot: 0, radio: 0, echo: 0.25, wobble: 0.7 } },
+  // Не менять: автор просил сохранить «Пришельца» в первозданном виде.
+  voice('alien', { pitch: 3, echo: 0.25, wobble: 0.7 }),
+  // 2026-11-12, на новых эффектах. «Мультяшная» высота (pitch) двигает и окраску голоса;
+  // естественная (tone) — только высоту, окраску задаёт тембр (formant), как в MorphVOX и AV.
+  // «Девушка»: выше на 5 полутонов и окраска легче на 2 — без писка бурундука.
+  voice('girl', { tone: 5, formant: 2 }),
+  voice('giant', { pitch: -5, formant: 2, hall: 0.2 }),
+  voice('legion', { pitch: -2, chorus: 1 }),
+  voice('demon', { pitch: -6, formant: -2, growl: 0.8, chorus: 0.5, hall: 0.3 }),
+  voice('cathedral', { hall: 1 }),
+  voice('ghost', { pitch: 2, wobble: 0.2, chorus: 0.4, hall: 0.7 }),
 ];
 
-const KEYS = ['pitch', 'robot', 'radio', 'echo', 'wobble'] as const;
-type Effects = MorpherVoice['params'];
 
 /** Свой голос, сохранённый человеком. Хранится в самом узле морфера (`params.voices`) — поэтому
  *  попадает в проект и в шаблон вместе со схемой. */

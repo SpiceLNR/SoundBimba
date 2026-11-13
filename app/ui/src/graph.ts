@@ -48,7 +48,7 @@ export const KINDS: Record<NodeKind, KindInfo> = {
     defaults: { threshold: -24, ratio: 3, attack: 5, release: 120, makeup: 12 },
   },
   // Голос «Обычный»: все эффекты выключены, голос проходит без изменений.
-  'voice-morpher': { category: 'processing', input: true, output: true, defaults: { pitch: 0, robot: 0, radio: 0, echo: 0, wobble: 0 } },
+  'voice-morpher': { category: 'processing', input: true, output: true, defaults: { pitch: 0, robot: 0, radio: 0, echo: 0, wobble: 0, formant: 0, growl: 0, chorus: 0, hall: 0, tone: 0 } },
   denoise: { category: 'processing', input: true, output: true, defaults: { amount: 1 } },
   'speaker-out': { category: 'output', input: true, output: false, defaults: { device: 'default' } },
   'virtual-out': { category: 'output', input: true, output: false, defaults: { device: 'virtual-1' } },

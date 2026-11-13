@@ -19,6 +19,8 @@ pub use ring::{ring, RingReader, RingWriter};
 pub mod compressor;
 pub mod denoise;
 pub mod morpher;
+#[cfg(test)]
+mod morpher_legacy;
 
 pub use shared::{AtomicF32, ButtonState, CompressorParams, NodeShared, PortStats, COMPRESSOR_DEFAULTS};
 
