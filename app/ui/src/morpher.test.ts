@@ -74,3 +74,35 @@ describe('own voices', () => {
     expect(own).toEqual([{ id: 'c2', name: 'Ок', custom: true, params: { pitch: 2, robot: 0, radio: 0, echo: 0, wobble: 0, formant: 0, growl: 0, chorus: 0, hall: 0, tone: 0 } }]);
   });
 });
+
+describe('tune to your voice', () => {
+  it('ready voices reach the same pitch from any voice, without flipping direction', async () => {
+    const { adapted, VOICES, REFERENCE_F0 } = await import('./morpher');
+    const girl = VOICES.find((v) => v.id === 'girl')!.params;
+    const demon = VOICES.find((v) => v.id === 'demon')!.params;
+    // Голос автора (на нём настроены голоса) и «не подстроено» — без изменений.
+    expect(adapted(girl, REFERENCE_F0)).toEqual(girl);
+    expect(adapted(girl, null)).toEqual(girl);
+    // Низкий мужской голос: «Девушка» поднимает сильнее, тембр — тоже легче.
+    const deep = adapted(girl, 100);
+    expect(deep.tone).toBe(9);
+    expect(deep.formant).toBe(4);
+    // Высокий голос: «Девушка» не опускает — голос как есть.
+    expect(adapted(girl, 210)).toMatchObject({ tone: 0, formant: 0 });
+    // «Демон» у высокого голоса — ниже, вплоть до предела.
+    const high = adapted(demon, 210);
+    expect(high.tone).toBe(-12);
+    expect(high.formant).toBeLessThan(demon.formant);
+    // Мультяшные голоса (без естественной высоты) не трогаем.
+    const alien = VOICES.find((v) => v.id === 'alien')!.params;
+    expect(adapted(alien, 210)).toEqual(alien);
+  });
+
+  it('the voice picker shows tuned voices as chosen', async () => {
+    const { adapted, setVoiceProfile, voiceOf, VOICES } = await import('./morpher');
+    setVoiceProfile(100);
+    const girl = adapted(VOICES.find((v) => v.id === 'girl')!.params, 100);
+    expect(voiceOf(girl)).toBe('girl');
+    setVoiceProfile(null);
+  });
+});

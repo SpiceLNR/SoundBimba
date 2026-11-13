@@ -4,9 +4,9 @@ import { open } from '@tauri-apps/plugin-dialog';
 import type { Edge } from '@xyflow/react';
 import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
-import { api, type AudioApp, type AudioDevice } from '../api';
+import { api, type AudioApp } from '../api';
 import { isProblem, useAudio } from '../audio';
-import { lookOf, type NodeKind, type Params, type SoundNode } from '../graph';
+import { lookOf, type Params, type SoundNode } from '../graph';
 import { useT } from '../i18n';
 import CompressorParams from './CompressorParams';
 import DenoiseParams from './DenoiseParams';
@@ -14,6 +14,7 @@ import MorpherParams from './MorpherParams';
 import OriginalPicker from './OriginalPicker';
 import ButtonDisc from './ButtonDisc';
 import Dropdown from './Dropdown';
+import DevicePicker from './DevicePicker';
 import { useFullId } from './chipContext';
 
 interface Props {
@@ -25,43 +26,6 @@ interface Props {
   onDeleteEdge: (id: string) => void;
   /** Открыть микросхему (её схему внутри). */
   onOpenChip: (id: string) => void;
-}
-
-/** Выбор устройства: микрофон, наушники или виртуальный кабель. */
-function DevicePicker({ kind, value, onChange }: { kind: NodeKind; value: string; onChange: (v: string) => void }) {
-  const t = useT();
-  const [devices, setDevices] = useState<AudioDevice[] | null>(null);
-  const load = useCallback(() => {
-    api
-      .listAudioDevices()
-      .then(setDevices)
-      .catch(() => setDevices([]));
-  }, []);
-  useEffect(load, [load]);
-
-  const render = kind !== 'mic-input';
-  const list = (devices ?? []).filter((d) => d.render === render && (kind !== 'virtual-out' || d.cable));
-  const byDefault = list.find((d) => d.isDefault);
-  const special =
-    kind === 'virtual-out'
-      ? { value: 'virtual-1', label: t('param.deviceAuto') }
-      : { value: 'default', label: byDefault ? t('param.deviceDefaultNamed', { name: byDefault.name }) : t('param.deviceDefault') };
-  const items = [special, ...list.map((d) => ({ value: d.id, label: d.name }))].map((it) => ({
-    ...it,
-    selected: it.value === value,
-  }));
-  const current = items.find((it) => it.selected)?.label ?? (devices ? t('param.deviceUnknown') : '…');
-
-  return (
-    <div className="field">
-      <span>{t('param.device')}</span>
-      <Dropdown className="panel-dropdown" label={current} matchWidth groups={[{ items }]} onSelect={onChange} />
-      {kind === 'virtual-out' && devices && list.length === 0 && <p className="problem-text">{t('param.noCableHint')}</p>}
-      <button type="button" className="link-button" onClick={load}>
-        {t('param.refresh')}
-      </button>
-    </div>
-  );
 }
 
 /** Программа для узла «Звук приложения»: ввести имя exe или выбрать из тех, что сейчас со звуком. */

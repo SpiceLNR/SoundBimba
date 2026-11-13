@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Морфер голоса: выбор голоса (он же — в простом режиме), свои голоса и ползунки пяти эффектов.
 import type React from 'react';
+import { useReactFlow } from '@xyflow/react';
 import { useState } from 'react';
 import type { Params, SoundNode } from '../graph';
 import { useT } from '../i18n';
 import { addVoice, hiddenVoices, KEEP_VOICE, removeVoice, restoreVoices, voiceName, voiceOf, voicesOf } from '../morpher';
 import IconButton from './IconButton';
+import VoiceCalibration from './VoiceCalibration';
+import { useVoiceProfile } from './voiceProfile';
 
 const MAX_NAME = 24;
 
@@ -131,6 +134,55 @@ function Amount({ label, value, onChange }: { label: string; value: number; onCh
   );
 }
 
+/** Микрофон, который идёт в этот узел (через обработку на карте), или «default». */
+function micFeeding(nodeId: string, nodes: SoundNode[], edges: { source: string; target: string }[]): string {
+  const seen = new Set<string>();
+  const queue = [nodeId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const n = nodes.find((x) => x.id === id);
+    if (n?.data.kind === 'mic-input') {
+      const d = n.data.params.device;
+      return typeof d === 'string' && d ? d : 'default';
+    }
+    for (const e of edges) if (e.target === id) queue.push(e.source);
+  }
+  return 'default';
+}
+
+/** Подстроены ли голоса под голос человека; кнопка подстройки. */
+function VoiceProfileLine({ nodeId }: { nodeId: string }) {
+  const t = useT();
+  const { f0, onChange } = useVoiceProfile();
+  const [open, setOpen] = useState(false);
+  const rf = useReactFlow<SoundNode>();
+  return (
+    <div className="voice-profile">
+      <span>{f0 === null ? t('voiceCal.none') : t('voiceCal.set', { hz: Math.round(f0) })}</span>
+      <button type="button" className="link" onClick={() => setOpen(true)}>
+        {f0 === null ? t('voiceCal.open') : t('voiceCal.redo')}
+      </button>
+      {f0 !== null && (
+        <button type="button" className="link" onClick={() => onChange(null)}>
+          {t('voiceCal.reset')}
+        </button>
+      )}
+      {open && (
+        <VoiceCalibration
+          device={micFeeding(nodeId, rf.getNodes(), rf.getEdges())}
+          onClose={() => setOpen(false)}
+          onSave={(hz) => {
+            onChange(hz);
+            setOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function MorpherParams({ node, onParams }: { node: SoundNode; onParams: (id: string, p: Params) => void }) {
   const t = useT();
   const p = node.data.params;
@@ -145,6 +197,7 @@ export default function MorpherParams({ node, onParams }: { node: SoundNode; onP
       <div className="field">
         <span>{t('param.voices')}</span>
         <VoicePicker params={p} onPick={set} editable />
+        <VoiceProfileLine nodeId={node.id} />
       </div>
       <label className="field" title={t('param.toneHint')}>
         <span>

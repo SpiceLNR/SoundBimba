@@ -692,6 +692,63 @@ impl State {
     }
 }
 
+/// Высота голоса по записи (подстройка под голос, как Voice Doctor в MorphVOX).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VoicePitch {
+    /// Обычная высота (середина ряда), Гц.
+    pub median_hz: f32,
+    /// Нижняя и верхняя высота речи (10 % и 90 % кусков), Гц.
+    pub low_hz: f32,
+    pub high_hz: f32,
+    /// Доля кусков с голосом (не тишина и не шипящие).
+    pub voiced_share: f32,
+}
+
+/// Высота голоса по записи (моно, 48 кГц): YIN по кускам 40 мс, шипящие и тишина пропускаются.
+/// None — голоса почти нет (меньше 0,8 с речи).
+pub fn voice_pitch(mono: &[f32]) -> Option<VoicePitch> {
+    let win = RATE as usize / 25;
+    let (lo, hi) = (RATE as usize / 500, RATE as usize / 70);
+    let w = win - hi;
+    let mut f0s = Vec::new();
+    let mut chunks = 0usize;
+    let mut cmnd = vec![1.0f32; hi + 1];
+    for c in mono.chunks_exact(win) {
+        chunks += 1;
+        let e: f32 = c.iter().map(|v| v * v).sum();
+        if e / (win as f32) < 1e-5 {
+            continue;
+        }
+        let d: f32 = c.windows(2).map(|p| (p[1] - p[0]).powi(2)).sum();
+        if d / e > HISS_SHARPNESS {
+            continue;
+        }
+        let mut running = 0.0f32;
+        for tau in 1..=hi {
+            let diff: f32 = (0..w).map(|j| (c[j] - c[j + tau]).powi(2)).sum();
+            running += diff;
+            cmnd[tau] = if running > 0.0 { diff * tau as f32 / running } else { 1.0 };
+        }
+        let mut tau = lo;
+        while tau < hi && cmnd[tau] >= YIN_THRESHOLD {
+            tau += 1;
+        }
+        if tau >= hi {
+            continue;
+        }
+        while tau + 1 < hi && cmnd[tau + 1] < cmnd[tau] {
+            tau += 1;
+        }
+        f0s.push(RATE as f32 / tau as f32);
+    }
+    if f0s.len() < 20 {
+        return None;
+    }
+    f0s.sort_by(f32::total_cmp);
+    let at = |q: f32| f0s[((f0s.len() - 1) as f32 * q).round() as usize];
+    Some(VoicePitch { median_hz: at(0.5), low_hz: at(0.1), high_hz: at(0.9), voiced_share: f0s.len() as f32 / chunks.max(1) as f32 })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1449,5 +1506,34 @@ mod tests {
             }
             std::fs::write(format!("{dir}/{name}.wav"), b).unwrap();
         }
+    }
+
+    #[test]
+    fn measures_the_voice_pitch() {
+        // Живой голос: высота плавает 130–160 Гц вокруг 145.
+        let (stereo, _) = live_voice(3.0);
+        let mono: Vec<f32> = stereo.iter().step_by(2).copied().collect();
+        let v = voice_pitch(&mono).expect("голос есть");
+        assert!((v.median_hz - 145.0).abs() < 9.0, "{v:?}");
+        assert!(v.low_hz < 140.0 && v.high_hz > 150.0 && v.low_hz > 120.0 && v.high_hz < 170.0, "{v:?}");
+        assert!(v.voiced_share > 0.5, "{v:?}");
+        // Тишина и шум — голоса нет.
+        assert_eq!(voice_pitch(&vec![0.0; RATE as usize * 3]), None);
+        let mut seed = 1u32;
+        let noise: Vec<f32> = (0..RATE as usize * 3)
+            .map(|_| {
+                seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+                ((seed >> 8) as f32 / (1u32 << 24) as f32 - 0.5) * 0.2
+            })
+            .collect();
+        assert_eq!(voice_pitch(&noise), None);
+    }
+
+    /// Ручной разбор: высота голоса по записи SB_WAV (как при подстройке).
+    #[test]
+    #[ignore = "ручной разбор записи"]
+    fn voice_pitch_of_recording() {
+        let mono = read_wav(&std::env::var("SB_WAV").expect("SB_WAV"));
+        println!("{:?}", voice_pitch(&mono));
     }
 }

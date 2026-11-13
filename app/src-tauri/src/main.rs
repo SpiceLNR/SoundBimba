@@ -165,6 +165,44 @@ async fn measure_latency(app: tauri::AppHandle) -> Result<LatencyDto, CmdError> 
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VoiceDto {
+    median_hz: f32,
+    low_hz: f32,
+    high_hz: f32,
+}
+
+/// Подстройка морфера под голос: 5 секунд с микрофона → высота голоса. `device` — id микрофона
+/// или «default» (по умолчанию в Windows). Запись никуда не сохраняется.
+#[tauri::command]
+async fn measure_voice(device: Option<String>) -> Result<VoiceDto, CmdError> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        winaudio::devices::ensure_com().map_err(|e| e.message())?;
+        let devs = winaudio::devices::list().map_err(|e| e.message())?;
+        let mic = match device.as_deref() {
+            Some(id) if id != "default" => devs.iter().find(|d| !d.render && d.id == id),
+            _ => winaudio::devices::default_device(&devs, false),
+        }
+        .ok_or("no-mic")?;
+        let mono = winaudio::record::record_mic(&mic.id, VOICE_SECONDS)?;
+        engine::morpher::voice_pitch(&mono).ok_or_else(|| "no-voice".to_string())
+    })
+    .await
+    .map_err(|e| CmdError::new("io", e))?;
+    match result {
+        Ok(v) => {
+            applog::info(&format!("voice measured: {:.0} Hz ({:.0}–{:.0})", v.median_hz, v.low_hz, v.high_hz));
+            Ok(VoiceDto { median_hz: v.median_hz, low_hz: v.low_hz, high_hz: v.high_hz })
+        }
+        Err(e) if e == "no-mic" || e == "no-voice" => Err(CmdError::new(&e, &e)),
+        Err(e) => Err(CmdError::new("io", e)),
+    }
+}
+
+/// Сколько секунд слушать голос при подстройке.
+const VOICE_SECONDS: f32 = 5.0;
+
 /// Программы, у которых сейчас есть звук, — для выбора в узле «Звук приложения».
 #[tauri::command]
 fn list_audio_apps() -> Result<Vec<AppDto>, CmdError> {
@@ -334,6 +372,7 @@ fn main() {
             list_audio_devices,
             list_audio_apps,
             measure_latency,
+            measure_voice,
             press_button,
             seek_button,
             get_ui_state,

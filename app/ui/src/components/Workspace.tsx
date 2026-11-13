@@ -49,6 +49,8 @@ import { DICTS, useT, type Lang } from '../i18n';
 import { wireShape } from '../theme';
 import { applyTemplate, type Template } from '../templates';
 import { IdPrefix } from './chipContext';
+import { VoiceProfileContext } from './voiceProfile';
+import { setVoiceProfile } from '../morpher';
 import TraceEdge from './TraceEdge';
 import NeonEdge from './NeonEdge';
 import MagicEdge from './MagicEdge';
@@ -500,185 +502,191 @@ export default function Workspace({ project, version, settings, lang, onSettings
   const selectedNode = nodes.find((n) => n.id === selected.node);
   const selectedEdge = shownEdges.find((e) => e.id === selected.edge);
 
+  // Морфер: голоса подстраиваются под голос человека (настройка voiceF0).
+  setVoiceProfile(settings.voiceF0);
+  const voiceProfile = { f0: settings.voiceF0 ?? null, onChange: (f0: number | null) => onSettings({ ...settings, voiceF0: f0 }) };
+
   return (
-    <div className="workspace">
-      <Toolbar
-        lang={lang}
-        settings={settings}
-        saveState={saveState}
-        bindings={bindings}
-        onToggleAudio={onToggleAudio}
-        onAdd={addNode}
-        onArrange={onArrange}
-        onExport={() => void onExport()}
-        onImport={() => void onImport()}
-        onDiagnostics={() => void onDiagnostics()}
-        onLatency={() => void onLatency()}
-        onHotkeys={() => setHotkeysOpen(true)}
-        onTemplates={() => setTemplatesOpen(true)}
-        onCable={() => setCableOpen(true)}
-        onClear={() => setClearOpen(true)}
-        onSettings={onSettings}
-        onOpenPanel={() => void openPanel()}
-        simple={settings.mode === 'simple'}
-        inChip={inChip}
-      />
-      {settings.mode === 'simple' ? (
-        <main className="main-simple">
-          <SimpleView project={flattenProject(JSON.parse(projectJson) as Project)} onParams={onParams} />
-        </main>
-      ) : (
-      <main className="main">
-        <div className="map" ref={mapRef}>
-          <Watermark />
-          <Mascot theme={settings.theme} />
-          {inChip && (
-            <nav className="chip-path" aria-label={t('chip.path')}>
-              <button type="button" className="chip-back" onClick={() => exitTo(stack.length - 1)}>
-                ← {t('chip.back')}
-              </button>
-              <button type="button" className="crumb" onClick={() => exitTo(0)}>
-                {t('chip.map')}
-              </button>
-              {stack.map((level, i) => {
-                const chip = level.nodes.find((n) => n.id === level.chipId);
-                const name = typeof chip?.data.params.name === 'string' && chip.data.params.name.trim() ? chip.data.params.name.trim() : t('node.chip.title');
-                const last = i === stack.length - 1;
-                return (
-                  <span key={i} className="chip-path-step">
-                    <span className="crumb-sep" aria-hidden="true">
-                      ›
+    <VoiceProfileContext.Provider value={voiceProfile}>
+      <div className="workspace">
+        <Toolbar
+          lang={lang}
+          settings={settings}
+          saveState={saveState}
+          bindings={bindings}
+          onToggleAudio={onToggleAudio}
+          onAdd={addNode}
+          onArrange={onArrange}
+          onExport={() => void onExport()}
+          onImport={() => void onImport()}
+          onDiagnostics={() => void onDiagnostics()}
+          onLatency={() => void onLatency()}
+          onHotkeys={() => setHotkeysOpen(true)}
+          onTemplates={() => setTemplatesOpen(true)}
+          onCable={() => setCableOpen(true)}
+          onClear={() => setClearOpen(true)}
+          onSettings={onSettings}
+          onOpenPanel={() => void openPanel()}
+          simple={settings.mode === 'simple'}
+          inChip={inChip}
+        />
+        {settings.mode === 'simple' ? (
+          <main className="main-simple">
+            <SimpleView project={flattenProject(JSON.parse(projectJson) as Project)} onParams={onParams} />
+          </main>
+        ) : (
+        <main className="main">
+          <div className="map" ref={mapRef}>
+            <Watermark />
+            <Mascot theme={settings.theme} />
+            {inChip && (
+              <nav className="chip-path" aria-label={t('chip.path')}>
+                <button type="button" className="chip-back" onClick={() => exitTo(stack.length - 1)}>
+                  ← {t('chip.back')}
+                </button>
+                <button type="button" className="crumb" onClick={() => exitTo(0)}>
+                  {t('chip.map')}
+                </button>
+                {stack.map((level, i) => {
+                  const chip = level.nodes.find((n) => n.id === level.chipId);
+                  const name = typeof chip?.data.params.name === 'string' && chip.data.params.name.trim() ? chip.data.params.name.trim() : t('node.chip.title');
+                  const last = i === stack.length - 1;
+                  return (
+                    <span key={i} className="chip-path-step">
+                      <span className="crumb-sep" aria-hidden="true">
+                        ›
+                      </span>
+                      {last ? (
+                        <strong className="crumb current" aria-current="page">
+                          {name}
+                        </strong>
+                      ) : (
+                        <button type="button" className="crumb" onClick={() => exitTo(i + 1)}>
+                          {name}
+                        </button>
+                      )}
                     </span>
-                    {last ? (
-                      <strong className="crumb current" aria-current="page">
-                        {name}
-                      </strong>
-                    ) : (
-                      <button type="button" className="crumb" onClick={() => exitTo(i + 1)}>
-                        {name}
-                      </button>
-                    )}
-                  </span>
-                );
-              })}
-            </nav>
-          )}
-          {wireTip && (
-            <div className="wire-tip" style={{ left: wireTip.x, top: wireTip.y }} role="tooltip">
-              {wireTip.text}
-            </div>
-          )}
-          {nodes.length === 0 && (
-            <div className="empty-hint">
-              <strong>{t('empty.title')}</strong>
-              <span className="panel-desc">{t('empty.hint')}</span>
-              <button type="button" className="primary" onClick={() => setTemplatesOpen(true)}>
-                {t('welcome.templates')}
-              </button>
-            </div>
-          )}
+                  );
+                })}
+              </nav>
+            )}
+            {wireTip && (
+              <div className="wire-tip" style={{ left: wireTip.x, top: wireTip.y }} role="tooltip">
+                {wireTip.text}
+              </div>
+            )}
+            {nodes.length === 0 && (
+              <div className="empty-hint">
+                <strong>{t('empty.title')}</strong>
+                <span className="panel-desc">{t('empty.hint')}</span>
+                <button type="button" className="primary" onClick={() => setTemplatesOpen(true)}>
+                  {t('welcome.templates')}
+                </button>
+              </div>
+            )}
+            <IdPrefix.Provider value={stack.map((l) => `${l.chipId}/`).join('')}>
+            <ReactFlow
+              nodes={nodes}
+              edges={shownEdges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              isValidConnection={isValidConnection}
+              onSelectionChange={onSelectionChange}
+              onNodeDoubleClick={(_, n) => enterChip(n.id)}
+              onEdgeMouseEnter={showWireTip}
+              onEdgeMouseMove={showWireTip}
+              onEdgeMouseLeave={hideWireTip}
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              connectionLineType={traces ? ConnectionLineType.SmoothStep : ConnectionLineType.Bezier}
+              snapToGrid
+              snapGrid={[20, 20]}
+              colorMode="dark"
+              /* Встроенные клавиши React Flow выключены: свои клавиши (Delete и др.) — в hotkeys.ts,
+                 их можно переназначить. */
+              deleteKeyCode={null}
+              selectionKeyCode={null}
+              multiSelectionKeyCode={null}
+              zoomActivationKeyCode={null}
+              panActivationKeyCode={null}
+              disableKeyboardA11y
+              ariaLabelConfig={ariaLabelConfig}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
+              <MiniMap pannable zoomable nodeClassName={(n) => `cat-${lookOf((n as SoundNode).data.kind)}`} />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+            </IdPrefix.Provider>
+          </div>
           <IdPrefix.Provider value={stack.map((l) => `${l.chipId}/`).join('')}>
-          <ReactFlow
-            nodes={nodes}
-            edges={shownEdges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            isValidConnection={isValidConnection}
-            onSelectionChange={onSelectionChange}
-            onNodeDoubleClick={(_, n) => enterChip(n.id)}
-            onEdgeMouseEnter={showWireTip}
-            onEdgeMouseMove={showWireTip}
-            onEdgeMouseLeave={hideWireTip}
-            fitView
-            fitViewOptions={{ padding: 0.2 }}
-            connectionLineType={traces ? ConnectionLineType.SmoothStep : ConnectionLineType.Bezier}
-            snapToGrid
-            snapGrid={[20, 20]}
-            colorMode="dark"
-            /* Встроенные клавиши React Flow выключены: свои клавиши (Delete и др.) — в hotkeys.ts,
-               их можно переназначить. */
-            deleteKeyCode={null}
-            selectionKeyCode={null}
-            multiSelectionKeyCode={null}
-            zoomActivationKeyCode={null}
-            panActivationKeyCode={null}
-            disableKeyboardA11y
-            ariaLabelConfig={ariaLabelConfig}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
-            <MiniMap pannable zoomable nodeClassName={(n) => `cat-${lookOf((n as SoundNode).data.kind)}`} />
-            <Controls showInteractive={false} />
-          </ReactFlow>
+          <SidePanel
+            node={selectedNode}
+            edge={selectedEdge}
+            edgeLabel={typeof selectedEdge?.label === 'string' ? selectedEdge.label : undefined}
+            onParams={onParams}
+            onDeleteNode={deleteNode}
+            onDeleteEdge={deleteEdge}
+            onOpenChip={enterChip}
+          />
           </IdPrefix.Provider>
-        </div>
-        <IdPrefix.Provider value={stack.map((l) => `${l.chipId}/`).join('')}>
-        <SidePanel
-          node={selectedNode}
-          edge={selectedEdge}
-          edgeLabel={typeof selectedEdge?.label === 'string' ? selectedEdge.label : undefined}
-          onParams={onParams}
-          onDeleteNode={deleteNode}
-          onDeleteEdge={deleteEdge}
-          onOpenChip={enterChip}
-        />
-        </IdPrefix.Provider>
-      </main>
-      )}
-      {templatesOpen && (
-        <TemplatesDialog
-          project={JSON.parse(projectJson) as Project}
-          fresh={freshTemplates}
-          hidden={settings.hiddenTemplates ?? []}
-          onHidden={(ids) => onSettings({ ...settings, hiddenTemplates: ids })}
-          current={settings.currentTemplate ?? null}
-          onCurrent={(id) => onSettings({ ...settings, currentTemplate: id })}
-          onPick={addTemplate}
-          onClose={() => {
-            setTemplatesOpen(false);
-            setFreshTemplates([]);
-          }}
-          notify={notify}
-          reason={reason}
-        />
-      )}
-      {cableOpen && <CableWizard onClose={() => setCableOpen(false)} />}
-      {clearOpen && (
-        <div className="dialog-backdrop">
-          <div className="dialog dialog-narrow" role="alertdialog" aria-modal="true" aria-labelledby="clear-title">
-            <h2 id="clear-title" className="panel-title">
-              {t('clear.title')}
-            </h2>
-            <p className="panel-desc">{t('clear.text')}</p>
-            <div className="dialog-actions">
-              <span className="toolbar-gap" />
-              <button type="button" autoFocus onClick={() => setClearOpen(false)}>
-                {t('clear.no')}
-              </button>
-              <button type="button" className="danger" onClick={clearAll}>
-                {t('clear.yes')}
-              </button>
+        </main>
+        )}
+        {templatesOpen && (
+          <TemplatesDialog
+            project={JSON.parse(projectJson) as Project}
+            fresh={freshTemplates}
+            hidden={settings.hiddenTemplates ?? []}
+            onHidden={(ids) => onSettings({ ...settings, hiddenTemplates: ids })}
+            current={settings.currentTemplate ?? null}
+            onCurrent={(id) => onSettings({ ...settings, currentTemplate: id })}
+            onPick={addTemplate}
+            onClose={() => {
+              setTemplatesOpen(false);
+              setFreshTemplates([]);
+            }}
+            notify={notify}
+            reason={reason}
+          />
+        )}
+        {cableOpen && <CableWizard onClose={() => setCableOpen(false)} />}
+        {clearOpen && (
+          <div className="dialog-backdrop">
+            <div className="dialog dialog-narrow" role="alertdialog" aria-modal="true" aria-labelledby="clear-title">
+              <h2 id="clear-title" className="panel-title">
+                {t('clear.title')}
+              </h2>
+              <p className="panel-desc">{t('clear.text')}</p>
+              <div className="dialog-actions">
+                <span className="toolbar-gap" />
+                <button type="button" autoFocus onClick={() => setClearOpen(false)}>
+                  {t('clear.no')}
+                </button>
+                <button type="button" className="danger" onClick={clearAll}>
+                  {t('clear.yes')}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      {welcome && !templatesOpen && !cableOpen && (
-        <WelcomeDialog
-          onTemplates={() => {
-            closeWelcome();
-            setTemplatesOpen(true);
-          }}
-          onCable={() => {
-            closeWelcome();
-            setCableOpen(true);
-          }}
-          onClose={closeWelcome}
-        />
-      )}
-      {hotkeysOpen && <HotkeysDialog bindings={bindings} onChange={changeBindings} onClose={() => setHotkeysOpen(false)} />}
-    </div>
+        )}
+        {welcome && !templatesOpen && !cableOpen && (
+          <WelcomeDialog
+            onTemplates={() => {
+              closeWelcome();
+              setTemplatesOpen(true);
+            }}
+            onCable={() => {
+              closeWelcome();
+              setCableOpen(true);
+            }}
+            onClose={closeWelcome}
+          />
+        )}
+        {hotkeysOpen && <HotkeysDialog bindings={bindings} onChange={changeBindings} onClose={() => setHotkeysOpen(false)} />}
+      </div>
+    </VoiceProfileContext.Provider>
   );
 }

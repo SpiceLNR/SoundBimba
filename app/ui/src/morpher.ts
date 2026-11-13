@@ -13,6 +13,36 @@ export interface MorpherVoice {
 export const KEYS = ['pitch', 'robot', 'radio', 'echo', 'wobble', 'formant', 'growl', 'chorus', 'hall', 'tone'] as const;
 type Effects = Record<(typeof KEYS)[number], number>;
 
+/**
+ * Подстройка под голос (как Voice Doctor в MorphVOX). Готовые голоса с естественной высотой
+ * (`tone`) настроены на голос автора — 123 Гц (замер по его записи 2026-11-13). Для другого
+ * голоса они сдвигаются так, чтобы прийти к той же высоте: у низкого голоса «Девушка» поднимает
+ * сильнее, у высокого — меньше, но направление не меняется (высокий голос «Девушка» не опускает,
+ * а оставляет как есть). Тембр следует за добавкой высоты на 40 % (как советуют для смены пола).
+ */
+export const REFERENCE_F0 = 123;
+const TIMBRE_FOLLOWS = 0.4;
+let userF0: number | null = null;
+
+/** Чей голос подстраиваем: высота, Гц, или null — средний (как у автора). */
+export function setVoiceProfile(f0: number | null | undefined): void {
+  userF0 = typeof f0 === 'number' && f0 > 50 && f0 < 600 ? f0 : null;
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** Готовый голос под голос человека (при подстройке). */
+export function adapted(p: Effects, f0: number | null = userF0): Effects {
+  if (f0 === null || p.tone === 0) return p;
+  const extra = 12 * Math.log2(REFERENCE_F0 / f0);
+  let tone = p.tone + extra;
+  // Направление голоса не меняем: «вверх» не опускает, «вниз» не поднимает.
+  tone = p.tone > 0 ? Math.max(0, tone) : Math.min(0, tone);
+  tone = Math.round(clamp(tone, -12, 12));
+  const formant = Math.round(clamp(p.formant + (tone - p.tone) * TIMBRE_FOLLOWS, -8, 8));
+  return { ...p, tone, formant };
+}
+
 /** Голос из нескольких эффектов (остальные — 0). */
 const voice = (id: string, set: Partial<Effects>): MorpherVoice => ({
   id,
@@ -81,7 +111,7 @@ export function hiddenVoices(params: Params): string[] {
 export function voicesOf(params: Params): ShownVoice[] {
   const hidden = new Set(hiddenVoices(params));
   return [
-    ...VOICES.filter((v) => v.id === KEEP_VOICE || !hidden.has(v.id)).map((v) => ({ ...v, custom: false as const })),
+    ...VOICES.filter((v) => v.id === KEEP_VOICE || !hidden.has(v.id)).map((v) => ({ ...v, params: adapted(v.params), custom: false as const })),
     ...customVoices(params).map((v) => ({ ...v, custom: true as const })),
   ];
 }

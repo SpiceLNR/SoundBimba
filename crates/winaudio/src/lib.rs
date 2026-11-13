@@ -10,6 +10,7 @@ pub mod format;
 pub mod latency;
 pub mod loopback;
 pub mod processes;
+pub mod record;
 pub mod routing;
 pub mod runner;
 pub mod streams;

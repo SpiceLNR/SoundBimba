@@ -23,6 +23,15 @@ export interface Settings {
   currentTemplate?: string | null;
   /** «Звук в VR (Virtual Desktop)»: устойчивый вывод на его устройство (по умолчанию — да). */
   vrSteady?: boolean;
+  /** Высота голоса человека, Гц (подстройка морфера); нет — средний голос. */
+  voiceF0?: number | null;
+}
+
+/** Замер голоса для подстройки морфера. */
+export interface VoiceMeasure {
+  medianHz: number;
+  lowHz: number;
+  highHz: number;
 }
 
 /** Свой шаблон из папки пользователя (`id` — имя файла .bmb без расширения). */
@@ -154,6 +163,7 @@ function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     load_state: { project: previewProject, settings: { language: null, theme: 'bimba' }, recoveredFrom: null, version: 'dev' },
     list_audio_devices: previewDevices,
     measure_latency: { outputMs: 41.3, inputEstimateMs: 25 },
+    measure_voice: { medianHz: 128, lowHz: 108, highHz: 162 },
     list_audio_apps: [
       { exe: 'chrome.exe', active: true },
       { exe: 'Discord.exe', active: false },
@@ -260,6 +270,8 @@ export const api = {
   listAudioDevices: () => call<AudioDevice[]>('list_audio_devices'),
   listAudioApps: () => call<AudioApp[]>('list_audio_apps'),
   measureLatency: () => call<Latency>('measure_latency'),
+  /** `device` — id микрофона или «default». */
+  measureVoice: (device: string) => call<VoiceMeasure>('measure_voice', { device }),
   pressButton: (nodeId: string) => call<void>('press_button', { nodeId }),
   seekButton: (nodeId: string, fraction: number) => call<void>('seek_button', { nodeId, fraction }),
   getUiState: () => call<UiState>('get_ui_state'),

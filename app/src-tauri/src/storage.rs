@@ -71,6 +71,9 @@ pub struct Settings {
     /// больше ≈30 мс). Остальные выходы всегда в быстром режиме.
     #[serde(default = "default_true")]
     pub vr_steady: bool,
+    /// Высота голоса человека, Гц (подстройка морфера); None — не подстроено (средний голос).
+    #[serde(default)]
+    pub voice_f0: Option<f32>,
 }
 
 fn default_true() -> bool {
@@ -98,6 +101,7 @@ impl Default for Settings {
             hidden_templates: Vec::new(),
             current_template: None,
             vr_steady: true,
+            voice_f0: None,
         }
     }
 }
