@@ -3,9 +3,13 @@
 // знает узлы по полному id (схему ему отдают распакованной), поэтому уровни звука, состояние
 // кнопок и нажатия внутри микросхемы идут по полному id.
 import { createContext, useContext } from 'react';
+import type { Params } from '../graph';
 
 export const IdPrefix = createContext('');
 
 export function useFullId(id: string): string {
   return useContext(IdPrefix) + id;
 }
+
+/** Изменить параметры узла на открытом уровне карты (кнопка «Выключить звук» на узле). */
+export const SetParams = createContext<(id: string, patch: Params) => void>(() => {});

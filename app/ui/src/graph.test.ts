@@ -10,7 +10,7 @@ const project: Project = {
   nodes: [
     { id: 'n1', type: 'app-source', pos: [0, 0], params: { exe: 'discord.exe' } },
     { id: 'n2', type: 'mic-input', pos: [0, 160], params: { device: 'default' } },
-    { id: 'n3', type: 'volume', pos: [260, 0], params: { gain: 1, mute: false } },
+    { id: 'n3', type: 'volume', pos: [260, 0], params: { gain: 1 } },
     { id: 'n4', type: 'virtual-out', pos: [520, 60], params: { device: 'virtual-1' } },
   ],
   edges: [
@@ -338,8 +338,10 @@ describe('graph', () => {
   });
 
   it('writes short node subtitles', () => {
-    const t = (k: string) => translate('ru', k);
-    expect(summary('volume', { gain: 1.5, mute: true }, t)).toBe('150 % · звук выключен');
+    const t = (k: string, v?: Record<string, string | number>) => translate('ru', k, v);
+    expect(summary('volume', { gain: 1 }, t)).toBe('0 дБ');
+    expect(summary('volume', { gain: 1.5, pan: -0.3 }, t)).toBe('+3,5 дБ · левее 30 %');
+    expect(summary('volume', { gain: 0 }, t)).toBe('выкл.');
     expect(summary('app-source', { exe: '' }, t)).toBe('программа не выбрана');
     expect(summary('mic-input', { device: 'default' }, t)).toBe('по умолчанию');
   });

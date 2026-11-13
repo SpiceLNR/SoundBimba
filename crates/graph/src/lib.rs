@@ -390,18 +390,32 @@ pub const MORPHER_RANGES: [(&str, std::ops::RangeInclusive<f64>); 12] = [
 /// Шумоподавление: сила 0…1 (смесь очищенного и исходного).
 pub const DENOISE_RANGES: [(&str, std::ops::RangeInclusive<f64>); 2] = [("amount", 0.0..=1.0), ("gate", 0.0..=1.0)];
 
+/// Наибольшая громкость: ×4 (+12 дБ). До 2026-11-13 было ×2 (+6 дБ).
+pub const VOLUME_MAX_GAIN: f64 = 4.0;
+
 fn check_params(n: &Node) -> Result<(), GraphError> {
     let bad = |param| GraphError::BadParam { node: n.id.clone(), param };
     if n.kind == NodeKind::Volume {
         if let Some(g) = n.params.get("gain") {
             let g = g.as_f64().ok_or_else(|| bad("gain"))?;
-            if !(0.0..=2.0).contains(&g) {
+            if !(0.0..=VOLUME_MAX_GAIN).contains(&g) {
                 return Err(bad("gain"));
             }
         }
-        if let Some(m) = n.params.get("mute") {
-            m.as_bool().ok_or_else(|| bad("mute"))?;
+        if let Some(p) = n.params.get("pan") {
+            let p = p.as_f64().ok_or_else(|| bad("pan"))?;
+            if !(-1.0..=1.0).contains(&p) {
+                return Err(bad("pan"));
+            }
         }
+    }
+    // «Выключить звук»: у источников и выходов (и у «Громкости» из старых схем).
+    let mutable = matches!(
+        n.kind,
+        NodeKind::Volume | NodeKind::AppSource | NodeKind::MicInput | NodeKind::SoundButton | NodeKind::SpeakerOut | NodeKind::VirtualOut
+    );
+    if let (true, Some(m)) = (mutable, n.params.get("mute")) {
+        m.as_bool().ok_or_else(|| bad("mute"))?;
     }
     let ranges: &[(&'static str, std::ops::RangeInclusive<f64>)] = match n.kind {
         NodeKind::Compressor => &COMPRESSOR_RANGES,
@@ -607,8 +621,20 @@ mod tests {
     #[test]
     fn checks_volume_params() {
         let mut p = default_project();
-        p.nodes[2].params.insert("gain".into(), serde_json::json!(2.5));
+        p.nodes[2].params.insert("gain".into(), serde_json::json!(3.9));
+        validate(&p).unwrap();
+        p.nodes[2].params.insert("gain".into(), serde_json::json!(4.5));
         assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
+        p.nodes[2].params.insert("gain".into(), serde_json::json!(1.0));
+        p.nodes[2].params.insert("pan".into(), serde_json::json!(-0.5));
+        validate(&p).unwrap();
+        p.nodes[2].params.insert("pan".into(), serde_json::json!(1.5));
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
+        p.nodes[2].params.remove("pan");
+        p.nodes[0].params.insert("mute".into(), serde_json::json!("yes"));
+        assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
+        p.nodes[0].params.insert("mute".into(), serde_json::json!(true));
+        validate(&p).unwrap();
         p.nodes[2].params.insert("gain".into(), serde_json::json!("loud"));
         assert_eq!(validate(&p).unwrap_err().code(), "bad-param");
     }

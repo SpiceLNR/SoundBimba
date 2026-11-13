@@ -18,7 +18,7 @@ const withChip: Project = {
         inner: {
           nodes: [
             { id: 'n1', type: 'chip-in', pos: [0, 0], params: { name: 'Голос' } },
-            { id: 'n2', type: 'volume', pos: [260, 0], params: { gain: 0.5, mute: false } },
+            { id: 'n2', type: 'volume', pos: [260, 0], params: { gain: 0.5 } },
             { id: 'n3', type: 'chip-out', pos: [520, 0], params: { name: '' } },
           ],
           edges: [
@@ -74,7 +74,7 @@ describe('chips', () => {
     const top = toFlow(withChip);
     const inside = toFlow({ schema: 1, ...(withChip.nodes[1].params.inner as Omit<Project, 'schema'>) });
     // Внутри: громкость стала 0.8, выход микросхемы удалили.
-    const nodes = inside.nodes.filter((n) => n.id !== 'n3').map((n) => (n.id === 'n2' ? { ...n, data: { ...n.data, params: { gain: 0.8, mute: false } } } : n));
+    const nodes = inside.nodes.filter((n) => n.id !== 'n3').map((n) => (n.id === 'n2' ? { ...n, data: { ...n.data, params: { gain: 0.8 } } } : n));
     const edges = inside.edges.filter((e) => e.target !== 'n3');
     const root = composeRoot([{ chipId: 'n2', nodes: top.nodes, edges: top.edges }], nodes, edges);
     const inner = root.nodes[1].params.inner as Project;
@@ -127,7 +127,7 @@ describe('chips', () => {
   it('a change from simple mode lands inside the chip', () => {
     const params = patchNested(withChip.nodes[1].params, ['n2'], { gain: 1.5 });
     const inner = params.inner as Project;
-    expect(inner.nodes[1].params).toEqual({ gain: 1.5, mute: false });
+    expect(inner.nodes[1].params).toEqual({ gain: 1.5 });
     expect(inner.nodes[0]).toEqual((withChip.nodes[1].params.inner as Project).nodes[0]);
   });
 

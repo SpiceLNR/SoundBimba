@@ -318,3 +318,8 @@
     opacity: 0;
   }
 }
+
+/* Звёздочка не под кнопкой «Выключить звук». */
+[data-theme='magic'] .sound-node:has(.node-mute)::after {
+  right: 28px;
+}

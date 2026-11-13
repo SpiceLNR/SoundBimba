@@ -8,6 +8,8 @@ import { api, type AudioApp } from '../api';
 import { isProblem, useAudio } from '../audio';
 import { lookOf, type Params, type SoundNode } from '../graph';
 import { useT } from '../i18n';
+import { balanceLabel, dbLabel } from '../volume';
+import VolumeSlider from './VolumeSlider';
 import CompressorParams from './CompressorParams';
 import DenoiseParams from './DenoiseParams';
 import MorpherParams from './MorpherParams';
@@ -137,26 +139,32 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
         </>
       );
     case 'volume': {
-      const percent = Math.round(Number(params.gain ?? 1) * 100);
+      const pan = Math.round(Number(params.pan ?? 0) * 100);
       return (
         <>
           <label className="field">
             <span>
-              {t('param.gain')}: {percent} %
+              {t('param.volume')}: {dbLabel(Number(params.gain ?? 1), t)}
+            </span>
+            <VolumeSlider gain={Number(params.gain ?? 1)} onGain={(gain) => set({ gain })} />
+            <span className="panel-hint">{t('param.volumeHint')}</span>
+          </label>
+          <label className="field">
+            <span>
+              {t('param.balance')}: {balanceLabel(pan / 100, t)}
             </span>
             <input
               type="range"
-              min={0}
-              max={200}
+              className="balance"
+              min={-100}
+              max={100}
               step={5}
-              value={percent}
-              style={{ '--fill': `${percent / 2}%` } as React.CSSProperties}
-              onChange={(e) => set({ gain: Number(e.target.value) / 100 })}
+              value={pan}
+              title={t('param.balanceHint')}
+              style={{ '--from': `${Math.min(50, (pan + 100) / 2)}%`, '--to': `${Math.max(50, (pan + 100) / 2)}%` } as React.CSSProperties}
+              onChange={(e) => set({ pan: Number(e.target.value) / 100 })}
+              onDoubleClick={() => set({ pan: 0 })}
             />
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={params.mute === true} onChange={(e) => set({ mute: e.target.checked })} />
-            <span>{t('param.mute')}</span>
           </label>
         </>
       );

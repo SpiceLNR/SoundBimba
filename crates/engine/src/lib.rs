@@ -129,8 +129,8 @@ struct Step {
     /// Индексы (в `steps`) узлов, чьи выходы складываются на входе этого узла.
     inputs: Vec<usize>,
     shared: Arc<NodeShared>,
-    /// Усиление, применённое в прошлом блоке (для плавного изменения без щелчков).
-    last_gain: f32,
+    /// Усиление левого и правого канала в прошлом блоке (для плавного изменения без щелчков).
+    last_gains: [f32; 2],
 }
 
 /// Скомпилированный граф. Создаётся вне потока реального времени.
@@ -221,7 +221,7 @@ impl Graph {
             let mut ins: Vec<usize> =
                 project.edges.iter().filter(|e| e.to == node.id).map(|e| index[e.from.as_str()]).collect();
             ins.sort_unstable();
-            steps.push(Step { op, inputs: ins, last_gain: sh.target_gain(), shared: sh });
+            steps.push(Step { op, inputs: ins, last_gains: sh.target_gains(), shared: sh });
         }
         // Узлы, которых больше нет в проекте, забываем.
         shared.retain(|id, _| by_id.contains_key(id.as_str()));
@@ -269,10 +269,12 @@ impl Graph {
             if let Op::Morpher(state) = &mut step.op {
                 state.process(&mut out[..], step.shared.morpher());
             }
-            if let Op::Volume = step.op {
-                let target = step.shared.target_gain();
-                ramp_gain(&mut out[..], step.last_gain, target);
-                step.last_gain = target;
+            // Громкость и баланс — у «Громкости» (и ножек микросхем); «Выключить звук» — ещё и у
+            // источников и выходов (у них громкость всегда 1, баланс посередине).
+            if matches!(step.op, Op::Volume | Op::Source(_) | Op::Button(..) | Op::Output(_)) {
+                let target = step.shared.target_gains();
+                ramp_gains(&mut out[..], step.last_gains, target);
+                step.last_gains = target;
             }
             if let Op::Output(Some(p)) = &step.op {
                 let p = *p;
@@ -476,18 +478,19 @@ fn limit(buf: &mut [f32], gain: &mut f32) -> bool {
     overloaded
 }
 
-/// Усиление с плавным переходом от `from` к `to` за блок — без щелчков при движении ползунка.
-fn ramp_gain(buf: &mut [f32], from: f32, to: f32) {
-    let frames = buf.len() / CHANNELS;
-    if (from - to).abs() < 1e-6 {
-        if (to - 1.0).abs() > 1e-6 {
-            buf.iter_mut().for_each(|s| *s *= to);
-        }
+/// Усиление каналов с плавным переходом от `from` к `to` за блок — без щелчков при движении
+/// ползунка и при выключении звука.
+fn ramp_gains(buf: &mut [f32], from: [f32; CHANNELS], to: [f32; CHANNELS]) {
+    let same = from.iter().zip(&to).all(|(a, b)| (a - b).abs() < 1e-6);
+    if same && to.iter().all(|g| (g - 1.0).abs() < 1e-6) {
         return;
     }
+    let frames = buf.len() / CHANNELS;
     for (f, frame) in buf.as_chunks_mut::<CHANNELS>().0.iter_mut().enumerate() {
-        let g = from + (to - from) * (f + 1) as f32 / frames as f32;
-        frame.iter_mut().for_each(|s| *s *= g);
+        let t = if same { 1.0 } else { (f + 1) as f32 / frames as f32 };
+        for ((s, a), b) in frame.iter_mut().zip(from).zip(to) {
+            *s *= a + (b - a) * t;
+        }
     }
 }
 

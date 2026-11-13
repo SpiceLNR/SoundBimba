@@ -1736,3 +1736,80 @@ details.more > .field + .field {
 /* Персонаж двигается всегда, даже если в Windows выключены эффекты анимации (решение автора
    2026-11-08): он появляется ненадолго и только при включении темы. Остальные эффекты тем эту
    настройку уважают. */
+
+/* «Выключить звук» на источниках и выходах: значок динамика в углу узла. Выключенный узел
+   бледнеет (кроме самой кнопки — её видно, чтобы включить обратно). */
+.sound-node {
+  position: relative;
+}
+
+.sound-node:has(.node-mute) .sound-node-title {
+  padding-right: 10px;
+}
+
+.node-mute {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.node-mute:hover {
+  color: var(--node-text);
+  background: var(--control-bg-hover);
+}
+
+.node-mute.on {
+  color: var(--danger);
+}
+
+.node-mute:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.sound-node.muted > :not(.node-mute) {
+  opacity: 0.4;
+}
+
+/* Ползунок громкости: черта на отметке 0 дБ. */
+.volume-slider {
+  position: relative;
+  display: flex;
+  flex: 1;
+}
+
+.volume-slider input[type='range'] {
+  flex: 1;
+}
+
+.volume-slider::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--slider-thumb-width, 16px) / 2 + (100% - var(--slider-thumb-width, 16px)) * var(--zero) - 1px);
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Баланс: закрашено от середины до ползунка. */
+input[type='range'].balance::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--slider-track) var(--from),
+    var(--accent) var(--from) var(--to),
+    var(--slider-track) var(--to)
+  );
+}

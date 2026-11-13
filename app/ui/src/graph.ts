@@ -2,6 +2,7 @@
 // Модель карты на стороне интерфейса: та же схема, что в crates/graph (Rust проверяет её при сохранении).
 import type { Edge, Node } from '@xyflow/react';
 import { signed } from './compressor';
+import { balanceLabel, dbLabel, migrateParams } from './volume';
 import { voiceName, voiceOf, voicesOf } from './morpher';
 import type { Translate } from './i18n';
 
@@ -39,7 +40,7 @@ export const KINDS: Record<NodeKind, KindInfo> = {
   'sound-button': { category: 'button', input: false, output: true, defaults: { file: '' } },
   'app-source': { category: 'source', input: false, output: true, defaults: { exe: '' } },
   'mic-input': { category: 'source', input: false, output: true, defaults: { device: 'default' } },
-  volume: { category: 'processing', input: true, output: true, defaults: { gain: 1, mute: false } },
+  volume: { category: 'processing', input: true, output: true, defaults: { gain: 1, pan: 0 } },
   // Те же значения, что набор «Голос» и COMPRESSOR_DEFAULTS в движке.
   compressor: {
     category: 'processing',
@@ -170,7 +171,7 @@ export function toFlow(p: Project): { nodes: SoundNode[]; edges: Edge[] } {
       id: n.id,
       type: 'sound',
       position: { x: n.pos[0], y: n.pos[1] },
-      data: { kind: n.type, params: { ...n.params } },
+      data: { kind: n.type, params: migrateParams(n.type, { ...n.params }) },
     })),
     edges: p.edges.map((e) => ({
       id: edgeId(e.from, e.to, e.fromPort, e.toPort),
@@ -689,8 +690,9 @@ export function summary(kind: NodeKind, params: Params, t: Translate): string {
     case 'sound-button':
       return typeof params.file === 'string' && params.file ? params.file : t('param.fileEmpty');
     case 'volume': {
-      const gain = `${Math.round(Number(params.gain ?? 1) * 100)} %`;
-      return params.mute === true ? `${gain} · ${t('param.muted')}` : gain;
+      const volume = dbLabel(Number(params.gain ?? 1), t);
+      const pan = Number(params.pan ?? 0);
+      return Math.abs(pan) >= 0.005 ? `${volume} · ${balanceLabel(pan, t)}` : volume;
     }
     case 'compressor':
       return `${signed(Number(params.threshold ?? -24))} ${t('unit.db')} · ${Number(params.ratio ?? 3)}:1 · +${Number(params.makeup ?? 12)} ${t('unit.db')}`;

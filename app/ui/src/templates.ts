@@ -2,6 +2,7 @@
 // Готовые схемы одним щелчком. Шаблон добавляется к карте (ниже имеющегося), ничего не стирая.
 import type { Edge } from '@xyflow/react';
 import { arrange, edgeId, KINDS, newNode, nextNodeId, NODE_HEIGHT, type NodeKind, type Params, type Project, type SoundNode } from './graph';
+import { migrateParams } from './volume';
 
 interface TemplateNode {
   /** Имя узла внутри шаблона (для проводов). */
@@ -28,7 +29,7 @@ export const TEMPLATES: Template[] = [
       { key: 'clean', kind: 'denoise' },
       { key: 'b1', kind: 'sound-button' },
       { key: 'b2', kind: 'sound-button' },
-      { key: 'vol', kind: 'volume', params: { gain: 0.8, mute: false } },
+      { key: 'vol', kind: 'volume', params: { gain: 0.8 } },
       { key: 'virt', kind: 'virtual-out' },
       { key: 'phones', kind: 'speaker-out' },
     ],
@@ -47,7 +48,7 @@ export const TEMPLATES: Template[] = [
       { key: 'game', kind: 'app-source' },
       { key: 'mic', kind: 'mic-input' },
       { key: 'clean', kind: 'denoise' },
-      { key: 'vol', kind: 'volume', params: { gain: 0.7, mute: false } },
+      { key: 'vol', kind: 'volume', params: { gain: 0.7 } },
       { key: 'virt', kind: 'virtual-out' },
     ],
     edges: [
@@ -61,7 +62,7 @@ export const TEMPLATES: Template[] = [
     id: 'music-to-stream',
     nodes: [
       { key: 'player', kind: 'app-source' },
-      { key: 'vol', kind: 'volume', params: { gain: 0.4, mute: false } },
+      { key: 'vol', kind: 'volume', params: { gain: 0.4 } },
       { key: 'mic', kind: 'mic-input' },
       { key: 'clean', kind: 'denoise' },
       { key: 'virt', kind: 'virtual-out' },
@@ -105,7 +106,7 @@ export const TEMPLATES: Template[] = [
     id: 'hear-myself',
     nodes: [
       { key: 'mic', kind: 'mic-input' },
-      { key: 'vol', kind: 'volume', params: { gain: 0.6, mute: false } },
+      { key: 'vol', kind: 'volume', params: { gain: 0.6 } },
       { key: 'phones', kind: 'speaker-out' },
     ],
     edges: [
@@ -138,7 +139,7 @@ export function applyTemplate(nodes: SoundNode[], edges: Edge[], tpl: Template):
     const id = nextNodeId(all);
     ids.set(n.key, id);
     const node = newNode(n.kind, id, 0, 0);
-    node.data.params = { ...KINDS[n.kind].defaults, ...n.params };
+    node.data.params = { ...KINDS[n.kind].defaults, ...migrateParams(n.kind, n.params ?? {}) };
     fresh.push(node);
     all = [...all, node];
   }

@@ -9,8 +9,8 @@ import { applyTemplate, fromProject } from './templates';
 const SETTINGS: Partial<Record<NodeKind, Record<string, unknown>>> = {
   'sound-button': { file: 'D:/Sounds/a.mp3', label: 'Фанфары', simpleOrder: 2 },
   'app-source': { exe: 'chrome.exe', original: 'cable', originalDevice: 'dev-1' },
-  'mic-input': { device: 'mic-2', name: 'Мой микрофон' },
-  volume: { gain: 0.35, mute: true, name: 'Тише', simpleOrder: 1 },
+  'mic-input': { device: 'mic-2', name: 'Мой микрофон', mute: true },
+  volume: { gain: 0.35, pan: -0.4, name: 'Тише', simpleOrder: 1 },
   compressor: { threshold: -30, ratio: 5, attack: 2, release: 300, makeup: 6 },
   'voice-morpher': {
     pitch: 3,
@@ -45,7 +45,7 @@ function project(): Project {
     inner: {
       nodes: [
         { id: 'n1', type: 'chip-in', pos: [0, 0], params: { name: 'Голос' } },
-        { id: 'n3', type: 'volume', pos: [200, 0], params: { gain: 1.5, mute: false } },
+        { id: 'n3', type: 'volume', pos: [200, 0], params: { gain: 1.5, pan: 0.5 } },
         { id: 'n2', type: 'chip-out', pos: [400, 0], params: { name: 'В стрим' } },
       ],
       edges: [

@@ -48,7 +48,7 @@ import { ACTIONS, actionFor, addedKind, eventToCombo, isTyping, mergeBindings, t
 import { DICTS, useT, type Lang } from '../i18n';
 import { wireShape } from '../theme';
 import { applyTemplate, type Template } from '../templates';
-import { IdPrefix } from './chipContext';
+import { IdPrefix, SetParams } from './chipContext';
 import { VoiceProfileContext } from './voiceProfile';
 import { setVoiceProfile } from '../morpher';
 import TraceEdge from './TraceEdge';
@@ -585,6 +585,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
               </div>
             )}
             <IdPrefix.Provider value={stack.map((l) => `${l.chipId}/`).join('')}>
+            <SetParams.Provider value={onParams}>
             <ReactFlow
               nodes={nodes}
               edges={shownEdges}
@@ -620,6 +621,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
               <MiniMap pannable zoomable nodeClassName={(n) => `cat-${lookOf((n as SoundNode).data.kind)}`} />
               <Controls showInteractive={false} />
             </ReactFlow>
+            </SetParams.Provider>
             </IdPrefix.Provider>
           </div>
           <IdPrefix.Provider value={stack.map((l) => `${l.chipId}/`).join('')}>

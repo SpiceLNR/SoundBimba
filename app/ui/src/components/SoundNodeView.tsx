@@ -2,13 +2,53 @@
 // Узел на карте: цвет по типу, крупные порты, мало текста (настройки — в боковой панели).
 // Пока звук включён: живой индикатор уровня, а если что-то не так — короткая подпись о проблеме.
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { memo } from 'react';
+import { memo, useContext } from 'react';
 import { api } from '../api';
 import { isProblem, meterFraction, useAudio } from '../audio';
 import ButtonDisc, { buttonLabel } from './ButtonDisc';
 import { chipPins, KINDS, lookOf, summary, type SoundNode } from '../graph';
 import { useT } from '../i18n';
-import { useFullId } from './chipContext';
+import { SetParams, useFullId } from './chipContext';
+import { MUTABLE } from '../volume';
+
+/** Значок динамика: со звуком — волны, без звука — крестик. */
+function SpeakerIcon({ muted }: { muted: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path
+        d={muted ? 'M15.5 9.5l5 5M20.5 9.5l-5 5' : 'M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11'}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** Кнопка «Выключить звук» в углу узла-источника или выхода. */
+function MuteButton({ id, muted }: { id: string; muted: boolean }) {
+  const t = useT();
+  const setParams = useContext(SetParams);
+  const label = t(muted ? 'node.unmute' : 'node.mute');
+  return (
+    <button
+      type="button"
+      className={`node-mute nodrag${muted ? ' on' : ''}`}
+      aria-label={label}
+      aria-pressed={muted}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        setParams(id, { mute: !muted });
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
+      <SpeakerIcon muted={muted} />
+    </button>
+  );
+}
 
 /** Микросхема: название и ножки — входы слева, выходы справа, у каждой своя точка. */
 function ChipView({ data, selected }: Pick<NodeProps<SoundNode>, 'data' | 'selected'>) {
@@ -58,8 +98,13 @@ function SoundNodeView({ id: localId, data, selected }: NodeProps<SoundNode>) {
   const isButton = data.kind === 'sound-button';
   const sub = problem || (isButton ? buttonLabel(data.params, '') || t('param.fileEmpty') : summary(data.kind, data.params, t));
   const level = audio.enabled ? (audio.levels[id] ?? 0) : 0;
+  const mutable = MUTABLE.has(data.kind);
+  const muted = mutable && data.params.mute === true;
   return (
-    <div className={`sound-node cat-${lookOf(data.kind)}${selected ? ' selected' : ''}${audio.enabled ? '' : ' sound-off'}`}>
+    <div
+      className={`sound-node cat-${lookOf(data.kind)}${selected ? ' selected' : ''}${audio.enabled ? '' : ' sound-off'}${muted ? ' muted' : ''}`}
+    >
+      {mutable && <MuteButton id={localId} muted={muted} />}
       {info.input && <Handle type="target" position={Position.Left} />}
       <div className="sound-node-row">
         {isButton && (

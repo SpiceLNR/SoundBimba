@@ -244,6 +244,41 @@ fn mute_silences_only_that_branch() {
 }
 
 #[test]
+fn mute_button_on_source_and_output() {
+    // «Выключить звук» на источнике — пропадает только он; на выходе — всё, что туда идёт.
+    let blocks = 40;
+    let inputs = || [vec![0.4; blocks * BLOCK_SAMPLES], vec![0.1; blocks * BLOCK_SAMPLES]];
+    let mut p = mixer_project(1.0, false);
+    p.nodes[1].params.insert("mute".into(), json!(true));
+    let mut r = rig(&p, &ports());
+    let out = run_blocks(&mut r, blocks, &inputs());
+    let tail = &out[0][out[0].len() - BLOCK_SAMPLES..];
+    assert!(tail.iter().all(|&s| (s - 0.4).abs() < 1e-5), "{:?}", &tail[..4]);
+    let mut p = mixer_project(1.0, false);
+    p.nodes[3].params.insert("mute".into(), json!(true));
+    let mut r = rig(&p, &ports());
+    let out = run_blocks(&mut r, blocks, &inputs());
+    let tail = &out[0][out[0].len() - BLOCK_SAMPLES..];
+    assert!(tail.iter().all(|&s| s == 0.0));
+    assert_eq!(r.shared["out"].take_peak(), 0.0, "индикатор выключенного выхода молчит");
+}
+
+#[test]
+fn balance_turns_down_the_other_side() {
+    let blocks = 40;
+    let mut p = mixer_project(1.0, false);
+    p.nodes[2].params.insert("pan".into(), json!(-0.5));
+    let mut r = rig(&p, &ports());
+    let zeros = vec![0.0f32; blocks * BLOCK_SAMPLES];
+    let out = run_blocks(&mut r, blocks, &[vec![0.4; blocks * BLOCK_SAMPLES], zeros]);
+    let tail = &out[0][out[0].len() - BLOCK_SAMPLES..];
+    // Влево на половину: левый как есть, правый вдвое тише.
+    for f in tail.as_chunks::<2>().0 {
+        assert!((f[0] - 0.4).abs() < 1e-5 && (f[1] - 0.2).abs() < 1e-5, "{f:?}");
+    }
+}
+
+#[test]
 fn gain_change_is_smooth() {
     let p = mixer_project(1.0, false);
     let mut r = rig(&p, &ports());

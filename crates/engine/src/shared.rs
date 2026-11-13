@@ -34,6 +34,8 @@ impl AtomicF32 {
 #[derive(Debug)]
 pub struct NodeShared {
     gain: AtomicF32,
+    /// Баланс у «Громкости»: −1 — только левый, 0 — середина, +1 — только правый.
+    pan: AtomicF32,
     mute: AtomicBool,
     peak: AtomicF32,
     press: AtomicBool,
@@ -87,6 +89,7 @@ impl Default for NodeShared {
     fn default() -> Self {
         NodeShared {
             gain: AtomicF32::new(1.0),
+            pan: AtomicF32::new(0.0),
             mute: AtomicBool::new(false),
             peak: AtomicF32::new(0.0),
             press: AtomicBool::new(false),
@@ -105,11 +108,19 @@ impl Default for NodeShared {
 }
 
 impl NodeShared {
-    /// Берёт громкость из параметров узла (для узла «Громкость»).
+    /// Берёт настройки из параметров узла.
     pub fn apply_params(&self, node: &graph::Node) {
-        if node.kind == graph::NodeKind::Volume {
+        use graph::NodeKind as K;
+        if node.kind == K::Volume {
             let gain = node.params.get("gain").and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
-            self.gain.store(gain.clamp(0.0, 2.0));
+            self.gain.store(gain.clamp(0.0, graph::VOLUME_MAX_GAIN as f32));
+            let pan = node.params.get("pan").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+            self.pan.store(pan.clamp(-1.0, 1.0));
+        }
+        // «Выключить звук»: кнопка на источниках и выходах. У «Громкости» — из старых схем
+        // (до 2026-11-13 там была галочка; интерфейс переносит её на ползунок, но движок
+        // на всякий случай её тоже слушается).
+        if matches!(node.kind, K::Volume | K::AppSource | K::MicInput | K::SoundButton | K::SpeakerOut | K::VirtualOut) {
             self.mute.store(node.params.get("mute").and_then(|v| v.as_bool()).unwrap_or(false), Relaxed);
         }
         if node.kind == graph::NodeKind::Compressor {
@@ -176,6 +187,14 @@ impl NodeShared {
         } else {
             self.gain.load()
         }
+    }
+
+    /// Усиление левого и правого канала: громкость, баланс и «Выключить звук».
+    /// Баланс как на пульте: середина — оба канала как есть, в сторону — второй тише.
+    pub fn target_gains(&self) -> [f32; 2] {
+        let g = self.target_gain();
+        let pan = self.pan.load();
+        [g * (1.0 - pan).min(1.0), g * (1.0 + pan).min(1.0)]
     }
 
     pub fn report_peak(&self, buf: &[f32]) {

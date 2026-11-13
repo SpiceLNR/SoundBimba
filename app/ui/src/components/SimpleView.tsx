@@ -2,9 +2,11 @@
 // Простой режим: без карты. Кнопки-звуки, громкость с подписью «откуда → куда», голоса морфера.
 // Элементы каждого раздела можно переставлять (ручка слева сверху); порядок хранится в узлах и
 // попадает в проект и шаблоны. Длинные перечисления «откуда / куда» сворачиваются.
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import { simpleSorted, volumeRoutes, type Params, type Project, type VolumeRoute } from '../graph';
 import { useT } from '../i18n';
+import { dbLabel } from '../volume';
+import VolumeSlider from './VolumeSlider';
 import ButtonGrid from './ButtonGrid';
 import { VoicePicker } from './MorpherParams';
 import { useReorder, type Reorder } from './useReorder';
@@ -70,31 +72,14 @@ export default function SimpleView({ project, onParams }: Props) {
         {routes.length === 0 && <p className="panel-hint">{t('simple.noVolume')}</p>}
         {routes.map((r) => {
           const node = project.nodes.find((n) => n.id === r.id)!;
-          const percent = Math.round(Number(node.params.gain ?? 1) * 100);
+          const gain = Number(node.params.gain ?? 1);
           const drag = volumes.item(r.id);
           return (
             <div key={r.id} {...drag} className={`simple-volume${drag.className}`}>
               <Route r={r} reorder={volumes} label={`${r.from} → ${r.to}`} />
               <div className="simple-controls">
-                <input
-                  type="range"
-                  min={0}
-                  max={200}
-                  step={5}
-                  value={percent}
-                  aria-label={`${r.from} → ${r.to}`}
-                  style={{ '--fill': `${percent / 2}%` } as CSSProperties}
-                  onChange={(e) => onParams(r.id, { gain: Number(e.target.value) / 100 })}
-                />
-                <span className="simple-percent">{percent} %</span>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={node.params.mute === true}
-                    onChange={(e) => onParams(r.id, { mute: e.target.checked })}
-                  />
-                  <span>{t('param.mute')}</span>
-                </label>
+                <VolumeSlider gain={gain} label={`${r.from} → ${r.to}`} onGain={(g) => onParams(r.id, { gain: g })} />
+                <span className="simple-percent">{dbLabel(gain, t)}</span>
               </div>
             </div>
           );
