@@ -99,10 +99,15 @@ jobs:
           }
           exit 1
 
+      # Портативная версия: zip с программой, памяткой и лицензиями (без установки) — удобно
+      # отправить тестировщику одним файлом. Скрипт тот же, что для сборки на своём компьютере.
+      - name: Portable
+        run: ./tools/portable.ps1
+
       - name: SHA-256
         run: |
           $dir = 'target/release/bundle/nsis'
-          Get-ChildItem $dir -Filter *-setup.exe | ForEach-Object {
+          @(Get-ChildItem $dir -Filter *-setup.exe) + @(Get-ChildItem target/release/portable -Filter *.zip) | ForEach-Object {
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           } | Set-Content -Encoding ascii "$dir/SHA256SUMS.txt"
           Get-Content "$dir/SHA256SUMS.txt"
@@ -113,6 +118,7 @@ jobs:
           path: |
             target/release/bundle/nsis/*-setup.exe
             target/release/bundle/nsis/SHA256SUMS.txt
+            target/release/portable/*.zip
           if-no-files-found: error
 
   release:
@@ -146,7 +152,8 @@ jobs:
           # Ссылка на политику подписи — на странице каждого релиза (условие SignPath Foundation).
           printf '\n---\n\n[Code signing policy](https://github.com/%s/blob/main/README.en.md#code-signing-policy) · [Политика подписи](https://github.com/%s#политика-подписи-code-signing-policy)\n' \
             "$GITHUB_REPOSITORY" "$GITHUB_REPOSITORY" >> notes.md
-          gh release create "$TAG" dist/* \
+          # Файлы лежат в подпапках артефакта (bundle/nsis, portable) — берём все файлы.
+          gh release create "$TAG" $(find dist -type f ! -name '*.sha256') \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
             --title "SoundBimba $TAG" \

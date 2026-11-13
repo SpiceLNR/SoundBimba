@@ -33,6 +33,10 @@ outputs on the right, wires in between. No internet, no ads, no telemetry.
 3. Run the installer. No administrator rights, no internet needed: the window engine
    (Microsoft WebView2) is inside the installer.
 
+**No installation (portable):** on the same page — `SoundBimba_…_x64-portable.zip` (≈ 6 MB).
+Unpack and run `SoundBimba.exe`. Needs WebView2, which up-to-date Windows 10 and 11 already have
+(if the window does not open, install "WebView2 Runtime" from Microsoft).
+
 **Why Windows says "Windows protected your PC".** Releases are not signed yet (see "Code signing
 policy" below). Click "More info" → "Run anyway". If in doubt, compare the SHA-256 (step 2) or build
 the program yourself.
