@@ -53,7 +53,7 @@ const YIN_MIN_LAG: usize = RATE as usize / 600;
 const YIN_MAX_LAG: usize = RATE as usize / 80;
 /// Каждые 5 мс, с плавным переходом к новой оценке (ступеньки высоты — тоже дрожь).
 const YIN_EVERY: usize = 240;
-const PERIOD_SMOOTH: f64 = 0.5;
+const PERIOD_SMOOTH: f64 = 0.25;
 /// Яма глубже YIN_THRESHOLD — период найден; если и лучшая мельче YIN_VOICED — это шум.
 const YIN_THRESHOLD: f32 = 0.15;
 const YIN_VOICED: f32 = 0.3;
@@ -61,6 +61,12 @@ const YIN_VOICED: f32 = 0.3;
 const YIN_KEEP_VOICED: f32 = 0.55;
 /// Шаг зёрен для шума (с, ш, ф): 10 мс, высота не меняется.
 const UNVOICED_STEP: f32 = 480.0;
+/// Наименьшая сумма окон, на которую делим (там, где зёрен почти нет, громкость не раздуваем).
+const WSUM_MIN: f32 = 0.5;
+/// find_period: «это шипящая» (не путать с «периода не видно» — 0).
+const HISS: f32 = -1.0;
+/// Сколько проверок (по 5 мс) без периода ещё считать голосом.
+const VOICE_HOLD: u32 = 6;
 /// Скорость перехода «голос ↔ шум» за отсчёт (полный переход — за 5 мс).
 const VOICING_STEP: f32 = 1.0 / 240.0;
 /// «Резкость» шипящих (энергия разности соседних отсчётов к энергии): выше — это «с», «ш», «ф»
@@ -100,6 +106,12 @@ const ROOM: f32 = 0.86;
 const DAMP: f32 = 0.3;
 const HALL_WET: f32 = 0.42;
 
+/// Эквалайзер: граница среза низов при силе 0…1, частота и наибольшее усиление полки верхов.
+const LOWCUT_FROM_HZ: f32 = 80.0;
+const LOWCUT_TO_HZ: f32 = 300.0;
+const BRIGHT_HZ: f32 = 3500.0;
+const BRIGHT_DB: f32 = 6.0;
+
 /// Сила эффектов (пишет интерфейс). Пределы — `graph::MORPHER_RANGES`.
 #[derive(Debug)]
 pub struct MorpherParams {
@@ -115,6 +127,10 @@ pub struct MorpherParams {
     /// Высота без смены окраски («естественная»), полутона (−12…12). Старая `pitch` —
     /// «мультяшная»: сдвигает голос целиком (бурундук, монстр).
     pub tone: AtomicF32,
+    /// Срез низов 0…1 (граница 80…300 Гц) и яркость 0…1 (верха выше 3,5 кГц до +6 дБ) — простой
+    /// эквалайзер: так AV Voice Changer делает голос «девичьим» (замер 2026-11-13).
+    pub lowcut: AtomicF32,
+    pub bright: AtomicF32,
     pub growl: AtomicF32,
     pub chorus: AtomicF32,
     pub hall: AtomicF32,
@@ -130,6 +146,8 @@ impl Default for MorpherParams {
             wobble: AtomicF32::new(0.0),
             formant: AtomicF32::new(0.0),
             tone: AtomicF32::new(0.0),
+            lowcut: AtomicF32::new(0.0),
+            bright: AtomicF32::new(0.0),
             growl: AtomicF32::new(0.0),
             chorus: AtomicF32::new(0.0),
             hall: AtomicF32::new(0.0),
@@ -157,6 +175,27 @@ impl Biquad {
         let a0 = 1.0 + alpha;
         let (b0, b1) = if high_pass { ((1.0 + cos) / 2.0, -(1.0 + cos)) } else { ((1.0 - cos) / 2.0, 1.0 - cos) };
         Biquad { b0: b0 / a0, b1: b1 / a0, b2: b0 / a0, a1: -2.0 * cos / a0, a2: (1.0 - alpha) / a0, ..Default::default() }
+    }
+
+    /// Новые коэффициенты фильтра среза низов (состояние сохраняется — без щелчка).
+    fn set_high_pass(&mut self, freq: f32) {
+        let f = Biquad::new(true, freq);
+        (self.b0, self.b1, self.b2, self.a1, self.a2) = (f.b0, f.b1, f.b2, f.a1, f.a2);
+    }
+
+    /// Полка верхов (RBJ high shelf): усиление `gain_db` выше `freq`.
+    fn set_high_shelf(&mut self, freq: f32, gain_db: f32) {
+        let a = 10f32.powf(gain_db / 40.0);
+        let w = TAU * freq / RATE as f32;
+        let (cos, sin) = (w.cos(), w.sin());
+        let alpha = sin / 2.0 * std::f32::consts::SQRT_2;
+        let sq = 2.0 * a.sqrt() * alpha;
+        let a0 = (a + 1.0) - (a - 1.0) * cos + sq;
+        self.b0 = a * ((a + 1.0) + (a - 1.0) * cos + sq) / a0;
+        self.b1 = -2.0 * a * ((a - 1.0) + (a + 1.0) * cos) / a0;
+        self.b2 = a * ((a + 1.0) + (a - 1.0) * cos - sq) / a0;
+        self.a1 = 2.0 * ((a - 1.0) - (a + 1.0) * cos) / a0;
+        self.a2 = ((a + 1.0) - (a - 1.0) * cos - sq) / a0;
     }
 
     fn run(&mut self, ch: usize, x: f32) -> f32 {
@@ -197,6 +236,8 @@ struct Psola {
     input: Box<[f32; PSOLA_RING]>,
     /// Сумма уложенных зёрен (выход), кольцо.
     acc: Box<[f32; PSOLA_RING]>,
+    /// Сумма их окон (с тем же усилением) — для выравнивания громкости.
+    wsum: Box<[f32; PSOLA_RING]>,
     t: u64,
     /// Где (в отсчётах выхода) положить следующее зерно.
     next_mark: f64,
@@ -204,6 +245,8 @@ struct Psola {
     in_center: f64,
     /// Период голоса, отсчётов; 0 — шум (периода нет).
     period: f32,
+    /// Сколько проверок подряд периода не видно.
+    unvoiced_run: u32,
     /// Доля обработанного голоса в выходе: 1 — голос (зёрна), 0 — шум (идёт как есть).
     voicing: f32,
     since_detect: usize,
@@ -218,11 +261,13 @@ impl Psola {
         Psola {
             input: Box::new([0.0; PSOLA_RING]),
             acc: Box::new([0.0; PSOLA_RING]),
+            wsum: Box::new([0.0; PSOLA_RING]),
             t: 0,
             next_mark: 0.0,
             in_center: 0.0,
             period: 0.0,
             voicing: 0.0,
+            unvoiced_run: 0,
             since_detect: 0,
             detect: Box::new([0.0; YIN_WIN + YIN_MAX_LAG]),
             diff: Box::new([0.0; YIN_MAX_LAG + 1]),
@@ -234,10 +279,12 @@ impl Psola {
     fn reset(&mut self) {
         self.input.fill(0.0);
         self.acc.fill(0.0);
+        self.wsum.fill(0.0);
         self.next_mark = self.t as f64 + PSOLA_LOOKAHEAD as f64;
         self.in_center = self.next_mark - PSOLA_LATENCY as f64;
         self.period = 0.0;
         self.voicing = 0.0;
+        self.unvoiced_run = 0;
         self.since_detect = 0;
     }
 
@@ -296,7 +343,7 @@ impl Psola {
             d += (b - a) * (b - a);
         }
         if e > 0.0 && d / e > knob("HISS", HISS_SHARPNESS as f64) as f32 {
-            return 0.0;
+            return HISS;
         }
         // Разность d(τ) = Σ (x[j] − x[j+τ])² и её нормировка (cumulative mean normalized).
         self.diff[0] = 1.0;
@@ -350,7 +397,21 @@ impl Psola {
             let found = self.find_period();
             // Плавно к новой оценке (не ступенькой): ступеньки высоты — «дрожь» голоса.
             let k = knob("SMOOTH", PERIOD_SMOOTH) as f32;
-            self.period = if found > 0.0 && self.period > 0.0 { self.period + (found - self.period) * k } else { found };
+            if found > 0.0 {
+                self.unvoiced_run = 0;
+                self.period = if self.period > 0.0 { self.period + (found - self.period) * k } else { found };
+            } else if found == HISS {
+                // Шипящая — сразу шум.
+                self.period = 0.0;
+            } else {
+                // Периода не видно — но на «б», «р» и неровных гласных так бывает на миг. Голос
+                // держим ещё VOICE_HOLD проверок (с прежним периодом): иначе звук то сдвигается,
+                // то нет, — дрожание.
+                self.unvoiced_run += 1;
+                if self.unvoiced_run as f64 > knob("HOLD", VOICE_HOLD as f64) {
+                    self.period = 0.0;
+                }
+            }
         }
         // Зёрна кладём заранее: к моменту, когда до метки останется PSOLA_LOOKAHEAD отсчётов.
         while self.next_mark <= (self.t + PSOLA_LOOKAHEAD as u64) as f64 {
@@ -394,15 +455,22 @@ impl Psola {
                     self.at(self.in_center + off)
                 };
                 let v = x * w * gain;
-                self.acc[(o.rem_euclid(PSOLA_RING as i64)) as usize] += v;
+                let at = (o.rem_euclid(PSOLA_RING as i64)) as usize;
+                self.acc[at] += v;
+                self.wsum[at] += w * gain;
             }
             self.next_mark += p / ratio;
         }
         // Шум идёт как есть (с той же задержкой), голос — из зёрен; переход плавный (≈5 мс).
         let target = if self.period > 0.0 { 1.0 } else { 0.0 };
         self.voicing += (target - self.voicing).clamp(-VOICING_STEP, VOICING_STEP);
-        let grains = self.acc[now];
+        // Сумма окон зёрен в каждом отсчёте неровная (зёрна ложатся не кратно своей длине) —
+        // громкость «пульсирует» с периодом, на большом сдвиге это слышно как дрожание. Делим на
+        // сумму окон: громкость ровная. Где зёрен почти нет — не раздуваем (не меньше WSUM_MIN).
+        let norm = knob("NORM", 1.0) > 0.5;
+        let grains = if norm { self.acc[now] / self.wsum[now].max(WSUM_MIN) } else { self.acc[now] };
         self.acc[now] = 0.0;
+        self.wsum[now] = 0.0;
         let direct = self.input[((self.t as i64 - 1 - PSOLA_LATENCY as i64).rem_euclid(PSOLA_RING as i64)) as usize];
         grains * self.voicing + direct * (1.0 - self.voicing)
     }
@@ -486,6 +554,10 @@ impl Reverb {
 
 pub struct State {
     voice: Psola,
+    lowcut_filter: Biquad,
+    lowcut: Ramp,
+    bright_filter: Biquad,
+    bright: Ramp,
     growl: Ramp,
     growl_phase: f32,
     growl_low: Biquad,
@@ -516,6 +588,10 @@ impl Default for State {
     fn default() -> Self {
         State {
             voice: Psola::new(),
+            lowcut_filter: Biquad::new(true, LOWCUT_FROM_HZ),
+            lowcut: Ramp::default(),
+            bright_filter: Biquad::new(true, 1000.0),
+            bright: Ramp::default(),
             growl: Ramp::default(),
             growl_phase: 0.0,
             growl_low: Biquad::new(false, GROWL_LOWPASS),
@@ -576,6 +652,19 @@ impl State {
         let growl = p.growl.load().clamp(0.0, 1.0);
         let chorus = p.chorus.load().clamp(0.0, 1.0);
         let hall = p.hall.load().clamp(0.0, 1.0);
+        let lowcut = p.lowcut.load().clamp(0.0, 1.0);
+        let bright = p.bright.load().clamp(0.0, 1.0);
+        // Эквалайзер: коэффициенты — раз на блок; срез низов включается плавной смесью, яркость —
+        // плавным усилением (полка с усилением 0 — сам звук).
+        let lowcut_on = if lowcut > 0.0 { 1.0 } else { 0.0 };
+        let eq_low = lowcut_on > 0.0 || self.lowcut.last > 0.0;
+        if eq_low {
+            self.lowcut_filter.set_high_pass(LOWCUT_FROM_HZ + (LOWCUT_TO_HZ - LOWCUT_FROM_HZ) * lowcut.max(self.lowcut.last));
+        }
+        let eq_high = bright > 0.0 || self.bright.last > 0.0;
+        if eq_high {
+            self.bright_filter.set_high_shelf(BRIGHT_HZ, BRIGHT_DB * (bright + self.bright.last) * 0.5);
+        }
         // Включаем заново — без остатков старого звука.
         if voice_on > 0.0 && self.voice.mix.last == 0.0 {
             self.voice.reset();
@@ -657,6 +746,14 @@ impl State {
                 if hall_now > 0.0 {
                     y += self.reverb.run(ch, y) * 3.0 * HALL_WET * hall_now;
                 }
+                // Эквалайзер.
+                if eq_low {
+                    let m = self.lowcut.at(lowcut_on, f, frames);
+                    y = y * (1.0 - m) + self.lowcut_filter.run(ch, y) * m;
+                }
+                if eq_high {
+                    y = self.bright_filter.run(ch, y);
+                }
                 buf[f * CHANNELS + ch] = if y.is_finite() { y } else { 0.0 };
             }
             self.chorus_write = (self.chorus_write + 1) % CHORUS_BUF;
@@ -679,6 +776,8 @@ impl State {
         self.growl.last = growl;
         self.chorus.last = chorus;
         self.hall.last = hall;
+        self.lowcut.last = lowcut_on;
+        self.bright.last = bright;
     }
 
     fn chorus_tap(&self, ch: usize, delay: f32) -> f32 {
@@ -1368,7 +1467,10 @@ mod tests {
         let dir = std::env::var("SB_OUT").expect("SB_OUT");
         let src = read_wav(&std::env::var("SB_WAV").expect("SB_WAV"));
         println!("исходный: {:.3}", periodicity(&src));
-        for name in ["girl", "up3", "down4", "timbre_up3", "timbre_down3"] {
+        let mut names: Vec<String> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()?.file_name().into_string().ok()).filter(|n| n.ends_with(".wav")).collect();
+        names.sort();
+        for name in names {
+            let name = name.trim_end_matches(".wav");
             let x = read_wav(&format!("{dir}/{name}.wav"));
             println!("{name}: {:.3}", periodicity(&x));
         }
@@ -1472,20 +1574,16 @@ mod tests {
         let mono = read_wav(&std::env::var("SB_WAV").expect("SB_WAV"));
         let dir = std::env::var("SB_OUT").expect("SB_OUT");
         let stereo: Vec<f32> = mono.iter().flat_map(|&v| [v, v]).collect();
-        let voices: [(&str, [f32; 10]); 9] = [
-            ("giant", [-5.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.2, 0.0]),
-            ("legion_old", [-2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
-            ("legion_new", [0.0, 0.0, 0.0, 0.0, 0.0, -2.0, 0.0, 1.0, 0.25, -3.0]),
-            ("demon_old", [-6.0, 0.0, 0.0, 0.0, 0.0, -2.0, 0.8, 0.5, 0.3, 0.0]),
-            ("demon_new", [0.0, 0.0, 0.0, 0.0, 0.0, -3.0, 0.4, 0.25, 0.3, -7.0]),
-            ("cathedral_old", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
-            ("cathedral_new", [0.0, 0.0, 0.0, 0.15, 0.0, -1.0, 0.0, 0.0, 1.0, -1.0]),
-            ("ghost_old", [2.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.4, 0.7, 0.0]),
-            ("ghost_new", [0.0, 0.0, 0.15, 0.0, 0.0, 3.0, 0.0, 0.5, 0.8, 3.0]),
+        // (pitch, robot, radio, echo, wobble, formant, growl, chorus, hall, tone, lowcut, bright).
+        let voices: [(&str, [f32; 12]); 4] = [
+            ("ours_girl", [0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0]),
+            ("ours_like_av", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 8.0, 0.6, 0.5]),
+            ("ours_av1", [0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 8.0, 0.6, 0.5]),
+            ("ours_av2", [0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 7.0, 0.5, 0.4]),
         ];
         for (name, v) in voices {
             let p = with(|p| {
-                for (cell, x) in [&p.pitch, &p.robot, &p.radio, &p.echo, &p.wobble, &p.formant, &p.growl, &p.chorus, &p.hall, &p.tone].into_iter().zip(v) {
+                for (cell, x) in [&p.pitch, &p.robot, &p.radio, &p.echo, &p.wobble, &p.formant, &p.growl, &p.chorus, &p.hall, &p.tone, &p.lowcut, &p.bright].into_iter().zip(v) {
                     cell.store(x);
                 }
             });
@@ -1535,5 +1633,266 @@ mod tests {
     fn voice_pitch_of_recording() {
         let mono = read_wav(&std::env::var("SB_WAV").expect("SB_WAV"));
         println!("{:?}", voice_pitch(&mono));
+    }
+
+    /// Ручной разбор: как один голос переделан в другой (SB_WAV — исходный, SB_WAV2 — изменённый).
+    /// Печатает: высоту по кускам (отношение), средний спектр по полосам эквалайзера (разница в
+    /// дБ), положение формант (вершины сглаженного спектра), задержку и «ровность».
+    #[test]
+    #[ignore = "ручной разбор записей"]
+    fn compare_voices() {
+        use realfft::RealFftPlanner;
+        let a = read_wav(&std::env::var("SB_WAV").expect("SB_WAV"));
+        let b = read_wav(&std::env::var("SB_WAV2").expect("SB_WAV2"));
+        let n = 4096;
+        let mut planner = RealFftPlanner::<f32>::new();
+        let fft = planner.plan_fft_forward(n);
+        let bin = RATE as f32 / n as f32;
+        // Средний спектр мощности по звонким кускам (YIN нашёл период).
+        let avg = |x: &[f32]| -> (Vec<f32>, usize) {
+            let mut acc = vec![0.0f32; n / 2 + 1];
+            let mut used = 0;
+            let mut buf = vec![0.0f32; n];
+            let mut spec = fft.make_output_vec();
+            for start in (0..x.len().saturating_sub(n)).step_by(n / 2) {
+                let c = &x[start..start + n];
+                let e: f32 = c.iter().map(|v| v * v).sum::<f32>() / n as f32;
+                if e < 1e-5 { continue; }
+                let st: Vec<f32> = c.iter().flat_map(|&v| [v, v]).collect();
+                let tr = pitch_track(&st);
+                if tr.iter().filter(|f| **f > 70.0 && **f < 500.0).count() * 2 < tr.len() { continue; }
+                for (j, v) in buf.iter_mut().enumerate() {
+                    *v = c[j] * (0.5 - 0.5 * (TAU * j as f32 / n as f32).cos());
+                }
+                fft.process(&mut buf, &mut spec).unwrap();
+                for (k, s) in spec.iter().enumerate() {
+                    acc[k] += s.norm_sqr();
+                }
+                used += 1;
+            }
+            for v in acc.iter_mut() { *v /= used.max(1) as f32; }
+            (acc, used)
+        };
+        let (pa, ua) = avg(&a);
+        let (pb, ub) = avg(&b);
+        println!("звонких кусков: исходный {ua}, изменённый {ub}");
+        let band = |p: &[f32], lo: f32, hi: f32| -> f32 {
+            let (i, j) = ((lo / bin) as usize, ((hi / bin) as usize).min(p.len() - 1));
+            p[i..=j].iter().sum::<f32>() / (j - i + 1) as f32
+        };
+        let total = |p: &[f32]| band(p, 80.0, 8000.0);
+        let mut row = Vec::new();
+        for (c, w) in [(30.0f32, 0.5f32), (75.0, 0.5), (140.0, 0.5), (280.0, 0.5), (560.0, 0.5), (1000.0, 0.5), (2000.0, 0.5), (4000.0, 0.5), (9000.0, 0.5), (16000.0, 0.3)] {
+            let (lo, hi) = (c * (1.0 - w), c * (1.0 + w));
+            let da = 10.0 * (band(&pa, lo, hi) / total(&pa)).log10();
+            let db = 10.0 * (band(&pb, lo, hi) / total(&pb)).log10();
+            row.push(format!("{c} Гц: {:+.1}", db - da));
+        }
+        println!("разница спектра (дБ, относительно общей громкости): {}", row.join("  "));
+        // Сглаженный спектр (±120 Гц) и его вершины 250–4000 Гц — форманты.
+        let peaks = |p: &[f32]| -> Vec<f32> {
+            let w = (120.0 / bin) as usize;
+            let db: Vec<f32> = p.iter().map(|v| 10.0 * (v + 1e-12).log10()).collect();
+            let sm: Vec<f32> = (0..db.len()).map(|k| {
+                let (i, j) = (k.saturating_sub(w), (k + w).min(db.len() - 1));
+                db[i..=j].iter().sum::<f32>() / (j - i + 1) as f32
+            }).collect();
+            let (lo, hi) = ((250.0 / bin) as usize, (4000.0 / bin) as usize);
+            let mut out: Vec<(f32, f32)> = (lo..hi).filter(|&k| sm[k] > sm[k - 1] && sm[k] >= sm[k + 1]).map(|k| (k as f32 * bin, sm[k])).collect();
+            out.sort_by(|x, y| y.1.total_cmp(&x.1));
+            let mut f: Vec<f32> = out.iter().take(4).map(|x| x.0).collect();
+            f.sort_by(f32::total_cmp);
+            f
+        };
+        println!("вершины спектра (Гц): исходный {:?}, изменённый {:?}", peaks(&pa), peaks(&pb));
+        // Задержка: взаимная корреляция огибающих громкости (по 5 мс).
+        let env = |x: &[f32]| -> Vec<f32> { x.chunks(240).map(|c| (c.iter().map(|v| v * v).sum::<f32>() / c.len() as f32).sqrt()).collect() };
+        let (ea, eb) = (env(&a), env(&b));
+        let best = (-100i32..100).max_by(|&l1, &l2| {
+            let corr = |l: i32| (0..ea.len()).filter_map(|i| { let j = i as i32 + l; (j >= 0 && (j as usize) < eb.len()).then(|| ea[i] * eb[j as usize]) }).sum::<f32>();
+            corr(l1).total_cmp(&corr(l2))
+        }).unwrap();
+        println!("сдвиг изменённого относительно исходного: {} мс", best * 5);
+        println!("ровность: исходный {:.3}, изменённый {:.3}", periodicity(&a), periodicity(&b));
+    }
+
+    /// Форманты кадра методом линейного предсказания (LPC порядка 12 на 12 кГц): вершины огибающей
+    /// 1/|A(e^jω)| выше 200 Гц. Только для разборов.
+    fn lpc_formants(frame48: &[f32]) -> Vec<f32> {
+        // В 12 кГц: среднее четвёрок (срез верхов) — форманты голоса ниже 5 кГц.
+        let x: Vec<f32> = frame48.as_chunks::<4>().0.iter().map(|c| c.iter().sum::<f32>() / 4.0).collect();
+        let n = x.len();
+        let mut y = vec![0.0f32; n];
+        for k in 1..n {
+            let w = 0.54 - 0.46 * (TAU * k as f32 / (n - 1) as f32).cos();
+            y[k] = (x[k] - 0.97 * x[k - 1]) * w;
+        }
+        const P: usize = 12;
+        let r: Vec<f64> = (0..=P).map(|lag| (lag..n).map(|k| y[k] as f64 * y[k - lag] as f64).sum()).collect();
+        if r[0] <= 0.0 {
+            return vec![];
+        }
+        // Левинсон — Дарбин.
+        let mut a = [0.0f64; P + 1];
+        a[0] = 1.0;
+        let mut err = r[0];
+        for i in 1..=P {
+            let mut acc = r[i];
+            for j in 1..i {
+                acc += a[j] * r[i - j];
+            }
+            let k = -acc / err;
+            let prev = a;
+            for j in 1..i {
+                a[j] = prev[j] + k * prev[i - j];
+            }
+            a[i] = k;
+            err *= 1.0 - k * k;
+            if err <= 0.0 {
+                return vec![];
+            }
+        }
+        let fs = 12000.0f64;
+        let grid = 1024;
+        let resp: Vec<f64> = (0..grid)
+            .map(|g| {
+                let w = std::f64::consts::PI * g as f64 / grid as f64;
+                let (mut re, mut im) = (0.0, 0.0);
+                for (j, &c) in a.iter().enumerate() {
+                    re += c * (w * j as f64).cos();
+                    im -= c * (w * j as f64).sin();
+                }
+                1.0 / (re * re + im * im)
+            })
+            .collect();
+        (1..grid - 1)
+            .filter(|&g| resp[g] > resp[g - 1] && resp[g] >= resp[g + 1])
+            .map(|g| (g as f64 * fs / 2.0 / grid as f64) as f32)
+            .filter(|&f| f > 200.0)
+            .take(3)
+            .collect()
+    }
+
+    /// Ручной разбор: форманты F1–F3 (середины по звонким кадрам 25 мс) у двух записей.
+    #[test]
+    #[ignore = "ручной разбор записей"]
+    fn compare_formants() {
+        let mut out = Vec::new();
+        for var in ["SB_WAV", "SB_WAV2"] {
+            let x = read_wav(&std::env::var(var).expect(var));
+            let win = 1200;
+            let mut fs: [Vec<f32>; 3] = [vec![], vec![], vec![]];
+            for c in x.chunks_exact(win) {
+                let e: f32 = c.iter().map(|v| v * v).sum::<f32>() / win as f32;
+                let d: f32 = c.windows(2).map(|p| (p[1] - p[0]).powi(2)).sum::<f32>() / win as f32;
+                if e < 1e-4 || d / e > 0.2 {
+                    continue;
+                }
+                let f = lpc_formants(c);
+                if f.len() == 3 {
+                    for k in 0..3 {
+                        fs[k].push(f[k]);
+                    }
+                }
+            }
+            let med = |v: &mut Vec<f32>| {
+                v.sort_by(f32::total_cmp);
+                v.get(v.len() / 2).copied().unwrap_or(0.0)
+            };
+            let [mut a, mut b, mut c] = fs;
+            let n = a.len();
+            out.push((med(&mut a), med(&mut b), med(&mut c), n));
+        }
+        let (m, g) = (out[0], out[1]);
+        println!("исходный: F1 {:.0}, F2 {:.0}, F3 {:.0} (кадров {})", m.0, m.1, m.2, m.3);
+        println!("изменённый: F1 {:.0}, F2 {:.0}, F3 {:.0} (кадров {})", g.0, g.1, g.2, g.3);
+        println!("во сколько раз: F1 ×{:.2}, F2 ×{:.2}, F3 ×{:.2}", g.0 / m.0, g.1 / m.1, g.2 / m.2);
+    }
+
+    #[test]
+    fn equalizer_cuts_lows_and_brightens_highs() {
+        let level = |p: &MorpherParams, f: f32| {
+            let out = run(p, &sine(f, 0.6));
+            rms(&out[RATE as usize / 3 * CHANNELS..]) / rms(&sine(f, 0.6)[RATE as usize / 3 * CHANNELS..])
+        };
+        let db = |x: f32| 20.0 * x.log10();
+        let low = with(|p| p.lowcut.store(1.0));
+        assert!(db(level(&low, 75.0)) < -15.0, "75 Гц: {} дБ", db(level(&low, 75.0)));
+        assert!(db(level(&low, 1000.0)).abs() < 1.0, "1 кГц: {} дБ", db(level(&low, 1000.0)));
+        let high = with(|p| p.bright.store(1.0));
+        let up = db(level(&high, 9000.0));
+        assert!((4.5..7.0).contains(&up), "9 кГц: {up} дБ");
+        assert!(db(level(&high, 500.0)).abs() < 1.0, "500 Гц: {} дБ", db(level(&high, 500.0)));
+    }
+
+    /// «Дрожание» голоса на гласных: (высота, громкость). Высота — средний модуль разницы
+    /// соседних кусков по 10 мс (в центах) там, где оба — голос и без скачков больше 200 центов;
+    /// громкость — средний модуль разницы громкости соседних кусков (в дБ) на тех же кусках.
+    fn tremble(mono: &[f32]) -> (f32, f32) {
+        let hop = 480;
+        let win = 1440;
+        let (lo, hi) = (RATE as usize / 500, RATE as usize / 70);
+        let w = win - hi;
+        let mut track: Vec<Option<(f32, f32)>> = Vec::new();
+        let mut cmnd = vec![1.0f32; hi + 1];
+        let mut start = 0;
+        while start + win <= mono.len() {
+            let c = &mono[start..start + win];
+            start += hop;
+            let e: f32 = c.iter().map(|v| v * v).sum::<f32>() / win as f32;
+            let d: f32 = c.windows(2).map(|p| (p[1] - p[0]).powi(2)).sum::<f32>() / win as f32;
+            if e < 1e-4 || d / e > 0.2 {
+                track.push(None);
+                continue;
+            }
+            let mut running = 0.0f32;
+            for tau in 1..=hi {
+                let diff: f32 = (0..w).map(|j| (c[j] - c[j + tau]).powi(2)).sum();
+                running += diff;
+                cmnd[tau] = if running > 0.0 { diff * tau as f32 / running } else { 1.0 };
+            }
+            let mut tau = lo;
+            while tau < hi && cmnd[tau] >= 0.15 {
+                tau += 1;
+            }
+            if tau >= hi {
+                track.push(None);
+                continue;
+            }
+            while tau + 1 < hi && cmnd[tau + 1] < cmnd[tau] {
+                tau += 1;
+            }
+            let (a, b, cc) = (cmnd[tau - 1], cmnd[tau], cmnd[tau + 1]);
+            let den = a - 2.0 * b + cc;
+            let t = tau as f32 + if den.abs() > 1e-9 { (0.5 * (a - cc) / den).clamp(-1.0, 1.0) } else { 0.0 };
+            track.push(Some((RATE as f32 / t, 10.0 * e.log10())));
+        }
+        let (mut dp, mut da, mut n) = (0.0f32, 0.0f32, 0);
+        for pair in track.windows(2) {
+            if let (Some((f1, l1)), Some((f2, l2))) = (pair[0], pair[1]) {
+                let cents = 1200.0 * (f2 / f1).log2();
+                if cents.abs() < 200.0 {
+                    dp += cents.abs();
+                    da += (l2 - l1).abs();
+                    n += 1;
+                }
+            }
+        }
+        (dp / n.max(1) as f32, da / n.max(1) as f32)
+    }
+
+    /// Ручной разбор: «дрожание» исходного (SB_WAV) и всех файлов в папке SB_OUT.
+    #[test]
+    #[ignore = "ручной разбор записей"]
+    fn compare_tremble() {
+        let dir = std::env::var("SB_OUT").expect("SB_OUT");
+        let (p, a) = tremble(&read_wav(&std::env::var("SB_WAV").expect("SB_WAV")));
+        println!("исходный: высота {p:.1} цента, громкость {a:.2} дБ");
+        let mut names: Vec<String> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()?.file_name().into_string().ok()).filter(|n| n.ends_with(".wav")).collect();
+        names.sort();
+        for name in names {
+            let (p, a) = tremble(&read_wav(&format!("{dir}/{name}")));
+            println!("{name}: высота {p:.1} цента, громкость {a:.2} дБ");
+        }
     }
 }

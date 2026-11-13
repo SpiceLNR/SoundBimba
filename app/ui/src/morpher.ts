@@ -10,7 +10,7 @@ export interface MorpherVoice {
 }
 
 /** Все эффекты морфера. Новые добавлять в конец; у старых голосов новые эффекты — 0. */
-export const KEYS = ['pitch', 'robot', 'radio', 'echo', 'wobble', 'formant', 'growl', 'chorus', 'hall', 'tone'] as const;
+export const KEYS = ['pitch', 'robot', 'radio', 'echo', 'wobble', 'formant', 'growl', 'chorus', 'hall', 'tone', 'lowcut', 'bright'] as const;
 type Effects = Record<(typeof KEYS)[number], number>;
 
 /**

@@ -248,6 +248,8 @@ export default function MorpherParams({ node, onParams }: { node: SoundNode; onP
       <Amount label={t('param.growl')} value={num('growl')} onChange={(growl) => set({ growl })} />
       <Amount label={t('param.chorus')} value={num('chorus')} onChange={(chorus) => set({ chorus })} />
       <Amount label={t('param.hall')} value={num('hall')} onChange={(hall) => set({ hall })} />
+      <Amount label={t('param.lowcut')} value={num('lowcut')} onChange={(lowcut) => set({ lowcut })} />
+      <Amount label={t('param.bright')} value={num('bright')} onChange={(bright) => set({ bright })} />
       {(pitch !== 0 || num('wobble') > 0) && <p className="later">{t('param.pitchDelay')}</p>}
       {(formant !== 0 || tone !== 0) && <p className="later">{t('param.formantDelay')}</p>}
     </>

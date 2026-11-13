@@ -13,4 +13,6 @@ nnnoiseless = { version = "0.5.2", default-features = false }
 rtrb = "0.4"
 
 [dev-dependencies]
+# Только для ручных разборов записей (спектр), в программу не попадает.
+realfft = "3.5"
 serde_json = "1"

@@ -64,14 +64,14 @@ describe('own voices', () => {
     p = { ...p, ...restoreVoices() };
     expect(voicesOf(p).map((v) => v.id)).toEqual(VOICES.map((v) => v.id));
     // «Пришелец» после возврата — тот же самый.
-    expect(voicesOf(p).find((v) => v.id === 'alien')!.params).toEqual({ pitch: 3, robot: 0, radio: 0, echo: 0.25, wobble: 0.7, formant: 0, growl: 0, chorus: 0, hall: 0, tone: 0 });
+    expect(voicesOf(p).find((v) => v.id === 'alien')!.params).toEqual({ pitch: 3, robot: 0, radio: 0, echo: 0.25, wobble: 0.7, formant: 0, growl: 0, chorus: 0, hall: 0, tone: 0, lowcut: 0, bright: 0 });
   });
 
   it('broken voice entries in a file are skipped', async () => {
     const { voicesOf } = await import('./morpher');
     const p = { voices: [null, 5, { id: 'c1' }, { id: 'c2', name: 'Ок', params: { pitch: 2, robot: 'x' } }] };
     const own = voicesOf(p).filter((v) => v.custom);
-    expect(own).toEqual([{ id: 'c2', name: 'Ок', custom: true, params: { pitch: 2, robot: 0, radio: 0, echo: 0, wobble: 0, formant: 0, growl: 0, chorus: 0, hall: 0, tone: 0 } }]);
+    expect(own).toEqual([{ id: 'c2', name: 'Ок', custom: true, params: { pitch: 2, robot: 0, radio: 0, echo: 0, wobble: 0, formant: 0, growl: 0, chorus: 0, hall: 0, tone: 0, lowcut: 0, bright: 0 } }]);
   });
 });
 

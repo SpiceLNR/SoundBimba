@@ -369,7 +369,7 @@ pub const COMPRESSOR_RANGES: [(&str, std::ops::RangeInclusive<f64>); 5] = [
 ];
 
 /// Допустимые значения морфера: сдвиг высоты (полутона) и сила эффектов 0…1 (с дрожанием).
-pub const MORPHER_RANGES: [(&str, std::ops::RangeInclusive<f64>); 10] = [
+pub const MORPHER_RANGES: [(&str, std::ops::RangeInclusive<f64>); 12] = [
     ("pitch", -12.0..=12.0),
     ("robot", 0.0..=1.0),
     ("radio", 0.0..=1.0),
@@ -382,6 +382,9 @@ pub const MORPHER_RANGES: [(&str, std::ops::RangeInclusive<f64>); 10] = [
     ("hall", 0.0..=1.0),
     // Высота без смены окраски («естественная»), полутона; `pitch` — мультяшная.
     ("tone", -12.0..=12.0),
+    // Эквалайзер (2026-11-13): срез низов и яркость.
+    ("lowcut", 0.0..=1.0),
+    ("bright", 0.0..=1.0),
 ];
 
 /// Шумоподавление: сила 0…1 (смесь очищенного и исходного).

@@ -315,6 +315,8 @@
   "voiceCal.open": "Tune to my voice",
   "voiceCal.redo": "Again",
   "voiceCal.reset": "Reset",
+  "param.lowcut": "Low cut",
+  "param.bright": "Brightness",
   "voice.custom": "custom",
   "param.pitch": "Cartoon pitch",
   "param.pitchHint": "Shifts the whole voice, colour included: up — chipmunk, down — monster. 12 is an octave.",
