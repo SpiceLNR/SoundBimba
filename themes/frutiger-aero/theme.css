@@ -22,6 +22,8 @@
   --accent: #6fe0ff;
   --accent-text: #04345e;
   --danger: #ffa3a3;
+  --window-tray: #ffb347;
+  --window-tray-text: #3d1d00;
   --radius: 12px;
   --radius-small: 7px;
   --shadow: 0 6px 22px rgba(0, 25, 60, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.45);
@@ -383,4 +385,75 @@
   [data-theme='frutiger-aero'] .map::after {
     animation: aero-twinkle 3.5s ease-in-out infinite;
   }
+}
+
+/* Кнопки окна — как в Windows 7: стеклянная группа на своём месте в панели; «Закрыть» — широкая
+   красная, «Свернуть в трей» — такая же оранжевая. Значки белые, толстые, с тёмной обводкой. */
+[data-theme='frutiger-aero'] .window-controls {
+  gap: 0;
+  border: 1px solid rgba(0, 20, 50, 0.7);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 6px rgba(0, 25, 60, 0.35);
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control {
+  /* Высота — как у остальных кнопок панели (33px вместе с рамкой группы). */
+  width: 40px;
+  height: 31px;
+  border: none;
+  border-left: 1px solid rgba(0, 20, 50, 0.55);
+  border-radius: 0;
+  color: #ffffff;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(205, 228, 250, 0.32) 45%, rgba(50, 100, 165, 0.38) 50%, rgba(110, 165, 220, 0.42) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+  text-shadow: none;
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control:first-child {
+  border-left: none;
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control:hover {
+  color: #ffffff;
+  background-image: linear-gradient(180deg, rgba(225, 247, 255, 0.8) 0%, rgba(120, 200, 255, 0.58) 45%, rgba(15, 125, 225, 0.62) 50%, rgba(80, 205, 255, 0.75) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 -5px 8px rgba(130, 235, 255, 0.65);
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control.window-close,
+[data-theme='frutiger-aero'] .window-controls > button.window-control.window-tray {
+  width: 62px;
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control.window-close {
+  background-image: linear-gradient(180deg, #eab4a6 0%, #d78a74 45%, #c0442a 50%, #d4653f 100%);
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control.window-close:hover {
+  background-image: linear-gradient(180deg, #ffd0c2 0%, #f2937b 45%, #e23e1a 50%, #ff7040 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 -5px 8px rgba(255, 170, 120, 0.75);
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control.window-tray {
+  background-image: linear-gradient(180deg, #ffe2ad 0%, #ffc066 45%, #ee870f 50%, #ffa936 100%);
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control.window-tray:hover {
+  background-image: linear-gradient(180deg, #fff0cf 0%, #ffd08a 45%, #ff9810 50%, #ffc04d 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 -5px 8px rgba(255, 225, 140, 0.8);
+}
+
+[data-theme='frutiger-aero'] .window-controls > button.window-control:active {
+  background-image: linear-gradient(180deg, rgba(10, 60, 130, 0.55) 0%, rgba(40, 110, 190, 0.5) 100%);
+  box-shadow: inset 0 2px 4px rgba(0, 20, 50, 0.6);
+}
+
+[data-theme='frutiger-aero'] .window-control svg {
+  width: 17px;
+  height: 17px;
+  filter: drop-shadow(0 0 1px rgba(0, 20, 50, 0.95)) drop-shadow(0 1px 0 rgba(0, 20, 50, 0.6));
+}
+
+[data-theme='frutiger-aero'] .window-control svg path {
+  stroke-width: 3;
 }

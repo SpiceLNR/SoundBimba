@@ -19,6 +19,8 @@
   --accent: #ff1493;
   --accent-text: #ffffff;
   --danger: #ff5c6c;
+  --window-tray: #f7801a;
+  --window-tray-text: #ffffff;
   --radius: 0px;
   --radius-small: 0px;
   --shadow: none;
@@ -92,4 +94,72 @@
 [data-theme='metro'] .voice-confirm-buttons > button:not(.danger):not(.primary):hover {
   background: var(--control-bg-hover);
   color: var(--accent);
+}
+
+/* Кнопки окна — как в Windows 8: плоские, на своём месте в панели; «Закрыть» — широкая красная
+   плитка всегда, «Свернуть в трей» — такая же оранжевая. Значки тонкие, с прямыми концами. */
+[data-theme='metro'] .window-controls {
+  gap: 0;
+}
+
+[data-theme='metro'] .window-controls > .window-control {
+  /* Высота — как у остальных кнопок панели. */
+  width: 44px;
+  height: 33px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+[data-theme='metro'] .window-controls > .window-control:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+}
+
+[data-theme='metro'] .window-controls > .window-control:active {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+[data-theme='metro'] .window-controls > .window-control.window-close,
+[data-theme='metro'] .window-controls > .window-control.window-tray {
+  width: 64px;
+  color: #ffffff;
+}
+
+[data-theme='metro'] .window-controls > .window-control.window-close {
+  background: #c75050;
+}
+
+[data-theme='metro'] .window-controls > .window-control.window-close:hover {
+  background: #e04343;
+  color: #ffffff;
+}
+
+[data-theme='metro'] .window-controls > .window-control.window-close:active {
+  background: #993d3d;
+}
+
+[data-theme='metro'] .window-controls > .window-control.window-tray {
+  background: var(--window-tray);
+}
+
+[data-theme='metro'] .window-controls > .window-control.window-tray:hover {
+  background: #ff9a3d;
+  color: #ffffff;
+}
+
+[data-theme='metro'] .window-controls > .window-control.window-tray:active {
+  background: #c5630d;
+}
+
+[data-theme='metro'] .window-control svg {
+  width: 13px;
+  height: 13px;
+}
+
+[data-theme='metro'] .window-control svg path {
+  stroke-width: 2.4;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
 }

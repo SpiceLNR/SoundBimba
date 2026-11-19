@@ -121,7 +121,7 @@ export default function Toolbar(p: Props) {
           { items: [{ value: 'settings:open', label: t('toolbar.settings') }] },
         ]}
       />
-      <WindowControls />
+      <WindowControls toTray={p.settings.closeToTray !== false} />
     </header>
   );
 }

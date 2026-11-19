@@ -108,6 +108,7 @@
   "window.maximize": "Maximize",
   "window.restore": "Restore",
   "window.close": "Close",
+  "window.toTray": "Hide to tray",
   "toolbar.params": "Options",
   "settings.title": "Settings",
   "settings.close": "Close",

@@ -108,6 +108,7 @@
   "window.maximize": "Развернуть",
   "window.restore": "Вернуть размер",
   "window.close": "Закрыть",
+  "window.toTray": "Свернуть в трей",
   "toolbar.params": "Параметры",
   "settings.title": "Настройки",
   "settings.close": "Закрыть",

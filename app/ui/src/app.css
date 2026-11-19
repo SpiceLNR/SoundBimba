@@ -189,6 +189,18 @@ input[type='range']:focus-visible {
   border-color: var(--danger);
 }
 
+/* «Свернуть в трей» (вместо крестика) — оранжевая во всех темах. */
+.window-control.window-tray {
+  color: var(--window-tray);
+  border-color: var(--window-tray);
+}
+
+.window-control.window-tray:hover:not(:disabled) {
+  background: var(--window-tray);
+  border-color: var(--window-tray);
+  color: var(--window-tray-text);
+}
+
 /* Выпадающие списки панели (свои, не системные — оформлены по теме). */
 .dropdown {
   position: relative;

@@ -20,6 +20,8 @@ const ICONS = {
   maximize: 'M6.5 6.5h11v11h-11z',
   restore: 'M8.5 9.5h9v8h-9zM6.5 14.5v-8h9',
   close: 'M7 7l10 10M17 7 7 17',
+  // «В трей»: стрелка вниз — в лоток (вместо крестика, когда крестик прячет окно в трей).
+  tray: 'M12 4.5v9M8 10l4 4 4-4M5.5 14.5v4h13v-4',
 } as const;
 
 const fail = (what: string) => (err: unknown) => api.log('error', `window ${what} failed: ${String(err)}`);
@@ -182,7 +184,8 @@ function Control({ kind, label, onClick }: { kind: keyof typeof ICONS; label: st
   );
 }
 
-export default function WindowControls() {
+/** `toTray` — крестик прячет окно в трей: вместо него оранжевая кнопка «Свернуть в трей». */
+export default function WindowControls({ toTray }: { toTray: boolean }) {
   const t = useT();
   const [maximized, setMaximized] = useState(false);
   useEffect(() => {
@@ -202,7 +205,12 @@ export default function WindowControls() {
         label={t(maximized ? 'window.restore' : 'window.maximize')}
         onClick={() => void w?.toggleMaximize()}
       />
-      <Control kind="close" label={t('window.close')} onClick={() => void (w ? w.close() : window.close())} />
+      {/* Окно закрывается одинаково: прятать ли его в трей, решает Rust (настройка closeToTray). */}
+      <Control
+        kind={toTray ? 'tray' : 'close'}
+        label={t(toTray ? 'window.toTray' : 'window.close')}
+        onClick={() => void (w ? w.close() : window.close())}
+      />
     </div>
   );
 }
