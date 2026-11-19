@@ -7,7 +7,18 @@ import { useT } from '../i18n';
 import Dropdown from './Dropdown';
 
 /** Выбор устройства: микрофон, наушники или виртуальный кабель. */
-export default function DevicePicker({ kind, value, onChange }: { kind: NodeKind; value: string; onChange: (v: string) => void }) {
+export default function DevicePicker({
+  kind,
+  value,
+  onChange,
+  label,
+}: {
+  kind: NodeKind;
+  value: string;
+  onChange: (v: string) => void;
+  /** Подпись поля вместо «Устройство». */
+  label?: string;
+}) {
   const t = useT();
   const [devices, setDevices] = useState<AudioDevice[] | null>(null);
   const load = useCallback(() => {
@@ -33,7 +44,7 @@ export default function DevicePicker({ kind, value, onChange }: { kind: NodeKind
 
   return (
     <div className="field">
-      <span>{t('param.device')}</span>
+      <span>{label ?? t('param.device')}</span>
       <Dropdown className="panel-dropdown" label={current} matchWidth groups={[{ items }]} onSelect={onChange} />
       {kind === 'virtual-out' && devices && list.length === 0 && <p className="problem-text">{t('param.noCableHint')}</p>}
       <button type="button" className="link-button" onClick={load}>

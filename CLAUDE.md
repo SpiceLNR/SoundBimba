@@ -78,6 +78,8 @@ elease\portable\`.
   в наушниках будет слышен тихий тон; `SB_RENDER=steady:40` — устойчивый режим вывода с буфером 40 мс), `--test mute_original` (заглушение в микшере убивает и копию),
   `--test redirect_original` (перенаправление тестовой программы на кабель и сброс; меняет настройку
   Windows только для тестовой программы — с разрешения автора 2026-11-03).
+- Диктофон, прослушивание на устройстве по умолчанию (тишина, ничего не слышно): `cargo test -p soundbimba
+  listening_plays_on_a_real_device -- --ignored --nocapture`.
 - Проверки кнопок на настоящем треке: `set SB_TRACK=путь\к\треку.mp3`, затем `cargo test -p clips
   --test seek_real_file -- --ignored --nocapture` (перемотка без провалов) и `--test real_track_end` (конец трека).
 - Щелчки кнопки на стыке «память → диск» (без железа и трека): `cargo test --release -p clips --test

@@ -45,6 +45,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   'add-denoise': 'Digit7',
   'add-speaker-out': 'Digit8',
   'add-virtual-out': 'Digit9',
+  // Диктофон — на R (решение автора 2026-11-19).
+  'add-recorder': 'KeyR',
   // Микросхема — на нуле; ножки (только внутри микросхемы) — без клавиш, их можно назначить.
   'add-chip': 'Digit0',
   'add-chip-in': '',

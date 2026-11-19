@@ -16,6 +16,7 @@ export type NodeKind =
   | 'denoise'
   | 'speaker-out'
   | 'virtual-out'
+  | 'recorder'
   | 'chip'
   | 'chip-in'
   | 'chip-out';
@@ -53,6 +54,8 @@ export const KINDS: Record<NodeKind, KindInfo> = {
   denoise: { category: 'processing', input: true, output: true, defaults: { amount: 1, gate: 0.7 } },
   'speaker-out': { category: 'output', input: true, output: false, defaults: { device: 'default' } },
   'virtual-out': { category: 'output', input: true, output: false, defaults: { device: 'virtual-1' } },
+  // «Диктофон»: записывает, что пришло; `playDevice` — куда слушать запись (мимо схемы).
+  recorder: { category: 'output', input: true, output: false, defaults: { playDevice: 'default' } },
   // Микросхема: внутри целая схема (params.inner), снаружи — ножки: её узлы «Вход/Выход
   // микросхемы». Новая — сразу с одним входом и одним выходом. В раскладке — как обработка.
   chip: {
@@ -707,6 +710,7 @@ export function summary(kind: NodeKind, params: Params, t: Translate): string {
     case 'speaker-out':
       return params.device === 'default' || params.device === undefined ? t('param.deviceDefault') : String(params.device);
     case 'virtual-out':
+    case 'recorder':
       return '';
     case 'chip': {
       const { ins, outs } = chipPins(params);

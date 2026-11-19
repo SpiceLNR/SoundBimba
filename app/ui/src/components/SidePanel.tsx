@@ -13,6 +13,7 @@ import VolumeSlider from './VolumeSlider';
 import CompressorParams from './CompressorParams';
 import DenoiseParams from './DenoiseParams';
 import MorpherParams from './MorpherParams';
+import RecorderParams from './RecorderParams';
 import OriginalPicker from './OriginalPicker';
 import ButtonDisc from './ButtonDisc';
 import Dropdown from './Dropdown';
@@ -177,6 +178,8 @@ function NodeParams({ node, onParams }: { node: SoundNode; onParams: Props['onPa
       return <MorpherParams node={node} onParams={onParams} />;
     case 'denoise':
       return <DenoiseParams node={node} onParams={onParams} />;
+    case 'recorder':
+      return <RecorderParams node={node} onParams={onParams} />;
     case 'chip':
     case 'chip-in':
     case 'chip-out':

@@ -93,6 +93,25 @@ export interface ButtonPlayback {
   len: number;
 }
 
+/** «Диктофон»: идёт ли запись, длина (идущей или последней), есть ли готовая запись. */
+export interface RecorderInfo {
+  recording: boolean;
+  seconds: number;
+  hasTake: boolean;
+  saved: boolean;
+  /** В записи есть пропуски (запись на диск не успевала). */
+  lost: boolean;
+  /** Ошибка записи — код причины (reason.<code>). */
+  error: string | null;
+}
+
+/** Прослушивание записи диктофона: чья, где сейчас и сколько всего (секунды). */
+export interface PlayerInfo {
+  id: string;
+  pos: number;
+  len: number;
+}
+
 /** Состояние звука, приходит из Rust ~15 раз в секунду. */
 export interface AudioState {
   enabled: boolean;
@@ -107,6 +126,10 @@ export interface AudioState {
   voices?: Record<string, number>;
   /** «Оригинал звука»: выставлено в Windows, ждёт звука программы или ошибка. */
   routes?: Record<string, 'applied' | 'waiting' | 'error'>;
+  /** Диктофоны по id узла. */
+  recorders?: Record<string, RecorderInfo>;
+  /** Прослушивание записи (null — не идёт). */
+  player?: PlayerInfo | null;
 }
 
 /** Проект и настройки без побочных действий (для кнопочной панели). */
@@ -156,6 +179,8 @@ const previewDevices: AudioDevice[] = [
 let previewEnabled = false;
 const previewTemplates: UserTemplate[] = [];
 const previewPlaying: Record<string, ButtonPlayback> = {};
+const previewRecorders: Record<string, RecorderInfo> = {};
+let previewPlayer: PlayerInfo | null = null;
 
 function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!browserPreview) return invoke<T>(cmd, args);
@@ -193,6 +218,21 @@ function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     b.playing = true;
     b.pos = Number(args?.fraction) * b.len;
   }
+  if (cmd === 'recorder_toggle') {
+    const id = String(args?.nodeId);
+    if (!previewEnabled) return Promise.reject({ code: 'recorder-sound-off', detail: id });
+    const r = (previewRecorders[id] ??= { recording: false, seconds: 0, hasTake: false, saved: false, lost: false, error: null });
+    if (r.recording) Object.assign(r, { recording: false, hasTake: true, saved: false });
+    else Object.assign(r, { recording: true, seconds: 0 });
+    return Promise.resolve(r.recording as T);
+  }
+  if (cmd === 'recorder_play') previewPlayer = { id: String(args?.nodeId), pos: 0, len: previewRecorders[String(args?.nodeId)]?.seconds ?? 0 };
+  if (cmd === 'recorder_stop_listening') previewPlayer = null;
+  if (cmd === 'recorder_seek' && previewPlayer) previewPlayer.pos = Number(args?.fraction) * previewPlayer.len;
+  if (cmd === 'recorder_save') {
+    const r = previewRecorders[String(args?.nodeId)];
+    if (r) r.saved = true;
+  }
   if (cmd === 'get_ui_state') return Promise.resolve({ project: previewProject, settings: { language: null, theme: 'bimba' } } as T);
   return Promise.resolve(answers[cmd] as T);
 }
@@ -220,7 +260,15 @@ export function onAudioState(handler: (s: AudioState) => void): () => void {
       for (const [id, b] of Object.entries(previewPlaying)) buttons[id] = { ...b };
       const reductions: Record<string, number> = {};
       for (const n of previewProject.nodes) if (n.type === 'compressor' && previewEnabled) reductions[n.id] = Math.random() * 9;
-      handler({ enabled: previewEnabled, running: previewEnabled, status, levels, buttons, reductions });
+      for (const r of Object.values(previewRecorders)) if (r.recording) r.seconds += 0.066;
+      if (previewPlayer) {
+        previewPlayer.pos += 0.066;
+        if (previewPlayer.pos >= previewPlayer.len) previewPlayer = null;
+      }
+      const recorders: Record<string, RecorderInfo> = {};
+      for (const [id, r] of Object.entries(previewRecorders)) recorders[id] = { ...r };
+      const player = previewPlayer ? { ...previewPlayer } : null;
+      handler({ enabled: previewEnabled, running: previewEnabled, status, levels, buttons, reductions, recorders, player });
     }, 66);
     return () => clearInterval(h);
   }
@@ -274,6 +322,13 @@ export const api = {
   measureVoice: (device: string) => call<VoiceMeasure>('measure_voice', { device }),
   pressButton: (nodeId: string) => call<void>('press_button', { nodeId }),
   seekButton: (nodeId: string, fraction: number) => call<void>('seek_button', { nodeId, fraction }),
+  /** Диктофон: начать или остановить запись; ответ — идёт ли запись. */
+  recorderToggle: (nodeId: string) => call<boolean>('recorder_toggle', { nodeId }),
+  /** Прослушать последнюю запись на устройстве (`device` — id или «default»), мимо схемы. */
+  recorderPlay: (nodeId: string, device: string) => call<void>('recorder_play', { nodeId, device }),
+  recorderStopListening: () => call<void>('recorder_stop_listening'),
+  recorderSeek: (fraction: number) => call<void>('recorder_seek', { fraction }),
+  recorderSave: (nodeId: string, path: string) => call<void>('recorder_save', { nodeId, path }),
   getUiState: () => call<UiState>('get_ui_state'),
   log: (level: 'info' | 'error', message: string) => call<void>('log_ui', { level, message }).catch(() => {}),
 };

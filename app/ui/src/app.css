@@ -937,6 +937,76 @@ button:disabled {
   fill: var(--text-muted);
 }
 
+/* «Диктофон»: круглая кнопка записи — красная точка; во время записи — квадрат и пульсирующее кольцо. */
+.record-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.record-button:not(:disabled):hover {
+  background: var(--control-bg-hover);
+  border-color: var(--danger);
+}
+
+.record-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.record-button .record-icon {
+  width: 42%;
+  height: 42%;
+  border-radius: 50%;
+  background: var(--danger);
+  transition: border-radius 0.15s;
+}
+
+.record-button.recording {
+  border-color: var(--danger);
+  animation: record-pulse 1.2s ease-in-out infinite;
+}
+
+.record-button.recording .record-icon {
+  width: 34%;
+  height: 34%;
+  border-radius: 12%;
+}
+
+@keyframes record-pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--danger) 35%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .record-button.recording {
+    animation: none;
+  }
+}
+
+.recorder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.recorder-status,
+.recorder-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.recorder-status.recording,
+.sound-node-sub.recording {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .file-value {
   overflow: hidden;
   text-overflow: ellipsis;

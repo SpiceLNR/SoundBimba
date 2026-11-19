@@ -6,6 +6,7 @@ import { memo, useContext } from 'react';
 import { api } from '../api';
 import { isProblem, meterFraction, useAudio } from '../audio';
 import ButtonDisc, { buttonLabel } from './ButtonDisc';
+import RecordButton, { recorderLabel } from './RecordButton';
 import { chipPins, KINDS, lookOf, summary, type SoundNode } from '../graph';
 import { useT } from '../i18n';
 import { SetParams, useFullId } from './chipContext';
@@ -96,7 +97,11 @@ function SoundNodeView({ id: localId, data, selected }: NodeProps<SoundNode>) {
   const status = audio.status[id];
   const problem = audio.enabled && isProblem(status) ? t(`status.${status}`) : '';
   const isButton = data.kind === 'sound-button';
-  const sub = problem || (isButton ? buttonLabel(data.params, '') || t('param.fileEmpty') : summary(data.kind, data.params, t));
+  const isRecorder = data.kind === 'recorder';
+  const rec = isRecorder ? audio.recorders?.[id] : undefined;
+  const sub =
+    problem ||
+    (isButton ? buttonLabel(data.params, '') || t('param.fileEmpty') : isRecorder ? recorderLabel(rec, t) : summary(data.kind, data.params, t));
   const level = audio.enabled ? (audio.levels[id] ?? 0) : 0;
   const mutable = MUTABLE.has(data.kind);
   const muted = mutable && data.params.mute === true;
@@ -116,9 +121,17 @@ function SoundNodeView({ id: localId, data, selected }: NodeProps<SoundNode>) {
             onSeek={(f) => void api.seekButton(id, f)}
           />
         )}
+        {isRecorder && (
+          <RecordButton
+            size={48}
+            recording={rec?.recording === true}
+            disabled={!audio.running}
+            onToggle={() => void api.recorderToggle(id).catch(() => {})}
+          />
+        )}
         <div className="sound-node-text">
           <div className="sound-node-title">{t(`node.${data.kind}.title`)}</div>
-          {sub && <div className={`sound-node-sub${problem ? ' problem' : ''}`}>{sub}</div>}
+          {sub && <div className={`sound-node-sub${problem ? ' problem' : ''}${rec?.recording ? ' recording' : ''}`}>{sub}</div>}
         </div>
       </div>
       {audio.enabled && (

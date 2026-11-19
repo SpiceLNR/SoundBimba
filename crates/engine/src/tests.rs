@@ -327,6 +327,119 @@ fn shared_values_survive_recompile_and_unused_are_dropped() {
     assert!(!r.shared.contains_key("mic"));
 }
 
+// ---------- «Диктофон» ----------
+
+/// Микрофон → наушники и (если `with_recorder`) микрофон → диктофон.
+fn recorder_project(with_recorder: bool) -> Project {
+    let mut p = Project {
+        schema: 1,
+        nodes: vec![node("mic", NodeKind::MicInput, json!({})), node("out", NodeKind::SpeakerOut, json!({}))],
+        edges: vec![edge("mic", "out")],
+    };
+    if with_recorder {
+        p.nodes.push(node("rec", NodeKind::Recorder, json!({})));
+        p.edges.push(edge("mic", "rec"));
+    }
+    p
+}
+
+fn recorder_ports() -> Vec<(&'static str, PortKey)> {
+    vec![("mic", PortKey::Capture("mic-id".into())), ("out", PortKey::Render("phones-id".into()))]
+}
+
+/// Что забрал писатель: номера записей и число отсчётов после каждой метки.
+fn drained(feed: &mut recorder::RecorderFeed) -> Vec<(u32, usize)> {
+    let mut takes: Vec<(u32, usize)> = Vec::new();
+    feed.drain(|piece| match piece {
+        recorder::Piece::Start(s) => takes.push((s, 0)),
+        recorder::Piece::Samples(x) => takes.last_mut().expect("отсчёты без метки").1 += x.len(),
+    });
+    takes
+}
+
+#[test]
+fn recorder_records_only_while_on_and_numbers_each_take() {
+    let mut r = rig(&recorder_project(true), &recorder_ports());
+    let (tap, mut feed) = recorder::tap();
+    assert!(r.graph.attach_recorder("rec", tap));
+    let mic = vec![0.3f32; 40 * BLOCK_SAMPLES];
+    run_blocks(&mut r, 10, std::slice::from_ref(&mic));
+    assert!(drained(&mut feed).is_empty(), "запись не включена — ничего");
+    r.shared["rec"].set_recording(true);
+    run_blocks(&mut r, 10, std::slice::from_ref(&mic));
+    assert_eq!(drained(&mut feed), vec![(1, 10 * BLOCK_SAMPLES)]);
+    r.shared["rec"].set_recording(false);
+    run_blocks(&mut r, 5, std::slice::from_ref(&mic));
+    assert!(drained(&mut feed).is_empty(), "остановлена — ничего");
+    r.shared["rec"].set_recording(true);
+    run_blocks(&mut r, 3, &[mic]);
+    assert_eq!(drained(&mut feed), vec![(2, 3 * BLOCK_SAMPLES)], "новая запись — новый номер");
+    assert_eq!(r.shared["rec"].rec_dropped(), 0);
+}
+
+#[test]
+fn recording_goes_on_after_the_sound_restarts() {
+    let p = recorder_project(true);
+    let mut r = rig(&p, &recorder_ports());
+    let (tap, mut feed) = recorder::tap();
+    r.graph.attach_recorder("rec", tap);
+    r.shared["rec"].set_recording(true);
+    run_blocks(&mut r, 4, &[vec![0.3; 4 * BLOCK_SAMPLES]]);
+    // Переставили провода: старый граф удалён, новый — с новым буфером, общие значения те же.
+    let resolver = Ports(recorder_ports().into_iter().map(|(id, k)| (id.to_string(), k)).collect());
+    let plan = plan(&p, &resolver).unwrap();
+    let ins = plan.inputs.iter().map(|_| ring(64, RATE, RATE, 1).1).collect();
+    let outs = plan.outputs.iter().map(|_| ring(64, RATE, RATE, 1).0).collect();
+    let old = std::mem::replace(&mut r.graph, Graph::compile(&p, &resolver, &plan, ins, outs, &mut HashMap::new(), &mut r.shared).unwrap());
+    drop(old);
+    assert_eq!(drained(&mut feed), vec![(1, 4 * BLOCK_SAMPLES)]);
+    assert!(feed.is_abandoned(), "старый буфер больше не пишется");
+    let (tap, mut feed) = recorder::tap();
+    r.graph.attach_recorder("rec", tap);
+    r.graph.process();
+    assert_eq!(drained(&mut feed), vec![(1, BLOCK_SAMPLES)], "та же запись (тот же номер) продолжается");
+}
+
+#[test]
+fn recorder_does_not_change_the_sound_elsewhere() {
+    let blocks = 30;
+    let mic = sine(blocks * BLOCK, 440.0, 0.5, RATE);
+    let mut plain = rig(&recorder_project(false), &recorder_ports());
+    let without = run_blocks(&mut plain, blocks, std::slice::from_ref(&mic));
+    let mut with = rig(&recorder_project(true), &recorder_ports());
+    let (tap, _feed) = recorder::tap();
+    with.graph.attach_recorder("rec", tap);
+    with.shared["rec"].set_recording(true);
+    let recorded = run_blocks(&mut with, blocks, &[mic]);
+    assert_eq!(without, recorded, "наушники звучат так же, с диктофоном и без");
+}
+
+#[test]
+fn full_recorder_buffer_loses_the_recording_not_the_sound() {
+    // Писатель «завис»: никто не забирает запись 3 с (буфер — на 2 с).
+    let blocks = 3 * RATE as usize / BLOCK;
+    let mic = vec![0.2f32; blocks * BLOCK_SAMPLES];
+    let mut r = rig(&recorder_project(true), &recorder_ports());
+    let (tap, mut feed) = recorder::tap();
+    r.graph.attach_recorder("rec", tap);
+    r.shared["rec"].set_recording(true);
+    let out = run_blocks(&mut r, blocks, &[mic]);
+    let tail = &out[0][out[0].len() - BLOCK_SAMPLES..];
+    assert!(tail.iter().all(|&s| (s - 0.2).abs() < 1e-5), "наушники играют как играли");
+    assert!(r.shared["rec"].rec_dropped() > 0, "пропавшее записано в счётчик");
+    let got: usize = drained(&mut feed).iter().map(|t| t.1).sum();
+    assert!(got <= recorder::TAP_SECONDS * RATE as usize * CHANNELS);
+}
+
+#[test]
+fn recorder_without_a_buffer_is_silent_and_harmless() {
+    let mut r = rig(&recorder_project(true), &recorder_ports());
+    r.shared["rec"].set_recording(true);
+    let out = run_blocks(&mut r, 10, &[vec![0.3; 10 * BLOCK_SAMPLES]]);
+    assert!(out[0][out[0].len() - BLOCK_SAMPLES..].iter().all(|&s| (s - 0.3).abs() < 1e-5));
+    assert!(!r.graph.attach_recorder("nope", recorder::tap().0));
+}
+
 #[test]
 fn two_nodes_on_one_device_share_a_port() {
     let mut p = mixer_project(1.0, false);

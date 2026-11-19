@@ -8,6 +8,7 @@
 mod applog;
 mod audio;
 mod diagnostics;
+mod recorder;
 mod routes;
 mod storage;
 mod templates;
@@ -99,6 +100,39 @@ fn press_button(audio: State<Audio>, node_id: String) {
 #[tauri::command]
 fn seek_button(audio: State<Audio>, node_id: String, fraction: f32) {
     audio.seek(&node_id, fraction);
+}
+
+/// Диктофон: начать запись или остановить. Возвращает: идёт ли запись.
+#[tauri::command]
+fn recorder_toggle(audio: State<Audio>, node_id: String) -> Result<bool, CmdError> {
+    audio.toggle_recording(&node_id).map_err(|code| CmdError::new(code, &node_id))
+}
+
+/// Прослушать последнюю запись диктофона на устройстве (id или «default») — мимо схемы.
+#[tauri::command]
+fn recorder_play(audio: State<Audio>, node_id: String, device: String) -> Result<(), CmdError> {
+    let devs = audio::current_devices();
+    audio.recorders().play(&node_id, &device, &devs).map_err(|e| {
+        let code = if e.starts_with("recorder-") { e.clone() } else { "recorder-play".into() };
+        CmdError::new(&code, e)
+    })
+}
+
+#[tauri::command]
+fn recorder_stop_listening(audio: State<Audio>) {
+    audio.recorders().stop_playing();
+}
+
+/// Перемотка прослушивания (доля 0…1).
+#[tauri::command]
+fn recorder_seek(audio: State<Audio>, fraction: f32) {
+    audio.recorders().seek(fraction);
+}
+
+/// Сохранить последнюю запись диктофона в выбранный файл.
+#[tauri::command]
+fn recorder_save(audio: State<Audio>, node_id: String, path: String) -> Result<(), CmdError> {
+    audio.recorders().save(&node_id, std::path::Path::new(&path)).map_err(|e| CmdError::new("io", e))
 }
 
 /// Включить или выключить звук (сама настройка сохраняется вместе с остальными).
@@ -357,8 +391,8 @@ fn main() {
             let state = app.state::<AppState>();
             let (templates, errors) = import_opened(&state.paths, templates::opened_files(std::env::args()));
             *state.opened.lock().unwrap() = OpenedDto { templates, errors };
-            let journal = app.state::<AppState>().paths.dir.join("routing.json");
-            app.manage(Audio::start(app.handle().clone(), journal));
+            let dir = app.state::<AppState>().paths.dir.clone();
+            app.manage(Audio::start(app.handle().clone(), dir.join("routing.json"), dir.join("recordings")));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -376,6 +410,11 @@ fn main() {
             measure_voice,
             press_button,
             seek_button,
+            recorder_toggle,
+            recorder_play,
+            recorder_stop_listening,
+            recorder_seek,
+            recorder_save,
             get_ui_state,
             list_templates,
             save_template,

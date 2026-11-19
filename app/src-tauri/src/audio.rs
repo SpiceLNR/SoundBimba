@@ -9,6 +9,9 @@
 //!   возвращается, когда выбор снят, звук выключен или SoundBimba закрывается.
 //!
 //! Уровни и состояния узлов ~15 раз в секунду уходят в интерфейс событием `audio-state`.
+//!
+//! «Диктофоны»: при каждом запуске движка получают свой буфер записи (`recorder`); звук
+//! выключили — запись останавливается и становится готовой.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
@@ -25,6 +28,7 @@ use winaudio::streams::{self, Source, Stream};
 use winaudio::{processes, runner};
 
 use crate::applog;
+use crate::recorder::{PlayerInfo, RecorderInfo, Recorders};
 use crate::routes::{self, Journal, RouteState, WindowsRoutes};
 
 /// Наименьший запас в кольцевых буферах, мс (часть общей задержки). Для устройств с крупными
@@ -105,6 +109,10 @@ struct StateEvent<'a> {
     reductions: HashMap<String, f32>,
     /// Шумоподавление: вероятность голоса 0…1 с прошлого события — для индикатора.
     voices: HashMap<String, f32>,
+    /// Диктофоны: идёт ли запись, её длина, есть ли готовая запись.
+    recorders: HashMap<String, RecorderInfo>,
+    /// Прослушивание записи (если идёт).
+    player: Option<PlayerInfo>,
 }
 
 #[derive(Serialize, Clone)]
@@ -244,6 +252,7 @@ fn resolve(p: &Project, cache: &mut ClipCache) -> Resolved {
             | NodeKind::Compressor
             | NodeKind::VoiceMorpher
             | NodeKind::Denoise
+            | NodeKind::Recorder
             | NodeKind::Chip
             | NodeKind::ChipIn
             | NodeKind::ChipOut => (None, NodeStatus::Ok),
@@ -327,6 +336,9 @@ struct Controller {
     vd_steady: bool,
     /// Настройку поменяли — перезапустить звук.
     restart_for_mode: bool,
+    recorders: Arc<Recorders>,
+    /// Диктофоны схемы (id) — когда список меняется, писатель узнаёт об этом.
+    recorder_ids: Vec<String>,
 }
 
 impl Controller {
@@ -375,7 +387,20 @@ impl Controller {
     fn refresh(&mut self) {
         self.sync_routes();
         let Some(project) = self.project.clone() else { return };
+        let ids: Vec<String> = project.nodes.iter().filter(|n| n.kind == NodeKind::Recorder).map(|n| n.id.clone()).collect();
+        if ids != self.recorder_ids {
+            self.recorders.set_nodes(ids.clone());
+            self.recorder_ids = ids;
+        }
         if !self.enabled {
+            // Звук выключен — записывать нечего: запись становится готовой.
+            let shared = self.shared.lock().unwrap();
+            for id in &self.recorder_ids {
+                if let Some(sh) = shared.get(id) {
+                    sh.set_recording(false);
+                }
+            }
+            drop(shared);
             self.stop();
             let mut s = self.snapshot.lock().unwrap();
             s.enabled = false;
@@ -493,7 +518,16 @@ impl Controller {
         let graph = {
             let mut shared = self.shared.lock().unwrap();
             match Graph::compile(project, resolved, &plan, inputs, outputs, &mut buttons, &mut shared) {
-                Ok(g) => g,
+                Ok(mut g) => {
+                    for n in project.nodes.iter().filter(|n| n.kind == NodeKind::Recorder) {
+                        let (tap, feed) = engine::recorder::tap();
+                        g.attach_recorder(&n.id, tap);
+                        if let Some(sh) = shared.get(&n.id) {
+                            self.recorders.feed(&n.id, sh.clone(), feed);
+                        }
+                    }
+                    g
+                }
                 Err(e) => {
                     applog::error(&format!("audio graph is invalid: {e}"));
                     return;
@@ -600,13 +634,15 @@ pub struct Audio {
     snapshot: Arc<Mutex<Snapshot>>,
     control: Mutex<Option<std::thread::JoinHandle<()>>>,
     shared: Arc<Mutex<HashMap<String, Arc<NodeShared>>>>,
+    recorders: Arc<Recorders>,
 }
 
 impl Audio {
-    pub fn start(app: AppHandle, journal_path: PathBuf) -> Audio {
+    pub fn start(app: AppHandle, journal_path: PathBuf, recordings: PathBuf) -> Audio {
         let (tx, rx) = channel::<Cmd>();
         let snapshot = Arc::new(Mutex::new(Snapshot::default()));
         let shared: Arc<Mutex<HashMap<String, Arc<NodeShared>>>> = Arc::default();
+        let recorders = Recorders::start(recordings);
 
         let mut c = Controller {
             project: None,
@@ -626,6 +662,8 @@ impl Audio {
             vd_steady: true,
             restart_for_mode: false,
             journal_path,
+            recorders: recorders.clone(),
+            recorder_ids: Vec::new(),
         };
         let control = std::thread::Builder::new()
             .name("sb-audio-control".into())
@@ -663,7 +701,7 @@ impl Audio {
             .expect("cannot start audio control thread");
 
         // Уровни и состояния — в интерфейс.
-        let (snap, sh) = (snapshot.clone(), shared.clone());
+        let (snap, sh, rec) = (snapshot.clone(), shared.clone(), recorders.clone());
         std::thread::Builder::new()
             .name("sb-audio-levels".into())
             .spawn(move || loop {
@@ -685,21 +723,43 @@ impl Audio {
                     (levels, buttons, reductions, voices)
                 };
                 let snapshot = snap.lock().unwrap().clone();
-                if app.emit("audio-state", StateEvent { snapshot: &snapshot, levels, buttons, reductions, voices }).is_err() {
+                let (recorders, player) = (rec.info(), rec.player_info());
+                if app.emit("audio-state", StateEvent { snapshot: &snapshot, levels, buttons, reductions, voices, recorders, player }).is_err() {
                     break;
                 }
             })
             .expect("cannot start audio levels thread");
 
-        Audio { tx: Mutex::new(tx), snapshot, control: Mutex::new(Some(control)), shared }
+        Audio { tx: Mutex::new(tx), snapshot, control: Mutex::new(Some(control)), shared, recorders }
     }
 
-    /// Остановить звук и дождаться, пока устройства закроются (при выходе из программы).
+    /// Остановить звук и дождаться, пока устройства закроются (при выходе из программы). Идущая
+    /// запись диктофона становится готовой.
     pub fn shutdown(&self) {
         let _ = self.tx.lock().unwrap().send(Cmd::Shutdown);
         if let Some(t) = self.control.lock().unwrap().take() {
             let _ = t.join();
         }
+        self.recorders.shutdown();
+    }
+
+    /// Диктофон: начать запись или остановить. Ok(идёт ли запись); Err — звук выключен.
+    pub fn toggle_recording(&self, node_id: &str) -> Result<bool, &'static str> {
+        if !self.snapshot.lock().unwrap().running {
+            return Err("recorder-sound-off");
+        }
+        let shared = self.shared.lock().unwrap();
+        let sh = shared.get(node_id).ok_or("recorder-sound-off")?;
+        let on = !sh.recording().0;
+        if on {
+            // Новая запись заменит файл прежней — её прослушивание останавливаем.
+            self.recorders.stop_playing_if(node_id);
+        }
+        Ok(sh.set_recording(on))
+    }
+
+    pub fn recorders(&self) -> &Recorders {
+        &self.recorders
     }
 
     pub fn set_project(&self, p: Project) {

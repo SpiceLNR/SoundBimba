@@ -21,6 +21,7 @@ pub mod denoise;
 pub mod morpher;
 #[cfg(test)]
 mod morpher_legacy;
+pub mod recorder;
 
 pub use shared::{AtomicF32, ButtonState, CompressorParams, NodeShared, PortStats, COMPRESSOR_DEFAULTS};
 
@@ -122,6 +123,9 @@ enum Op {
     Denoise(Box<denoise::State>),
     /// Выход: сумма входов → внешний выход. None — выхода нет.
     Output(Option<usize>),
+    /// «Диктофон»: сумма входов → писателю записи (если запись идёт). Дальше звук не идёт.
+    /// `marked` — номер записи, для которой уже поставлена метка начала.
+    Recorder { id: String, tap: Option<recorder::RecorderTap>, marked: u32 },
 }
 
 struct Step {
@@ -167,6 +171,7 @@ pub fn plan(project: &Project, resolver: &dyn PortResolver) -> Result<PortPlan, 
             | NodeKind::Compressor
             | NodeKind::VoiceMorpher
             | NodeKind::Denoise
+            | NodeKind::Recorder
             | NodeKind::Chip
             | NodeKind::ChipIn
             | NodeKind::ChipOut => continue,
@@ -217,6 +222,8 @@ impl Graph {
                 NodeKind::SpeakerOut | NodeKind::VirtualOut => {
                     Op::Output(port.and_then(|k| plan.outputs.iter().position(|p| *p == k)))
                 }
+                // Буфер записи подключает приложение (`attach_recorder`); без него узел молчит.
+                NodeKind::Recorder => Op::Recorder { id: node.id.clone(), tap: None, marked: 0 },
             };
             let mut ins: Vec<usize> =
                 project.edges.iter().filter(|e| e.to == node.id).map(|e| index[e.from.as_str()]).collect();
@@ -249,7 +256,7 @@ impl Graph {
                     None => out.fill(0.0),
                 },
                 Op::Button(src, pb) => play_button(src.as_mut(), pb, &step.shared, &mut out[..]),
-                Op::Volume | Op::Compressor(_) | Op::Morpher(_) | Op::Denoise(_) | Op::Output(_) => {
+                Op::Volume | Op::Compressor(_) | Op::Morpher(_) | Op::Denoise(_) | Op::Output(_) | Op::Recorder { .. } => {
                     out.fill(0.0);
                     for &src in &step.inputs {
                         for (o, s) in out.iter_mut().zip(before[src].iter()) {
@@ -268,6 +275,9 @@ impl Graph {
             }
             if let Op::Morpher(state) = &mut step.op {
                 state.process(&mut out[..], step.shared.morpher());
+            }
+            if let Op::Recorder { tap, marked, .. } = &mut step.op {
+                recorder::record(tap.as_mut(), marked, &step.shared, &out[..]);
             }
             // Громкость и баланс — у «Громкости» (и ножек микросхем); «Выключить звук» — ещё и у
             // источников и выходов (у них громкость всегда 1, баланс посередине).
@@ -301,6 +311,19 @@ impl Graph {
                 state.warm_up();
             }
         }
+    }
+
+    /// Подключает буфер записи к «Диктофону» `node_id` (до запуска графа). false — такого узла нет.
+    pub fn attach_recorder(&mut self, node_id: &str, new_tap: recorder::RecorderTap) -> bool {
+        for step in &mut self.steps {
+            if let Op::Recorder { id, tap, .. } = &mut step.op {
+                if id == node_id {
+                    *tap = Some(new_tap);
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Статистика портов (пропуски, переполнения) — для диагностики.

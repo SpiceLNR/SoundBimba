@@ -54,6 +54,8 @@ pub enum NodeKind {
     SpeakerOut,
     /// Выход «Виртуальный микрофон» (динамик виртуального кабеля).
     VirtualOut,
+    /// «Диктофон»: записывает то, что приходит на вход; звука дальше не отдаёт (2026-11-19).
+    Recorder,
     /// Микросхема: внутри целая схема (`params.inner` — узлы и провода), снаружи — ножки:
     /// входы — её узлы «Вход микросхемы», выходы — узлы «Выход микросхемы».
     Chip,
@@ -73,7 +75,7 @@ pub enum Category {
 }
 
 impl NodeKind {
-    pub const ALL: [NodeKind; 12] = [
+    pub const ALL: [NodeKind; 13] = [
         NodeKind::AppSource,
         NodeKind::MicInput,
         NodeKind::SoundButton,
@@ -83,6 +85,7 @@ impl NodeKind {
         NodeKind::Denoise,
         NodeKind::SpeakerOut,
         NodeKind::VirtualOut,
+        NodeKind::Recorder,
         NodeKind::Chip,
         NodeKind::ChipIn,
         NodeKind::ChipOut,
@@ -97,13 +100,14 @@ impl NodeKind {
                 | NodeKind::Denoise
                 | NodeKind::SpeakerOut
                 | NodeKind::VirtualOut
+                | NodeKind::Recorder
                 | NodeKind::Chip
                 | NodeKind::ChipOut
         )
     }
 
     pub fn has_output(self) -> bool {
-        !matches!(self, NodeKind::SpeakerOut | NodeKind::VirtualOut | NodeKind::ChipOut)
+        !matches!(self, NodeKind::SpeakerOut | NodeKind::VirtualOut | NodeKind::Recorder | NodeKind::ChipOut)
     }
 
     pub fn category(self) -> Category {
@@ -111,7 +115,7 @@ impl NodeKind {
             NodeKind::AppSource | NodeKind::MicInput | NodeKind::ChipIn => Category::Source,
             NodeKind::SoundButton => Category::Button,
             NodeKind::Volume | NodeKind::Compressor | NodeKind::VoiceMorpher | NodeKind::Denoise | NodeKind::Chip => Category::Processing,
-            NodeKind::SpeakerOut | NodeKind::VirtualOut | NodeKind::ChipOut => Category::Output,
+            NodeKind::SpeakerOut | NodeKind::VirtualOut | NodeKind::Recorder | NodeKind::ChipOut => Category::Output,
         }
     }
 }

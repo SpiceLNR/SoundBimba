@@ -54,6 +54,12 @@ pub struct NodeShared {
     /// «Тишина между словами» 0…1.
     denoise_gate: AtomicF32,
     voice: AtomicF32,
+    /// «Диктофон»: идёт ли запись (пишет приложение) и номер записи — каждая новая запись со своим
+    /// номером, чтобы писатель отличил её от продолжения прежней (после перезапуска звука).
+    rec_on: AtomicBool,
+    rec_session: AtomicU32,
+    /// Сколько отсчётов записи пропало: буфер записи был полон (писатель не успевал).
+    rec_dropped: AtomicU64,
 }
 
 /// Настройки компрессора (см. `graph::COMPRESSOR_RANGES`).
@@ -103,6 +109,9 @@ impl Default for NodeShared {
             denoise_amount: AtomicF32::new(1.0),
             denoise_gate: AtomicF32::new(DENOISE_GATE_DEFAULT),
             voice: AtomicF32::new(0.0),
+            rec_on: AtomicBool::new(false),
+            rec_session: AtomicU32::new(0),
+            rec_dropped: AtomicU64::new(0),
         }
     }
 }
@@ -240,6 +249,32 @@ impl NodeShared {
             pos_frames: self.pos_frames.load(Relaxed),
             total_frames: total,
         })
+    }
+
+    /// «Диктофон»: начать новую запись (с новым номером) или остановить. Возвращает: идёт ли запись.
+    pub fn set_recording(&self, on: bool) -> bool {
+        if on && !self.rec_on.load(Relaxed) {
+            // Номер записи — не 0 (0 у движка значит «запись ещё не отмечена»).
+            let next = self.rec_session.load(Relaxed).wrapping_add(1).max(1);
+            self.rec_session.store(next, Relaxed);
+            self.rec_dropped.store(0, Relaxed);
+        }
+        self.rec_on.store(on, Relaxed);
+        on
+    }
+
+    /// Идёт ли запись и её номер.
+    pub fn recording(&self) -> (bool, u32) {
+        (self.rec_on.load(Relaxed), self.rec_session.load(Relaxed))
+    }
+
+    pub(crate) fn add_rec_dropped(&self, samples: usize) {
+        self.rec_dropped.fetch_add(samples as u64, Relaxed);
+    }
+
+    /// Сколько отсчётов текущей записи пропало (буфер был полон).
+    pub fn rec_dropped(&self) -> u64 {
+        self.rec_dropped.load(Relaxed)
     }
 
     /// Играет ли кнопка и какая доля звука уже прозвучала (0…1).
