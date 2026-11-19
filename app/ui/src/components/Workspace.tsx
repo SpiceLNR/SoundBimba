@@ -54,6 +54,7 @@ import { setVoiceProfile } from '../morpher';
 import TraceEdge from './TraceEdge';
 import NeonEdge from './NeonEdge';
 import MagicEdge from './MagicEdge';
+import CartoonEdge from './CartoonEdge';
 import CableWizard from './CableWizard';
 import SettingsDialog from './SettingsDialog';
 import type { Notify } from './Notices';
@@ -67,7 +68,7 @@ import Watermark from './Watermark';
 import WelcomeDialog from './WelcomeDialog';
 
 const nodeTypes = { sound: SoundNodeView };
-const edgeTypes = { trace: TraceEdge, neon: NeonEdge, magic: MagicEdge };
+const edgeTypes = { trace: TraceEdge, neon: NeonEdge, magic: MagicEdge, cartoon: CartoonEdge };
 const SAVE_DELAY_MS = 600;
 
 interface Props {

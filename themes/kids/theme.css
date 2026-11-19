@@ -116,6 +116,23 @@
   box-shadow: 1px 1px 0 #2b1b5a;
 }
 
+/* На верхней панели кнопки не наклоняются: панель — заголовок окна для Windows (app-region),
+   и наклон кнопки каждый кадр заставлял пересчитывать область перетаскивания — окно тормозило.
+   Здесь кнопка «подпрыгивает» тенью. */
+[data-theme='kids'] .toolbar button:not(.button-disc):hover:not(:disabled),
+[data-theme='kids'] .toolbar button:not(.button-disc):active:not(:disabled) {
+  transform: none;
+}
+
+[data-theme='kids'] .toolbar button:not(.button-disc):hover:not(:disabled) {
+  box-shadow: 4px 4px 0 #2b1b5a;
+  filter: brightness(1.06);
+}
+
+[data-theme='kids'] .toolbar button:not(.button-disc):active:not(:disabled) {
+  box-shadow: 1px 1px 0 #2b1b5a;
+}
+
 /* Кнопки масштаба карты — одна пухлая панель с обводкой и общей тенью. */
 [data-theme='kids'] .react-flow__controls {
   border: 3px solid #2b1b5a;
@@ -172,12 +189,30 @@
   background: radial-gradient(circle at 35% 35%, #ffffff 0 18%, var(--cat) 22% 100%);
 }
 
-/* Провода: толстые, с тёмной обводкой; по ним бегут огоньки. */
+/* Точка встаёт на внутренний край рамки — двигаем её на внешний (рамка слева 12px, справа 3px). */
+[data-theme='kids'] .sound-node .react-flow__handle-left {
+  left: -12px;
+}
+
+[data-theme='kids'] .sound-node .react-flow__handle-right {
+  right: -3px;
+}
+
+/* Провода: толстые, с тёмной обводкой; по ним бегут огоньки. Обводка — отдельный путь под
+   проводом (CartoonEdge), не тень: тени вокруг бегущих чёрточек пересчитывались каждый кадр. */
 [data-theme='kids'] .react-flow__edge-path {
   stroke-width: 6;
   stroke-linecap: round;
   stroke-dasharray: 14 9;
-  filter: drop-shadow(1.5px 0 0 #2b1b5a) drop-shadow(-1.5px 0 0 #2b1b5a) drop-shadow(0 1.5px 0 #2b1b5a) drop-shadow(0 -1.5px 0 #2b1b5a);
+}
+
+/* Обводка — те же чёрточки, только шире: тёмный край вокруг каждого огонька, между ними
+   просвет (сплошная обводка выглядела как чёрная трубка). Бегут вместе с огоньками. */
+[data-theme='kids'] .wire-outline {
+  stroke: #2b1b5a;
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-dasharray: 14 9;
 }
 
 [data-theme='kids'] .meter {
@@ -235,7 +270,8 @@
     animation: kids-bounce 3s ease-in-out infinite;
   }
 
-  [data-theme='kids'] .react-flow__edge-path {
+  [data-theme='kids'] .react-flow__edge-path,
+  [data-theme='kids'] .wire-outline {
     animation: kids-current 1.2s linear infinite;
   }
 }

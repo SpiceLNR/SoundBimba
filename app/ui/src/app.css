@@ -823,7 +823,7 @@ button.crumb:hover {
 /* Темы — снимками: щелчок по снимку включает тему сразу. */
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 12px;
 }
 
