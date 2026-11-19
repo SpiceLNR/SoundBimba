@@ -55,6 +55,7 @@ import TraceEdge from './TraceEdge';
 import NeonEdge from './NeonEdge';
 import MagicEdge from './MagicEdge';
 import CartoonEdge from './CartoonEdge';
+import TimelineEdge from './TimelineEdge';
 import CableWizard from './CableWizard';
 import SettingsDialog from './SettingsDialog';
 import type { Notify } from './Notices';
@@ -64,11 +65,12 @@ import SoundNodeView from './SoundNodeView';
 import TemplatesDialog from './TemplatesDialog';
 import Toolbar, { type SaveState } from './Toolbar';
 import Mascot from './Mascot';
+import ThemeIntro from './ThemeIntro';
 import Watermark from './Watermark';
 import WelcomeDialog from './WelcomeDialog';
 
 const nodeTypes = { sound: SoundNodeView };
-const edgeTypes = { trace: TraceEdge, neon: NeonEdge, magic: MagicEdge, cartoon: CartoonEdge };
+const edgeTypes = { trace: TraceEdge, neon: NeonEdge, magic: MagicEdge, cartoon: CartoonEdge, timeline: TimelineEdge };
 const SAVE_DELAY_MS = 600;
 
 interface Props {
@@ -526,6 +528,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
           <div className="map" ref={mapRef}>
             <Watermark />
             <Mascot theme={settings.theme} />
+            <ThemeIntro theme={settings.theme} />
             {inChip && (
               <nav className="chip-path" aria-label={t('chip.path')}>
                 <button type="button" className="chip-back" onClick={() => exitTo(stack.length - 1)}>

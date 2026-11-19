@@ -1,5 +1,7 @@
 {
   "app.title": "SoundBimba",
+  "app.brandSound": "Sound",
+  "app.brandBimba": "Bimba",
   "lang.ru": "Русский",
   "lang.en": "English",
   "lang.uk": "Українська",
@@ -462,5 +464,11 @@
   "reason.recorder-io": "could not write the file (disk full?)",
   "tray.show": "Show SoundBimba",
   "tray.quit": "Quit",
-  "tray.tooltip": "SoundBimba"
+  "tray.tooltip": "SoundBimba",
+  "node.badge.button": "HD",
+  "intro.word": "Night",
+  "intro.plaque": "HUB",
+  "intro.sub": "soundbimba",
+  "intro.skip": "Click to skip",
+  "node.badge.recording": "LIVE"
 }

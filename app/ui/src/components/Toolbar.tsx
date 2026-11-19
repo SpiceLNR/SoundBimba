@@ -44,7 +44,11 @@ export default function Toolbar(p: Props) {
     // У окна нет системной рамки: пустое место панели — его заголовок (`app-region` в app.css;
     // не сработал — запасной путь в WindowControls).
     <header className="toolbar" data-drag onMouseDown={dragWindow} onPointerDown={dragWindowTouch} onDoubleClick={maximizeOnDoubleTap}>
-      <div className="brand">{t('app.title')}</div>
+      {/* Две части названия — для тем, которые красят их по-разному (Night Hub: плашка у «Bimba»). */}
+      <div className="brand" aria-label={t('app.title')}>
+        <span className="brand-sound">{t('app.brandSound')}</span>
+        <span className="brand-bimba">{t('app.brandBimba')}</span>
+      </div>
       <button
         type="button"
         className={`sound-toggle${p.settings.audioEnabled ? ' on' : ''}`}

@@ -155,6 +155,8 @@ export function isCmdError(e: unknown): e is CmdError {
 const browserPreview = import.meta.env.DEV && !('__TAURI_INTERNALS__' in window);
 // Снимки тем (tools/theme-previews.ps1): ?shot=<тема> — эта тема, звук включён, без приветствия.
 const shot = browserPreview ? new URLSearchParams(window.location.search).get('shot') : null;
+/** Идёт снимок темы (tools/theme-previews.ps1): заставки тем не показывать. */
+export const previewShot = shot !== null;
 
 const previewProject: Project = {
   schema: 1,

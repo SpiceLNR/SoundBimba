@@ -27,7 +27,7 @@ describe('themes', () => {
   });
 
   it('themes go in the order the author chose', () => {
-    expect(THEMES.map((t) => t.id)).toEqual(['bimba', 'metro', 'kids', 'kids-dark', 'neo-noir', 'magic', 'engineer', 'frutiger-aero']);
+    expect(THEMES.map((t) => t.id)).toEqual(['bimba', 'metro', 'kids', 'kids-dark', 'neo-noir', 'magic', 'engineer', 'frutiger-aero', 'night-hub']);
   });
 
   it('every theme defines the same variables as «Bimba»', () => {

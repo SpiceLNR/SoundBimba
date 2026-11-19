@@ -1,0 +1,487 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Тема «Night Hub»: чёрный фон, тёмно-серые карточки и насыщенный оранжевый акцент. Главная
+   деталь — оранжевая плашка: «Sound» белым, «Bimba» чёрным на оранжевом; так же выглядят главные
+   кнопки, заголовки панелей и выбранная вкладка «Настроек». Эффекты: оранжевые провода
+   с бегущими белыми кружками, метки LIVE / HD на узлах, тёплые огни боке на фоне и ореол у выбранного узла. */
+[data-theme='night-hub'] {
+  --font: 'Segoe UI', 'Nunito', system-ui, sans-serif;
+  --font-size: 14px;
+  --title-weight: 700;
+  --title-transform: none;
+  --title-spacing: 0;
+
+  --bg: #000000;
+  --surface: #111111;
+  --surface-2: #1b1b1b;
+  --text: #ffffff;
+  --text-muted: #9a9a9a;
+  --border: #2a2a2a;
+  --border-width: 1px;
+  --accent: #ff9000;
+  --accent-text: #000000;
+  --danger: #ff4d4d;
+  --window-tray: #ff9000;
+  --window-tray-text: #000000;
+  --radius: 6px;
+  --radius-small: 4px;
+  --shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+
+  --control-bg: #1b1b1b;
+  --control-bg-hover: #262626;
+  --control-border-hover: #ff9000;
+  --control-border: #2a2a2a;
+
+  /* Ширина списка «Добавить узел» под шрифт темы. */
+  --add-node-width: 228px;
+
+  --slider-track: #2a2a2a;
+  --slider-track-height: 6px;
+  --slider-thumb-bg: #ff9000;
+  --slider-thumb-width: 18px;
+  --slider-thumb-height: 18px;
+  --slider-thumb-radius: 50%;
+
+  --node-bg: #161616;
+  --node-text: #ffffff;
+  --node-source: #3fa7ff;
+  --node-processing: #b07cff;
+  --node-chip: #ff6b6b;
+  --node-output: #4cd97b;
+  --node-button: #ffc233;
+  --node-selected: #ff9000;
+  --handle-size: 16px;
+
+  --wire: #5a5a5a;
+  --wire-selected: #ff9000;
+  --dots: #1e1e1e;
+  --watermark-color: #ff9000;
+  --watermark-opacity: 0.04;
+
+  /* Полосы прокрутки: тонкие, при наведении — оранжевые. */
+  --scrollbar-size: 10px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #2a2a2a;
+  --scrollbar-thumb-hover: #ff9000;
+  --scrollbar-radius: 4px;
+
+  --backdrop: rgba(0, 0, 0, 0.72);
+  --notice-bg: #1b1b1b;
+  --notice-error-bg: #4a1a12;
+}
+
+/* Название программы: «Sound» белым, «Bimba» чёрным на оранжевой плашке. */
+[data-theme='night-hub'] .brand {
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+[data-theme='night-hub'] .brand-bimba {
+  margin-left: 3px;
+  padding: 0 5px 1px;
+  border-radius: 4px;
+  background: #ff9000;
+  color: #000000;
+}
+
+/* Кнопки: при наведении — оранжевая рамка и оранжевый текст (главные и кнопки окна — свои). */
+[data-theme='night-hub'] button:not(.primary):not(.window-control):not(.button-disc):not(.sound-toggle.on):hover:not(:disabled) {
+  color: #ff9000;
+}
+
+[data-theme='night-hub'] button.primary {
+  font-weight: 700;
+}
+
+[data-theme='night-hub'] button.primary:hover:not(:disabled) {
+  background: #ffa733;
+  border-color: #ffa733;
+  color: #000000;
+}
+
+/* Выбранный пункт списка — оранжевая плашка. */
+[data-theme='night-hub'] .dropdown-item.selected {
+  background: #ff9000;
+  color: #000000;
+}
+
+[data-theme='night-hub'] .dropdown-item.selected:hover {
+  background: #ffa733;
+}
+
+/* «Звук включён» — оранжевая плашка. */
+[data-theme='night-hub'] .sound-toggle.on {
+  background: #ff9000;
+  border-color: #ff9000;
+  color: #000000;
+}
+
+/* Наведение: плашка светлее, текст остаётся чёрным (общее правило наведения красило его
+   в оранжевый — на оранжевом не было видно). */
+[data-theme='night-hub'] button.sound-toggle.on:hover:not(:disabled) {
+  background: #ffa733;
+  border-color: #ffa733;
+  color: #000000;
+}
+
+[data-theme='night-hub'] .sound-toggle.on .sound-dot {
+  background: #000000;
+  box-shadow: none;
+}
+
+/* Полоска громкости — оранжевая у всех узлов (перегруз — по-прежнему красный). */
+[data-theme='night-hub'] .meter-fill:not(.clip) {
+  background: #ff9000;
+}
+
+/* Точка встаёт на внутренний край рамки — двигаем её на внешний (полоса слева 6px, рамка 1px). */
+[data-theme='night-hub'] .sound-node .react-flow__handle-left {
+  left: -6px;
+}
+
+[data-theme='night-hub'] .sound-node .react-flow__handle-right {
+  right: -1px;
+}
+
+/* Точки подключения — оранжевые кольца, при наведении заливаются. */
+[data-theme='night-hub'] .sound-node .react-flow__handle {
+  border-color: #ff9000;
+  background: #161616;
+}
+
+[data-theme='night-hub'] .sound-node .react-flow__handle:hover {
+  background: #ff9000;
+}
+
+/* ---- Провода: оранжевые, по ним от выхода ко входу бегут белые кружки, как ползунок плеера
+   (TimelineEdge). ---- */
+[data-theme='night-hub'] .react-flow__edge-path {
+  stroke: #ff9000;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+[data-theme='night-hub'] .wire-playhead {
+  fill: #ffffff;
+  stroke: #ff9000;
+  stroke-width: 2;
+  offset-distance: 50%;
+  offset-rotate: 0deg;
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-theme='night-hub'] .react-flow__edge.selected .react-flow__edge-path,
+[data-theme='night-hub'] .react-flow__edge:hover .react-flow__edge-path {
+  stroke: #ffb04d;
+}
+
+/* Кружок пробегает провод за малую часть цикла и пропадает до следующего раза; у проводов
+   разные цикл и сдвиг (как искорка «Магической»), поэтому кружки появляются редко и вразнобой. */
+@keyframes night-hub-playhead {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  1% {
+    opacity: 1;
+  }
+  15% {
+    opacity: 1;
+  }
+  16% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* ---- Метки у названия узла: HD у кнопок, LIVE у диктофона, пока идёт запись. ---- */
+[data-theme='night-hub'] .sound-node-title[data-badge]::after {
+  content: attr(data-badge);
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #ff9000;
+  color: #000000;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  vertical-align: 2px;
+}
+
+/* Кнопки — HD: чёрная метка с оранжевыми буквами, как плашка у названия программы наоборот. */
+[data-theme='night-hub'] .sound-node.cat-button .sound-node-title[data-badge]::after {
+  background: #000000;
+  color: #ff9000;
+  box-shadow: inset 0 0 0 1px #ff9000;
+}
+
+/* Заголовок боковой панели и окон — на оранжевой плашке. */
+[data-theme='night-hub'] .panel-title {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 9px 3px;
+  border-radius: 4px;
+  background: #ff9000;
+  color: #000000;
+}
+
+/* ---- Тёплое свечение: размытые оранжевые огни на фоне (боке, как ночной город вне фокуса) и
+   мягкий ореол у выбранного узла. Огни — градиенты без фильтров; плывут сдвигом слоя. ---- */
+[data-theme='night-hub'] .map::before {
+  content: '';
+  position: absolute;
+  inset: -15%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 90px at 18% 30%, rgba(255, 144, 0, 0.13), transparent 70%),
+    radial-gradient(circle 60px at 72% 22%, rgba(255, 170, 60, 0.11), transparent 70%),
+    radial-gradient(circle 120px at 82% 72%, rgba(255, 120, 0, 0.1), transparent 70%),
+    radial-gradient(circle 45px at 40% 78%, rgba(255, 190, 90, 0.12), transparent 70%),
+    radial-gradient(circle 70px at 55% 48%, rgba(255, 144, 0, 0.07), transparent 70%),
+    radial-gradient(circle 35px at 30% 60%, rgba(255, 200, 120, 0.1), transparent 70%);
+}
+
+[data-theme='night-hub'] .sound-node.selected {
+  box-shadow: 0 0 0 1px rgba(255, 144, 0, 0.5), 0 0 22px rgba(255, 144, 0, 0.35), var(--shadow);
+}
+
+@keyframes night-hub-bokeh {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(4%, -3%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='night-hub'] .wire-playhead {
+    animation: night-hub-playhead 14s linear infinite;
+  }
+
+  [data-theme='night-hub'] .react-flow__edges > svg:nth-child(3n + 2) .wire-playhead {
+    animation-duration: 17s;
+  }
+
+  [data-theme='night-hub'] .react-flow__edges > svg:nth-child(3n) .wire-playhead {
+    animation-duration: 11s;
+  }
+
+  [data-theme='night-hub'] .map::before {
+    animation: night-hub-bokeh 28s ease-in-out infinite alternate;
+  }
+}
+
+/* ---- Заставка (ThemeIntro): на всё поле карты под свой бас-рифф сменяются оранжевые значки —
+   микрофон, наушники, волна, «▶» (каждый на свой удар), курсор нажимает «▶» под щелчок мыши,
+   потом «Night» по буквам и «HUB» на плашке, подпись вразрядку; через ≈3,2 с всё гаснет. Время ударов — в introSound.ts. Играет
+   всегда при включении темы и запуске с ней, как персонаж «Фрутигер аэро». ---- */
+[data-theme='night-hub'] .theme-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: #000000;
+  cursor: pointer;
+  animation: night-hub-intro-fade 3.9s linear forwards;
+}
+
+[data-theme='night-hub'] .theme-intro > * {
+  grid-area: 1 / 1;
+}
+
+[data-theme='night-hub'] .intro-icon {
+  width: 104px;
+  height: 104px;
+  fill: none;
+  stroke: #ff9000;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  animation: night-hub-intro-pop linear forwards;
+}
+
+[data-theme='night-hub'] .intro-icon-1 {
+  animation-delay: 0.1s;
+  animation-duration: 0.36s;
+}
+
+[data-theme='night-hub'] .intro-icon-2 {
+  animation-delay: 0.46s;
+  animation-duration: 0.36s;
+}
+
+[data-theme='night-hub'] .intro-icon-3 {
+  animation-delay: 0.82s;
+  animation-duration: 0.36s;
+}
+
+[data-theme='night-hub'] .intro-icon-4 {
+  animation-delay: 1.18s;
+  animation-duration: 0.72s;
+}
+
+/* Курсор подъезжает снизу справа к «▶» и в 1,54 с нажимает (щелчок в звуке); от нажатия
+   расходится оранжевое кольцо. */
+[data-theme='night-hub'] .intro-cursor {
+  width: 34px;
+  height: 34px;
+  fill: #ffffff;
+  stroke: #000000;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  opacity: 0;
+  animation: night-hub-intro-cursor 0.72s ease-out 1.18s forwards;
+}
+
+[data-theme='night-hub'] .intro-ripple {
+  width: 104px;
+  height: 104px;
+  border: 3px solid #ff9000;
+  border-radius: 50%;
+  opacity: 0;
+  animation: night-hub-intro-ripple 0.42s ease-out 1.54s forwards;
+}
+
+[data-theme='night-hub'] .intro-mark {
+  display: flex;
+  align-items: center;
+  font-size: clamp(40px, 7vw, 86px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+[data-theme='night-hub'] .intro-word > span {
+  display: inline-block;
+  color: #ffffff;
+  opacity: 0;
+  animation: night-hub-intro-letter 0.22s ease-out forwards;
+  animation-delay: calc(1.9s + var(--i) * 0.06s);
+}
+
+[data-theme='night-hub'] .intro-plaque {
+  margin-left: 0.12em;
+  padding: 0.04em 0.16em 0.1em;
+  border-radius: 0.14em;
+  background: #ff9000;
+  color: #000000;
+  opacity: 0;
+  transform: scale(0.5);
+  animation: night-hub-intro-plaque 0.36s cubic-bezier(0.2, 1.6, 0.4, 1) 2.25s forwards;
+}
+
+[data-theme='night-hub'] .intro-sub {
+  margin-top: clamp(120px, 15vw, 190px);
+  color: #ffffff;
+  font-size: clamp(13px, 1.6vw, 20px);
+  letter-spacing: 0.5em;
+  text-transform: lowercase;
+}
+
+[data-theme='night-hub'] .intro-sub > span {
+  display: inline-block;
+  opacity: 0;
+  animation: night-hub-intro-letter 0.2s ease-out forwards;
+  animation-delay: calc(2.4s + var(--i) * 0.035s);
+}
+
+@keyframes night-hub-intro-fade {
+  0%, 82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes night-hub-intro-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  14% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  26% {
+    transform: scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes night-hub-intro-cursor {
+  0% {
+    opacity: 0;
+    transform: translate(80px, 70px);
+  }
+  20% {
+    opacity: 1;
+  }
+  40% {
+    transform: translate(18px, 22px) scale(1);
+  }
+  50% {
+    transform: translate(18px, 22px) scale(0.82);
+  }
+  58% {
+    transform: translate(18px, 22px) scale(1);
+  }
+  85% {
+    opacity: 1;
+    transform: translate(18px, 22px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(18px, 22px);
+  }
+}
+
+@keyframes night-hub-intro-ripple {
+  from {
+    opacity: 0.9;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes night-hub-intro-letter {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes night-hub-intro-plaque {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

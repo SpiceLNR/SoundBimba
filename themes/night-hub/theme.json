@@ -1,0 +1,15 @@
+{
+  "id": "night-hub",
+  "names": {
+    "ru": "Night Hub",
+    "en": "Night Hub",
+    "uk": "Night Hub"
+  },
+  "fonts": [
+    "Segoe UI",
+    "Nunito"
+  ],
+  "wires": "timeline",
+  "intro": true,
+  "order": 9
+}

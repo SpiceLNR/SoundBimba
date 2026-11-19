@@ -12,6 +12,7 @@ import { useT } from '../i18n';
 import { SetParams, useFullId } from './chipContext';
 import { MUTABLE } from '../volume';
 
+
 /** Значок динамика: со звуком — волны, без звука — крестик. */
 function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
@@ -130,7 +131,14 @@ function SoundNodeView({ id: localId, data, selected }: NodeProps<SoundNode>) {
           />
         )}
         <div className="sound-node-text">
-          <div className="sound-node-title">{t(`node.${data.kind}.title`)}</div>
+          {/* Метка у названия — показывают только темы, которые её рисуют (Night Hub): HD у
+              кнопок, LIVE у диктофона, пока идёт запись. */}
+          <div
+            className="sound-node-title"
+            data-badge={isButton ? t('node.badge.button') : rec?.recording ? t('node.badge.recording') : undefined}
+          >
+            {t(`node.${data.kind}.title`)}
+          </div>
           {sub && <div className={`sound-node-sub${problem ? ' problem' : ''}${rec?.recording ? ' recording' : ''}`}>{sub}</div>}
         </div>
       </div>
