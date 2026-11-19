@@ -18,6 +18,8 @@
 //! - Хор: три копии голоса с плавающими задержками 12–25 мс — «толпа» или многоголосое существо.
 //! - Эхо: повтор через 170 мс с затуханием.
 //! - Зал: реверберация (схема Freeverb: 8 гребенчатых и 4 всепропускающих фильтра) — пространство.
+//!   Чем слабее зал, тем он меньше: при малой силе — объём комнаты без отзвука (иначе в голосах с
+//!   «чуть-чуть зала» слышно эхо — автор, 2026-11-19), при полной — большой зал, как раньше.
 //!
 //! Сила каждого эффекта меняется плавно внутри блока — без щелчков. Буферы выделяются при
 //! компиляции графа; в обработке — только арифметика.
@@ -103,6 +105,8 @@ const ALLPASSES: [usize; 4] = [556, 441, 341, 225];
 /// Сдвиг длин правого канала — объём.
 const STEREO_SPREAD: usize = 23;
 const ROOM: f32 = 0.86;
+/// Размер зала при силе, близкой к 0 (отзвук ≈ 0,3 с); к силе 1 — растёт до ROOM (по квадрату силы).
+const ROOM_SMALL: f32 = 0.45;
 const DAMP: f32 = 0.3;
 const HALL_WET: f32 = 0.42;
 
@@ -488,10 +492,10 @@ impl Comb {
         Comb { buf: vec![0.0; len].into_boxed_slice(), pos: 0, store: 0.0 }
     }
 
-    fn run(&mut self, x: f32) -> f32 {
+    fn run(&mut self, x: f32, room: f32) -> f32 {
         let y = self.buf[self.pos];
         self.store = y * (1.0 - DAMP) + self.store * DAMP;
-        self.buf[self.pos] = x + self.store * ROOM;
+        self.buf[self.pos] = x + self.store * room;
         self.pos = (self.pos + 1) % self.buf.len();
         y
     }
@@ -542,9 +546,9 @@ impl Reverb {
         }
     }
 
-    fn run(&mut self, ch: usize, x: f32) -> f32 {
+    fn run(&mut self, ch: usize, x: f32, room: f32) -> f32 {
         let input = x * 0.015;
-        let mut y = self.combs[ch].iter_mut().map(|c| c.run(input)).sum::<f32>();
+        let mut y = self.combs[ch].iter_mut().map(|c| c.run(input, room)).sum::<f32>();
         for a in self.allpasses[ch].iter_mut() {
             y = a.run(y);
         }
@@ -711,6 +715,7 @@ impl State {
             let growl_now = self.growl.at(growl, f, frames);
             let chorus_now = self.chorus.at(chorus, f, frames);
             let hall_now = self.hall.at(hall, f, frames);
+            let room = ROOM - (ROOM - ROOM_SMALL) * (1.0 - hall_now * hall_now);
             let rough = 1.0 - 0.35 * growl_now * (0.5 + 0.5 * self.growl_phase.sin());
             for (ch, &y0) in v.iter().enumerate() {
                 let mut y = y0;
@@ -744,7 +749,7 @@ impl State {
                 y += delayed * ECHO_LEVEL * echo_now;
                 // Зал.
                 if hall_now > 0.0 {
-                    y += self.reverb.run(ch, y) * 3.0 * HALL_WET * hall_now;
+                    y += self.reverb.run(ch, y, room) * 3.0 * HALL_WET * hall_now;
                 }
                 // Эквалайзер.
                 if eq_low {
@@ -1218,6 +1223,11 @@ mod tests {
         let tail = rms(&out[RATE as usize / 2 * CHANNELS..RATE as usize * 3 / 4 * CHANNELS]);
         assert!(tail > 0.002, "хвост {tail}");
         assert!(out.iter().all(|v| v.abs() < 1.5));
+        // Слабый зал (как в «Легионе», «Демоне») — маленькая комната: через полсекунды тишина,
+        // а не эхо.
+        let small = run(&with(|p| p.hall.store(0.3)), &input);
+        let small_tail = rms(&small[RATE as usize / 2 * CHANNELS..RATE as usize * 3 / 4 * CHANNELS]);
+        assert!(small_tail < tail * 0.02, "слабый зал: хвост {small_tail} (полный {tail})");
     }
 
     #[test]
