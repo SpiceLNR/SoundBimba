@@ -6,6 +6,7 @@ import { CATEGORY_ORDER, KIND_ORDER, KINDS, lookOf, type NodeKind } from '../gra
 import { formatCombo, type Bindings } from '../hotkeys';
 import { useT } from '../i18n';
 import Dropdown from './Dropdown';
+import WindowControls, { dragWindow, dragWindowTouch, maximizeOnDoubleTap } from './WindowControls';
 
 export type SaveState = 'saved' | 'saving' | 'error';
 
@@ -40,7 +41,9 @@ export default function Toolbar(p: Props) {
     clear: p.onClear,
   };
   return (
-    <header className="toolbar">
+    // У окна нет системной рамки: пустое место панели — его заголовок (`app-region` в app.css;
+    // не сработал — запасной путь в WindowControls).
+    <header className="toolbar" data-drag onMouseDown={dragWindow} onPointerDown={dragWindowTouch} onDoubleClick={maximizeOnDoubleTap}>
       <div className="brand">{t('app.title')}</div>
       <button
         type="button"
@@ -118,6 +121,7 @@ export default function Toolbar(p: Props) {
           { items: [{ value: 'settings:open', label: t('toolbar.settings') }] },
         ]}
       />
+      <WindowControls />
     </header>
   );
 }

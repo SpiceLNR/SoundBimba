@@ -150,6 +150,43 @@ input[type='range']:focus-visible {
 .toolbar-gap {
   flex: 1;
   min-width: 8px;
+  align-self: stretch;
+}
+
+/* Пустое место верхней панели (и полосы кнопочной панели) — заголовок окна для самой Windows
+   (`app-region`, WebView2 123+): Windows двигает окно мышью и касанием (луч контроллера в Virtual
+   Desktop), прилипание к краям, «оторвать» развёрнутое, двойной щелчок — развернуть. Кнопки и
+   списки внутри — обычные, не заголовок. */
+.toolbar[data-drag],
+.panel-header[data-tauri-drag-region] {
+  app-region: drag;
+  /* Запасной путь (касание): браузер не должен считать это прокруткой — иначе обрывает касание. */
+  touch-action: none;
+}
+
+.toolbar :is(button, a, input, select, .dropdown, .dropdown-list),
+.panel-header :is(button, a, input, select) {
+  app-region: no-drag;
+}
+
+/* Кнопки окна (свернуть, развернуть, закрыть) — в правом конце панели, в стиле темы. */
+.window-controls {
+  display: flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.window-control {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 32px;
+  padding: 0;
+}
+
+.window-control.window-close:hover {
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 /* Выпадающие списки панели (свои, не системные — оформлены по теме). */
