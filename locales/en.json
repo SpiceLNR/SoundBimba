@@ -124,6 +124,9 @@
   "settings.voice": "Voice changer tuned to your voice",
   "settings.voiceHint": "To tune again, use the voice changer side panel (“Tune to my voice”).",
   "settings.panelFrame": "Frame around the button panel",
+  "settings.window": "Window",
+  "settings.closeToTray": "The close button hides the window to the tray",
+  "settings.closeToTrayHint": "Sound keeps working. Click the SoundBimba icon near the clock to bring the window back; to quit completely, right-click the icon → “Quit”.",
   "settings.recordings": "Recorder files",
   "settings.recordingsHint": "The last recording of each recorder is kept here. Save the ones you need with “Save to file…” — a new recording replaces the old one.",
   "settings.recordingsOpen": "Open the recordings folder",
@@ -455,5 +458,8 @@
   "reason.recorder-no-take": "there is no recording yet",
   "reason.recorder-no-device": "the listening device was not found",
   "reason.recorder-play": "could not open the listening device",
-  "reason.recorder-io": "could not write the file (disk full?)"
+  "reason.recorder-io": "could not write the file (disk full?)",
+  "tray.show": "Show SoundBimba",
+  "tray.quit": "Quit",
+  "tray.tooltip": "SoundBimba"
 }

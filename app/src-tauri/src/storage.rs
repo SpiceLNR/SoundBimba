@@ -74,6 +74,9 @@ pub struct Settings {
     /// Высота голоса человека, Гц (подстройка морфера); None — не подстроено (средний голос).
     #[serde(default)]
     pub voice_f0: Option<f32>,
+    /// Крестик основного окна прячет его в трей (звук работает дальше), а не закрывает программу.
+    #[serde(default = "default_true")]
+    pub close_to_tray: bool,
 }
 
 fn default_true() -> bool {
@@ -102,6 +105,7 @@ impl Default for Settings {
             current_template: None,
             vr_steady: true,
             voice_f0: None,
+            close_to_tray: true,
         }
     }
 }

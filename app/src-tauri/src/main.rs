@@ -12,6 +12,7 @@ mod recorder;
 mod routes;
 mod storage;
 mod templates;
+mod tray;
 mod zip;
 
 use std::fs;
@@ -23,6 +24,7 @@ use serde::Serialize;
 use audio::Audio;
 use storage::{Paths, Settings};
 use templates::{TemplateError, UserTemplate};
+use tray::{Tray, TrayTexts};
 use tauri::{Emitter, Manager, RunEvent, State};
 
 struct AppState {
@@ -255,9 +257,10 @@ fn list_audio_apps() -> Result<Vec<AppDto>, CmdError> {
 }
 
 #[tauri::command]
-fn save_settings(app: tauri::AppHandle, state: State<AppState>, audio: State<Audio>, settings: Settings) -> Result<(), CmdError> {
+fn save_settings(app: tauri::AppHandle, state: State<AppState>, audio: State<Audio>, tray: State<Tray>, settings: Settings) -> Result<(), CmdError> {
     let _ = app.emit("settings-changed", &settings);
     audio.set_vd_steady(settings.vr_steady);
+    tray.set_close_to_tray(settings.close_to_tray);
     let text = serde_json::to_string_pretty(&settings).map_err(|e| CmdError::new("io", e))?;
     let _guard = state.write_lock.lock().unwrap();
     storage::write_atomic(&state.paths.settings, &text).map_err(|e| CmdError::new("io", e))
@@ -361,6 +364,12 @@ fn save_diagnostics(state: State<AppState>, audio: State<Audio>, path: String, u
     Ok(())
 }
 
+/// Подписи значка в трее на языке интерфейса; первый вызов создаёт значок.
+#[tauri::command]
+fn set_tray(app: tauri::AppHandle, tray: State<Tray>, texts: TrayTexts) -> Result<(), CmdError> {
+    tray.set_texts(&app, texts).map_err(|e| CmdError::new("io", e))
+}
+
 /// Ошибки и события интерфейса — в общий журнал.
 #[tauri::command]
 fn log_ui(level: String, message: String) {
@@ -376,6 +385,7 @@ fn main() {
         winaudio::system::windows_info().summary()
     ));
     std::panic::set_hook(Box::new(|info| applog::error(&format!("panic: {info}"))));
+    let close_to_tray = storage::load_settings(&paths).close_to_tray;
 
     tauri::Builder::default()
         // Одна копия программы: вторая (например, двойной щелчок по .bmb при открытой программе)
@@ -386,12 +396,11 @@ fn main() {
             if !templates.is_empty() || !errors.is_empty() {
                 let _ = app.emit_to("main", "templates-opened", OpenedDto { templates, errors });
             }
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.set_focus();
-            }
+            // Окно могло быть спрятано в трей.
+            tray::show_main(app);
         }))
         .plugin(tauri_plugin_dialog::init())
+        .manage(Tray::new(close_to_tray))
         .manage(AppState { paths, write_lock: Mutex::new(()), opened: Mutex::new(OpenedDto::default()) })
         .setup(|app| {
             // Двойной щелчок по .bmb при закрытой программе: файл приходит аргументом запуска.
@@ -432,9 +441,19 @@ fn main() {
             delete_template,
             import_template,
             export_template,
-            take_opened_templates
+            take_opened_templates,
+            set_tray
         ])
         .on_window_event(|window, event| {
+            // Крестик (и Alt+F4) основного окна — спрятать в трей, если так выбрано.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" && window.state::<Tray>().hides_on_close() {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    applog::info("main window hidden to the tray");
+                    return;
+                }
+            }
             // Закрыли основное окно — закрываем и кнопочную панель, иначе программа не выйдет.
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 if let Some(panel) = window.app_handle().get_webview_window("buttons") {

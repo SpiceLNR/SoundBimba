@@ -263,6 +263,11 @@ export default function Workspace({ project, version, settings, lang, onSettings
     return () => cancelAnimationFrame(h);
   }, [levelKey, updateNodeInternals]);
 
+  // Значок в трее: подписи на языке интерфейса (первый раз — создать значок).
+  useEffect(() => {
+    api.setTray({ show: t('tray.show'), quit: t('tray.quit'), tooltip: t('tray.tooltip') }).catch(() => {});
+  }, [t]);
+
   // В простом режиме — весь проект: открытые микросхемы закрываем.
   useEffect(() => {
     if (settings.mode === 'simple' && stack.length) exitTo(0);

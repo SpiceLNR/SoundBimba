@@ -13,6 +13,7 @@ Keep this list up to date: every dependency and bundled resource must appear her
 | nsis-tauri-utils | Helper plugin inside the installer | MIT or Apache-2.0 | https://github.com/tauri-apps/nsis-tauri-utils |
 | Microsoft Edge WebView2 Runtime | UI engine (offline installer bundled in installer) | Microsoft redistributable terms | https://developer.microsoft.com/microsoft-edge/webview2 |
 | Tauri single-instance plugin (`tauri-plugin-single-instance`) | One running copy; passes .bmb files opened in Explorer to it | MIT or Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
+| Tray icon (`tray-icon`, `muda`; Tauri feature `tray-icon`) | Icon near the clock with "Show" / "Quit" menu | MIT or Apache-2.0 | https://github.com/tauri-apps/tray-icon |
 | Tauri dialog plugin (`tauri-plugin-dialog`, `@tauri-apps/plugin-dialog`) | File dialogs for export, import, diagnostics | MIT or Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
 | serde, serde_json | Project file (de)serialization | MIT or Apache-2.0 | https://github.com/serde-rs |
 | rtrb | Real-time safe ring buffers between audio devices and the engine | MIT or Apache-2.0 | https://github.com/mgeier/rtrb |

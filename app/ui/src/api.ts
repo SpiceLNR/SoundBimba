@@ -25,6 +25,8 @@ export interface Settings {
   vrSteady?: boolean;
   /** Высота голоса человека, Гц (подстройка морфера); нет — средний голос. */
   voiceF0?: number | null;
+  /** Крестик прячет основное окно в трей, звук работает дальше (по умолчанию — да). */
+  closeToTray?: boolean;
 }
 
 /** Замер голоса для подстройки морфера. */
@@ -339,5 +341,7 @@ export const api = {
   /** Открыть папку с записями диктофонов в Проводнике. */
   openRecordings: () => call<void>('open_recordings_folder'),
   getUiState: () => call<UiState>('get_ui_state'),
+  /** Подписи значка в трее (первый вызов создаёт значок). */
+  setTray: (texts: { show: string; quit: string; tooltip: string }) => call<void>('set_tray', { texts }),
   log: (level: 'info' | 'error', message: string) => call<void>('log_ui', { level, message }).catch(() => {}),
 };

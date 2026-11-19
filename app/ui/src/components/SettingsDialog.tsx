@@ -109,6 +109,14 @@ export default function SettingsDialog({ lang, settings, bindings, onSettings, o
                   />
                 </div>
                 <div className="field">
+                  <span>{t('settings.window')}</span>
+                  <label className="check">
+                    <input type="checkbox" checked={settings.closeToTray !== false} onChange={(e) => set({ closeToTray: e.target.checked })} />
+                    <span>{t('settings.closeToTray')}</span>
+                  </label>
+                  <p className="panel-hint">{t('settings.closeToTrayHint')}</p>
+                </div>
+                <div className="field">
                   <span>{t('buttons.open')}</span>
                   <label className="check">
                     <input type="checkbox" checked={settings.panelFrame !== false} onChange={(e) => set({ panelFrame: e.target.checked })} />
