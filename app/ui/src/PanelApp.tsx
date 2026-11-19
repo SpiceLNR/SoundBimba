@@ -40,10 +40,13 @@ export default function PanelApp() {
   }, []);
 
   const frame = settings.panelFrame !== false;
+  // Рамку меняют и здесь, и в окне «Настройки» основного окна — окно панели следует за настройкой.
+  useEffect(() => {
+    if (inTauri) void getCurrentWindow().setDecorations(frame);
+  }, [frame]);
   const toggleFrame = async () => {
     const next = { ...settings, panelFrame: !frame };
     setSettings(next);
-    if (inTauri) await getCurrentWindow().setDecorations(!frame);
     await api.saveSettings(next);
   };
 

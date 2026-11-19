@@ -55,7 +55,7 @@ import TraceEdge from './TraceEdge';
 import NeonEdge from './NeonEdge';
 import MagicEdge from './MagicEdge';
 import CableWizard from './CableWizard';
-import HotkeysDialog from './HotkeysDialog';
+import SettingsDialog from './SettingsDialog';
 import type { Notify } from './Notices';
 import SidePanel from './SidePanel';
 import SimpleView from './SimpleView';
@@ -91,7 +91,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
   const [stack, setStack] = useState<ChipLevel[]>([]);
   const inChip = stack.length > 0;
   const [saveState, setSaveState] = useState<SaveState>('saved');
-  const [hotkeysOpen, setHotkeysOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [freshTemplates, setFreshTemplates] = useState<string[]>([]);
   const [cableOpen, setCableOpen] = useState(false);
@@ -106,7 +106,7 @@ export default function Workspace({ project, version, settings, lang, onSettings
   }, []);
   const hideWireTip = useCallback(() => setWireTip(null), []);
   const welcome = !settings.welcomeDone;
-  const dialogOpen = hotkeysOpen || templatesOpen || cableOpen || clearOpen || welcome;
+  const dialogOpen = settingsOpen || templatesOpen || cableOpen || clearOpen || welcome;
   const mapRef = useRef<HTMLDivElement>(null);
   const bindings = useMemo(() => mergeBindings(settings.hotkeys), [settings.hotkeys]);
 
@@ -443,22 +443,6 @@ export default function Workspace({ project, version, settings, lang, onSettings
     [onSettings, settings],
   );
 
-  const [measuring, setMeasuring] = useState(false);
-  const onLatency = useCallback(async () => {
-    if (measuring) return;
-    setMeasuring(true);
-    notify('notice.latencyMeasuring');
-    try {
-      const l = await api.measureLatency();
-      notify('notice.latency', { output: Math.round(l.outputMs), total: Math.round(l.outputMs + l.inputEstimateMs) });
-    } catch (e) {
-      const code = isCmdError(e) ? e.code : 'other';
-      notify(code === 'no-cable' ? 'error.latencyNoCable' : 'error.latency', undefined, true);
-    } finally {
-      setMeasuring(false);
-    }
-  }, [measuring, notify]);
-
   // Кнопочная панель: отдельное окно поверх остальных; если уже открыто — показать его.
   const openPanel = useCallback(async () => {
     if (!('__TAURI_INTERNALS__' in window)) {
@@ -510,7 +494,6 @@ export default function Workspace({ project, version, settings, lang, onSettings
     <VoiceProfileContext.Provider value={voiceProfile}>
       <div className="workspace">
         <Toolbar
-          lang={lang}
           settings={settings}
           saveState={saveState}
           bindings={bindings}
@@ -520,12 +503,10 @@ export default function Workspace({ project, version, settings, lang, onSettings
           onExport={() => void onExport()}
           onImport={() => void onImport()}
           onDiagnostics={() => void onDiagnostics()}
-          onLatency={() => void onLatency()}
-          onHotkeys={() => setHotkeysOpen(true)}
           onTemplates={() => setTemplatesOpen(true)}
-          onCable={() => setCableOpen(true)}
           onClear={() => setClearOpen(true)}
           onSettings={onSettings}
+          onOpenSettings={() => setSettingsOpen(true)}
           onOpenPanel={() => void openPanel()}
           simple={settings.mode === 'simple'}
           inChip={inChip}
@@ -654,6 +635,18 @@ export default function Workspace({ project, version, settings, lang, onSettings
             reason={reason}
           />
         )}
+        {settingsOpen && (
+          <SettingsDialog
+            lang={lang}
+            settings={settings}
+            bindings={bindings}
+            onSettings={onSettings}
+            onBindings={changeBindings}
+            onCable={() => setCableOpen(true)}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+        {/* После настроек: мастер кабеля открывается из них поверх. */}
         {cableOpen && <CableWizard onClose={() => setCableOpen(false)} />}
         {clearOpen && (
           <div className="dialog-backdrop">
@@ -687,7 +680,6 @@ export default function Workspace({ project, version, settings, lang, onSettings
             onClose={closeWelcome}
           />
         )}
-        {hotkeysOpen && <HotkeysDialog bindings={bindings} onChange={changeBindings} onClose={() => setHotkeysOpen(false)} />}
       </div>
     </VoiceProfileContext.Provider>
   );

@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Верхняя панель — одна строка: слева работа с картой, справа «Проект», «Клавиши» и «Настройки»
-// (язык и тема).
+// Верхняя панель — одна строка: слева работа с картой, справа «Проект» и «Параметры» (режим,
+// кнопочная панель и «Настройки…» — окно: язык, тема, звук, клавиши).
 import type { Settings } from '../api';
 import { CATEGORY_ORDER, KIND_ORDER, KINDS, lookOf, type NodeKind } from '../graph';
 import { formatCombo, type Bindings } from '../hotkeys';
-import { LANGUAGES, isLang, useT, type Lang } from '../i18n';
-import { THEMES } from '../theme';
+import { useT } from '../i18n';
 import Dropdown from './Dropdown';
 
 export type SaveState = 'saved' | 'saving' | 'error';
 
 interface Props {
-  lang: Lang;
   settings: Settings;
   saveState: SaveState;
   bindings: Bindings;
@@ -21,12 +19,10 @@ interface Props {
   onExport: () => void;
   onImport: () => void;
   onDiagnostics: () => void;
-  onLatency: () => void;
-  onHotkeys: () => void;
   onTemplates: () => void;
-  onCable: () => void;
   onClear: () => void;
   onSettings: (s: Settings) => void;
+  onOpenSettings: () => void;
   onOpenPanel: () => void;
   /** Простой режим: без кнопок работы с картой. */
   simple: boolean;
@@ -40,9 +36,7 @@ export default function Toolbar(p: Props) {
     import: p.onImport,
     export: p.onExport,
     diagnostics: p.onDiagnostics,
-    latency: p.onLatency,
     templates: p.onTemplates,
-    cable: p.onCable,
     clear: p.onClear,
   };
   return (
@@ -91,30 +85,23 @@ export default function Toolbar(p: Props) {
           {
             items: [
               { value: 'templates', label: t('toolbar.templates') },
-              { value: 'cable', label: t('toolbar.cable') },
               { value: 'import', label: t('toolbar.import') },
               { value: 'export', label: t('toolbar.export') },
-              { value: 'latency', label: t('toolbar.latency') },
               { value: 'diagnostics', label: t('toolbar.diagnostics') },
               { value: 'clear', label: t('toolbar.clear') },
             ],
           },
         ]}
       />
-      <button type="button" onClick={p.onHotkeys}>
-        {t('toolbar.hotkeys')}
-      </button>
       <Dropdown
-        label={t('toolbar.settings')}
+        label={t('toolbar.params')}
         fit
         align="right"
         onSelect={(v) => {
           const [what, value] = v.split(':');
-          if (what === 'lang') p.onSettings({ ...p.settings, language: isLang(value) ? value : null });
-          if (what === 'theme') p.onSettings({ ...p.settings, theme: value });
           if (what === 'mode') p.onSettings({ ...p.settings, mode: value === 'simple' ? 'simple' : 'expert' });
-          if (what === 'vr') p.onSettings({ ...p.settings, vrSteady: value === 'steady' });
           if (what === 'window') p.onOpenPanel();
+          if (what === 'settings') p.onOpenSettings();
         }}
         groups={[
           {
@@ -125,31 +112,10 @@ export default function Toolbar(p: Props) {
             ],
           },
           {
-            title: t('toolbar.vr'),
-            items: [
-              { value: 'vr:steady', label: t('vr.steady'), selected: p.settings.vrSteady !== false },
-              { value: 'vr:fast', label: t('vr.fast'), selected: p.settings.vrSteady === false },
-            ],
-          },
-          {
             title: t('toolbar.windows'),
             items: [{ value: 'window:buttons', label: t('buttons.open') }],
           },
-          {
-            title: t('toolbar.language'),
-            items: [
-              { value: 'lang:system', label: t('toolbar.languageSystem'), selected: !p.settings.language },
-              ...LANGUAGES.map((l) => ({ value: `lang:${l}`, label: t(`lang.${l}`), selected: p.settings.language === l })),
-            ],
-          },
-          {
-            title: t('toolbar.theme'),
-            items: THEMES.map((th) => ({
-              value: `theme:${th.id}`,
-              label: th.names[p.lang] ?? th.names.en,
-              selected: th.id === p.settings.theme,
-            })),
-          },
+          { items: [{ value: 'settings:open', label: t('toolbar.settings') }] },
         ]}
       />
     </header>

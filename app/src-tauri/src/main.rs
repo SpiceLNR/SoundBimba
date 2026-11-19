@@ -135,6 +135,15 @@ fn recorder_save(audio: State<Audio>, node_id: String, path: String) -> Result<(
     audio.recorders().save(&node_id, std::path::Path::new(&path)).map_err(|e| CmdError::new("io", e))
 }
 
+/// Открыть папку с записями диктофонов в Проводнике (настройки → «Записи»).
+#[tauri::command]
+fn open_recordings_folder(state: State<AppState>) -> Result<(), CmdError> {
+    let dir = state.paths.dir.join("recordings");
+    fs::create_dir_all(&dir).map_err(|e| CmdError::new("io", e))?;
+    std::process::Command::new("explorer").arg(&dir).spawn().map_err(|e| CmdError::new("io", e))?;
+    Ok(())
+}
+
 /// Включить или выключить звук (сама настройка сохраняется вместе с остальными).
 #[tauri::command]
 fn set_audio_enabled(audio: State<Audio>, enabled: bool) {
@@ -415,6 +424,7 @@ fn main() {
             recorder_stop_listening,
             recorder_seek,
             recorder_save,
+            open_recordings_folder,
             get_ui_state,
             list_templates,
             save_template,

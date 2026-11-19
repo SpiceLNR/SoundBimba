@@ -39,6 +39,10 @@ describe('themes', () => {
     }
   });
 
+  it('every theme has a picture for «Settings → Theme» (tools/theme-previews.ps1)', () => {
+    for (const t of THEMES) expect(readdirSync(join(dir, t.id)), t.id).toContain('preview.jpg');
+  });
+
   it('each theme scopes its variables to its own data-theme', () => {
     for (const t of THEMES) expect(readFileSync(join(dir, t.id, 'theme.css'), 'utf8')).toContain(`[data-theme='${t.id}']`);
   });

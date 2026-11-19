@@ -64,6 +64,8 @@
 - Портативная версия (zip: программа, памятка `packaging/portable/README.txt`, лицензии): после
   сборки — `powershell -File tools/portable.ps1` (из корня) → `target\release\portable\`.
 elease\portable\`.
+- Снимки тем для «Настройки → Тема»: при запущенном `npm run dev` — `powershell -File tools/theme-previews.ps1`
+  (из корня) → `themes/<тема>/preview.jpg`. Поменяли вид темы — переснять.
 - Запуск для разработки: в `app` — `npx tauri dev`. Посмотреть интерфейс без Tauri (в браузере,
   с заглушкой вместо Rust): `npm run dev` в `app`, открыть http://localhost:5173.
 - Тесты: `cargo test --workspace` и `npm test` (в `app`); стиль: `cargo clippy --workspace --all-targets`,

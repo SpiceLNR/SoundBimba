@@ -146,13 +146,16 @@
 }
 
 /* Кнопки-значки (окно шаблонов): плоские кнопки темы без фона и рамки — значок висел бы в
-   пустоте, поэтому у него заливка-плитка и тонкая рамка; при наведении — рамка цвета акцента. */
-[data-theme='engineer'] .icon-button:not(.primary) {
+   пустоте, поэтому у него заливка-плитка и тонкая рамка; при наведении — рамка цвета акцента.
+   Так же — сочетание во вкладке «Клавиши» (по нему щёлкают, чтобы изменить). */
+[data-theme='engineer'] .icon-button:not(.primary),
+[data-theme='engineer'] .hotkey-combo {
   background: var(--border);
   border: 1px solid var(--border);
 }
 
-[data-theme='engineer'] .icon-button:not(.primary):hover:not(:disabled) {
+[data-theme='engineer'] .icon-button:not(.primary):hover:not(:disabled),
+[data-theme='engineer'] .hotkey-combo:hover {
   border-color: var(--accent);
   color: var(--accent);
 }

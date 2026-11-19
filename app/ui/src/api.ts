@@ -151,6 +151,8 @@ export function isCmdError(e: unknown): e is CmdError {
 // Только при разработке: интерфейс открыт в обычном браузере (без Tauri) — подставляем заглушку,
 // чтобы проверить вид. В выпускную сборку этот код не попадает (import.meta.env.DEV = false).
 const browserPreview = import.meta.env.DEV && !('__TAURI_INTERNALS__' in window);
+// Снимки тем (tools/theme-previews.ps1): ?shot=<тема> — эта тема, звук включён, без приветствия.
+const shot = browserPreview ? new URLSearchParams(window.location.search).get('shot') : null;
 
 const previewProject: Project = {
   schema: 1,
@@ -176,7 +178,7 @@ const previewDevices: AudioDevice[] = [
   { id: 'cabo', name: 'CABLE Output (VB-Audio Virtual Cable)', render: false, isDefault: false, cable: 'VB-CABLE' },
 ];
 
-let previewEnabled = false;
+let previewEnabled = shot !== null;
 const previewTemplates: UserTemplate[] = [];
 const previewPlaying: Record<string, ButtonPlayback> = {};
 const previewRecorders: Record<string, RecorderInfo> = {};
@@ -185,7 +187,12 @@ let previewPlayer: PlayerInfo | null = null;
 function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!browserPreview) return invoke<T>(cmd, args);
   const answers: Record<string, unknown> = {
-    load_state: { project: previewProject, settings: { language: null, theme: 'bimba' }, recoveredFrom: null, version: 'dev' },
+    load_state: {
+      project: previewProject,
+      settings: shot ? { language: 'ru', theme: shot, welcomeDone: true, audioEnabled: true } : { language: null, theme: 'bimba' },
+      recoveredFrom: null,
+      version: 'dev',
+    },
     list_audio_devices: previewDevices,
     measure_latency: { outputMs: 41.3, inputEstimateMs: 25 },
     measure_voice: { medianHz: 128, lowHz: 108, highHz: 162 },
@@ -329,6 +336,8 @@ export const api = {
   recorderStopListening: () => call<void>('recorder_stop_listening'),
   recorderSeek: (fraction: number) => call<void>('recorder_seek', { fraction }),
   recorderSave: (nodeId: string, path: string) => call<void>('recorder_save', { nodeId, path }),
+  /** Открыть папку с записями диктофонов в Проводнике. */
+  openRecordings: () => call<void>('open_recordings_folder'),
   getUiState: () => call<UiState>('get_ui_state'),
   log: (level: 'info' | 'error', message: string) => call<void>('log_ui', { level, message }).catch(() => {}),
 };

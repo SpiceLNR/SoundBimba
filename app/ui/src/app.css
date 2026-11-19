@@ -708,7 +708,107 @@ button.crumb:hover {
   line-height: 1;
 }
 
-/* Окно «Клавиши». */
+/* Окно «Настройки»: вкладки слева, страница справа. */
+.settings-dialog {
+  width: min(860px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 32px));
+  overflow: hidden;
+}
+
+.settings-body {
+  display: flex;
+  gap: 18px;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+  width: 150px;
+}
+
+.settings-tabs button {
+  text-align: left;
+}
+
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-choice button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+
+.settings-choice-hint {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+/* Темы — снимками: щелчок по снимку включает тему сразу. */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  text-align: left;
+}
+
+.theme-card img,
+.theme-card-empty {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: var(--radius-small);
+}
+
+.theme-card-empty {
+  background: var(--bg);
+}
+
+.theme-card.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.theme-card-name {
+  font-weight: 700;
+}
+
+/* Вкладка «Клавиши»: название, сочетание (щелчок — изменить), крестик (отключить). */
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -738,22 +838,45 @@ button.crumb:hover {
   gap: 6px;
 }
 
+.hotkey-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hotkey-group-title {
+  margin: 4px 0 0;
+  font-size: 1em;
+  color: var(--text);
+}
+
 .hotkey-row {
   display: grid;
-  grid-template-columns: 1fr 150px auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, auto) auto;
   align-items: center;
   gap: 8px;
 }
 
-.hotkey-combo {
-  padding: 5px 10px;
-  text-align: center;
-  background: var(--surface-2);
-  border-radius: var(--radius-small);
+.hotkey-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.hotkey-none {
+.hotkey-combo {
+  min-width: 120px;
+  padding: 5px 10px;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.hotkey-combo.hotkey-none {
   color: var(--text-muted);
+}
+
+.hotkey-combo.capturing {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 .dialog-actions {
