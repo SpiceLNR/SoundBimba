@@ -22,6 +22,9 @@ const SETTINGS: Partial<Record<NodeKind, Record<string, unknown>>> = {
     // Свои голоса и убранные готовые — тоже в шаблоне.
     voices: [{ id: 'c1', name: 'Мой бас', params: { pitch: -4, robot: 0.3, radio: 0, echo: 0, wobble: 0 } }],
     hiddenVoices: ['cave'],
+    // Какой голос выбран последним (его можно перезаписать) и перезаписанные готовые — тоже.
+    lastVoice: 'c1',
+    voiceOverrides: { alien: { pitch: 5, robot: 0, radio: 0, echo: 0.6, wobble: 0.2 } },
   },
   denoise: { amount: 0.4 },
   'speaker-out': { device: 'phones-1' },

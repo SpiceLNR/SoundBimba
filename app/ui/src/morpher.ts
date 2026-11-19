@@ -81,8 +81,9 @@ export interface CustomVoice {
   params: Effects;
 }
 
-/** Голос в списке: готовый (название из перевода) или свой (название, которое дал человек). */
-export type ShownVoice = { id: string; params: Effects } & ({ custom: false } | { custom: true; name: string });
+/** Голос в списке: готовый (название из перевода; `changed` — перезаписан в этом узле) или свой
+ *  (название, которое дал человек). */
+export type ShownVoice = { id: string; params: Effects } & ({ custom: false; changed: boolean } | { custom: true; name: string });
 
 /** «Обычный» убрать нельзя: им голос возвращается к исходному. */
 export const KEEP_VOICE = 'normal';
@@ -107,11 +108,33 @@ export function hiddenVoices(params: Params): string[] {
   return Array.isArray(params.hiddenVoices) ? params.hiddenVoices.filter((x): x is string => typeof x === 'string') : [];
 }
 
-/** Голоса в списке узла: готовые (кроме убранных), затем свои. */
+/**
+ * Перезаписанные готовые голоса этого узла (`params.voiceOverrides`: id → сила эффектов). Сами
+ * готовые голоса в программе не меняются — перезапись живёт в узле (значит, и в шаблоне) и
+ * снимается «Вернуть как было». «Обычный» не перезаписывается: им голос возвращается к исходному.
+ */
+export function voiceOverrides(params: Params): Record<string, Effects> {
+  const raw = params.voiceOverrides;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+  const out: Record<string, Effects> = {};
+  for (const [id, p] of Object.entries(raw as Record<string, unknown>)) {
+    if (id !== KEEP_VOICE && VOICES.some((v) => v.id === id) && typeof p === 'object' && p !== null) out[id] = effectsOf(p as Params);
+  }
+  return out;
+}
+
+/** Голоса в списке узла: готовые (кроме убранных; перезаписанные — с настройкой узла), затем свои. */
 export function voicesOf(params: Params): ShownVoice[] {
   const hidden = new Set(hiddenVoices(params));
+  const changed = voiceOverrides(params);
   return [
-    ...VOICES.filter((v) => v.id === KEEP_VOICE || !hidden.has(v.id)).map((v) => ({ ...v, params: adapted(v.params), custom: false as const })),
+    ...VOICES.filter((v) => v.id === KEEP_VOICE || !hidden.has(v.id)).map((v) => ({
+      ...v,
+      // Перезаписанный голос — ровно как его настроили (под голос человека уже не подстраивается).
+      params: changed[v.id] ?? adapted(v.params),
+      custom: false as const,
+      changed: v.id in changed,
+    })),
     ...customVoices(params).map((v) => ({ ...v, custom: true as const })),
   ];
 }
@@ -122,12 +145,44 @@ export function voiceOf(params: Params): string | null {
   return voicesOf(params).find((v) => KEYS.every((k) => now[k] === v.params[k]))?.id ?? null;
 }
 
-/** Сохранить текущую настройку как свой голос. */
+/** Сохранить текущую настройку как свой голос (он же становится последним выбранным). */
 export function addVoice(params: Params, name: string): Params {
   const list = customVoices(params);
   let n = list.length + 1;
   while (list.some((v) => v.id === `c${n}`)) n++;
-  return { voices: [...list, { id: `c${n}`, name: name.trim(), params: effectsOf(params) }] };
+  return { voices: [...list, { id: `c${n}`, name: name.trim(), params: effectsOf(params) }], lastVoice: `c${n}` };
+}
+
+/** Какой голос выбрали последним (`params.lastVoice`): его настройку можно перезаписать.
+ *  Хранится в узле — значит, и в шаблоне; движок его не читает. */
+export function lastVoice(params: Params): string | null {
+  return typeof params.lastVoice === 'string' ? params.lastVoice : null;
+}
+
+/** Голос, который можно перезаписать: последний выбранный (свой или готовый, кроме «Обычного»),
+ *  ползунки с тех пор изменены. */
+export function overwritable(params: Params): ShownVoice | null {
+  const last = lastVoice(params);
+  if (last === null || last === KEEP_VOICE || voiceOf(params) !== null) return null;
+  return voicesOf(params).find((v) => v.id === last) ?? null;
+}
+
+/** Перезаписать голос `id` текущей настройкой: свой — в списке своих (название и место прежние),
+ *  готовый — в перезаписях этого узла. */
+export function overwriteVoice(params: Params, id: string): Params {
+  if (id === KEEP_VOICE) return {};
+  if (VOICES.some((v) => v.id === id)) {
+    return { voiceOverrides: { ...voiceOverrides(params), [id]: effectsOf(params) }, lastVoice: id };
+  }
+  return { voices: customVoices(params).map((v) => (v.id === id ? { ...v, params: effectsOf(params) } : v)), lastVoice: id };
+}
+
+/** Перезаписанный готовый голос `id` — как было в программе (и сразу выбрать его). */
+export function resetVoice(params: Params, id: string): Params {
+  const original = VOICES.find((v) => v.id === id);
+  if (!original) return {};
+  const { [id]: _gone, ...rest } = voiceOverrides(params);
+  return { ...adapted(original.params), voiceOverrides: rest, lastVoice: id };
 }
 
 /** Убрать голос: свой — удаляется, готовый — прячется (его можно вернуть). */

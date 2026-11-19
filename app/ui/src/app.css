@@ -937,6 +937,19 @@ button:disabled {
   fill: var(--text-muted);
 }
 
+/* Перезаписанный в этой схеме готовый голос — точка после названия. */
+.voice-chip.changed > button::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+  vertical-align: middle;
+}
+
 /* «Диктофон»: круглая кнопка записи — красная точка; во время записи — квадрат и пульсирующее кольцо. */
 .record-button {
   display: inline-grid;

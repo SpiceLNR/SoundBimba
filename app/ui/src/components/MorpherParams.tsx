@@ -5,7 +5,7 @@ import { useReactFlow } from '@xyflow/react';
 import { useState } from 'react';
 import type { Params, SoundNode } from '../graph';
 import { useT } from '../i18n';
-import { addVoice, hiddenVoices, KEEP_VOICE, removeVoice, restoreVoices, voiceName, voiceOf, voicesOf } from '../morpher';
+import { addVoice, hiddenVoices, KEEP_VOICE, lastVoice, overwritable, overwriteVoice, removeVoice, resetVoice, restoreVoices, voiceName, voiceOf, voicesOf } from '../morpher';
 import IconButton from './IconButton';
 import VoiceCalibration from './VoiceCalibration';
 import { useVoiceProfile } from './voiceProfile';
@@ -22,7 +22,13 @@ export function VoicePicker({ params, onPick, editable }: { params: Params; onPi
   const voices = voicesOf(params);
   const [naming, setNaming] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [overwriting, setOverwriting] = useState(false);
   const hidden = hiddenVoices(params).length;
+  // Голос, выбранный последним и с тех пор изменённый ползунками, — его можно перезаписать.
+  const target = editable ? overwritable(params) : null;
+  const targetName = target ? voiceName(target, t) : '';
+  // Последний выбранный — перезаписанный готовый: его можно вернуть как было.
+  const changed = editable ? voices.find((v) => v.id === lastVoice(params) && !v.custom && v.changed) : undefined;
   const save = () => {
     if (naming?.trim()) onPick(addVoice(params, naming.slice(0, MAX_NAME)));
     setNaming(null);
@@ -55,13 +61,16 @@ export function VoicePicker({ params, onPick, editable }: { params: Params; onPi
             );
           }
           return (
-            <span key={v.id} className={`voice-chip${editable && v.id !== KEEP_VOICE ? ' removable' : ''}`}>
+            <span
+              key={v.id}
+              className={`voice-chip${editable && v.id !== KEEP_VOICE ? ' removable' : ''}${!v.custom && v.changed ? ' changed' : ''}`}
+            >
               <button
                 type="button"
                 className={active === v.id ? 'primary' : undefined}
                 aria-pressed={active === v.id}
-                title={v.custom ? t('voice.customHint') : t(`voice.${v.id}.hint`)}
-                onClick={() => onPick(v.params)}
+                title={v.custom ? t('voice.customHint') : `${t(`voice.${v.id}.hint`)}${v.changed ? `. ${t('voice.changedHint')}` : ''}`}
+                onClick={() => onPick({ ...v.params, lastVoice: v.id })}
               >
                 {name}
               </button>
@@ -74,10 +83,36 @@ export function VoicePicker({ params, onPick, editable }: { params: Params; onPi
       </div>
       {editable && (
         <div className="voice-tools">
-          {naming === null ? (
-            <button type="button" disabled={active !== null} title={active !== null ? t('voice.saveSame') : undefined} onClick={() => setNaming('')}>
-              {t('voice.save')}
-            </button>
+          {naming === null && target && overwriting ? (
+            <span className="voice-confirm" role="group" aria-label={t('voice.overwriteAsk', { name: targetName })}>
+              <span className="voice-confirm-text">{t('voice.overwriteAsk', { name: targetName })}</span>
+              <span className="voice-confirm-buttons">
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => {
+                    setOverwriting(false);
+                    onPick(overwriteVoice(params, target.id));
+                  }}
+                >
+                  {t('voice.overwriteYes')}
+                </button>
+                <button type="button" onClick={() => setOverwriting(false)}>
+                  {t('voice.cancel')}
+                </button>
+              </span>
+            </span>
+          ) : naming === null ? (
+            <>
+              {target && (
+                <button type="button" title={t('voice.overwriteHint')} onClick={() => setOverwriting(true)}>
+                  {t('voice.overwrite', { name: targetName })}
+                </button>
+              )}
+              <button type="button" disabled={active !== null} title={active !== null ? t('voice.saveSame') : undefined} onClick={() => setNaming('')}>
+                {t('voice.save')}
+              </button>
+            </>
           ) : (
             <form
               className="voice-name"
@@ -102,6 +137,11 @@ export function VoicePicker({ params, onPick, editable }: { params: Params; onPi
                 {t('voice.cancel')}
               </button>
             </form>
+          )}
+          {changed && (
+            <button type="button" className="link" onClick={() => onPick(resetVoice(params, changed.id))}>
+              {t('voice.reset', { name: voiceName(changed, t) })}
+            </button>
           )}
           {hidden > 0 && (
             <button type="button" className="link" onClick={() => onPick(restoreVoices())}>

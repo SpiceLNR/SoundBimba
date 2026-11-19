@@ -67,6 +67,60 @@ describe('own voices', () => {
     expect(voicesOf(p).find((v) => v.id === 'alien')!.params).toEqual({ pitch: 3, robot: 0, radio: 0, echo: 0.25, wobble: 0.7, formant: 0, growl: 0, chorus: 0, hall: 0, tone: 0, lowcut: 0, bright: 0 });
   });
 
+  it('overwrites the last picked own voice with the current sliders', async () => {
+    const { addVoice, overwritable, overwriteVoice, voiceOf, voicesOf } = await import('./morpher');
+    let p: Record<string, unknown> = { pitch: -3, robot: 0.4 };
+    p = { ...p, ...addVoice(p, 'Мой бас') };
+    p = { ...p, ...addVoice({ ...p, pitch: 6 }, 'Писк'), pitch: 6 };
+    // Выбрали «Мой бас» (как кнопка в списке) — ползунки те же, перезаписывать нечего.
+    p = { ...p, ...voicesOf(p).find((v) => v.id === 'c1')!.params, lastVoice: 'c1' };
+    expect(overwritable(p)).toBeNull();
+    // Подвинули ползунок — можно перезаписать «Мой бас».
+    p = { ...p, echo: 0.5 };
+    expect(overwritable(p)).toMatchObject({ id: 'c1', custom: true, name: 'Мой бас' });
+    p = { ...p, ...overwriteVoice(p, 'c1') };
+    expect(voiceOf(p)).toBe('c1');
+    expect(overwritable(p)).toBeNull();
+    const own = voicesOf(p).filter((v) => v.custom);
+    // Название и порядок прежние, второй голос не тронут.
+    expect(own.map((v) => [v.id, v.name])).toEqual([['c1', 'Мой бас'], ['c2', 'Писк']]);
+    expect(own[0].params).toMatchObject({ pitch: -3, robot: 0.4, echo: 0.5 });
+    expect(own[1].params).toMatchObject({ pitch: 6, robot: 0.4, echo: 0 });
+  });
+
+  it('a built-in voice is overwritten only in this node and can be reset', async () => {
+    const { overwritable, overwriteVoice, resetVoice, voiceOf, voicesOf, VOICES } = await import('./morpher');
+    const original = VOICES.find((v) => v.id === 'alien')!.params;
+    // Выбрали «Пришельца», подвинули ползунок — можно перезаписать.
+    let p: Record<string, unknown> = { ...original, lastVoice: 'alien', echo: 0.9 };
+    expect(overwritable(p)?.id).toBe('alien');
+    p = { ...p, ...overwriteVoice(p, 'alien') };
+    expect(voiceOf(p)).toBe('alien');
+    const shown = voicesOf(p).find((v) => v.id === 'alien')!;
+    expect(shown).toMatchObject({ custom: false, changed: true, params: { ...original, echo: 0.9 } });
+    // В программе «Пришелец» прежний; другой узел его перезаписи не видит.
+    expect(VOICES.find((v) => v.id === 'alien')!.params).toEqual(original);
+    expect(voicesOf({}).find((v) => v.id === 'alien')!.params).toEqual(original);
+    // «Вернуть как было»: голос снова прежний и сразу выбран.
+    p = { ...p, ...resetVoice(p, 'alien') };
+    expect(voicesOf(p).find((v) => v.id === 'alien')).toMatchObject({ changed: false, params: original });
+    expect(voiceOf(p)).toBe('alien');
+  });
+
+  it('"normal" and removed voices cannot be overwritten', async () => {
+    const { overwritable, overwriteVoice, removeVoice, voiceOverrides } = await import('./morpher');
+    // «Обычный» — путь обратно к исходному голосу, его не перезаписать.
+    const normal = { lastVoice: 'normal', echo: 0.5 };
+    expect(overwritable(normal)).toBeNull();
+    expect(overwriteVoice(normal, 'normal')).toEqual({});
+    expect(voiceOverrides({ voiceOverrides: { normal: { echo: 1 }, nope: { echo: 1 }, cave: 5 } })).toEqual({});
+    // Свой голос убрали — перезаписывать некого.
+    let p: Record<string, unknown> = { voices: [{ id: 'c1', name: 'А', params: { pitch: 1 } }], lastVoice: 'c1', pitch: 2 };
+    expect(overwritable(p)?.id).toBe('c1');
+    p = { ...p, ...removeVoice(p, 'c1') };
+    expect(overwritable(p)).toBeNull();
+  });
+
   it('broken voice entries in a file are skipped', async () => {
     const { voicesOf } = await import('./morpher');
     const p = { voices: [null, 5, { id: 'c1' }, { id: 'c2', name: 'Ок', params: { pitch: 2, robot: 'x' } }] };
