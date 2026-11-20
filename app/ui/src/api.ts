@@ -161,7 +161,8 @@ export const previewShot = shot !== null;
 const previewProject: Project = {
   schema: 1,
   nodes: [
-    { id: 'n1', type: 'app-source', pos: [0, 0], params: { exe: '' } },
+    // На снимках (темы, README) программа выбрана — без красной подсказки «программа не выбрана».
+    { id: 'n1', type: 'app-source', pos: [0, 0], params: { exe: shot ? 'chrome.exe' : '' } },
     { id: 'n2', type: 'mic-input', pos: [0, 160], params: { device: 'default' } },
     { id: 'n3', type: 'volume', pos: [260, 0], params: { gain: 1, mute: false } },
     { id: 'n4', type: 'virtual-out', pos: [520, 60], params: { device: 'virtual-1' } },
@@ -257,7 +258,7 @@ export function onAudioState(handler: (s: AudioState) => void): () => void {
       for (const n of previewProject.nodes) levels[n.id] = previewEnabled ? Math.random() * 0.6 : 0;
       const status: Record<string, NodeStatus> = {};
       for (const n of previewProject.nodes) status[n.id] = previewEnabled ? 'ok' : 'off';
-      if (previewEnabled) status.n1 = 'app-not-chosen';
+      if (previewEnabled && !shot) status.n1 = 'app-not-chosen';
       for (const b of Object.values(previewPlaying)) {
         if (!b.playing) continue;
         b.pos += 0.066;

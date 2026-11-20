@@ -4,6 +4,8 @@
 
 [Русский](README.md) · **English** · [Українська](README.uk.md)
 
+<p align="center"><a href="https://boosty.to/int3rw3b"><img src="assets/boosty-en.svg" alt="Support on Boosty" height="40"></a></p>
+
 SoundBimba is a free Windows program where you build sound like a diagram: sources on the left,
 outputs on the right, wires in between. No internet, no ads, no telemetry.
 
@@ -13,8 +15,12 @@ outputs on the right, wires in between. No internet, no ads, no telemetry.
 - **Button panel** — a separate always-on-top window; **simple mode** without the map.
 - **Ready-made setups** in one click and a virtual cable wizard for beginners. Save your own maps
   as templates — `.bmb` files that are easy to share (they open with a double click).
-- Languages: Russian, English, Ukrainian. Themes "Bimba" and "Metro".
+- Languages: Russian, English, Ukrainian. Nine themes; the default is the dark "Bimba".
 - Hotkeys work only inside the SoundBimba window (they don't interfere with games) and can be remapped.
+
+## What it looks like
+
+<p align="center"><img src="assets/screenshot.png" alt="SoundBimba: a sound scheme in the Bimba theme" width="900"></p>
 
 ## Requirements
 
